@@ -1,0 +1,71 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 30s linear infinite;
+}
+
+.animate-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* Add smooth transitions for FAQ sections */
+.faq-answer {
+  transition: max-height 0.3s ease-in-out;
+}
+
+/* Add hover effects for client logos */
+.client-logo {
+  transition: transform 0.3s ease-in-out;
+}
+
+.client-logo:hover {
+  transform: scale(1.05);
+}
+
+:root {
+  --visitrack-cyan: #00B2E3;
+  --visitrack-blue: #4f46e5;
+}
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  body {
+    @apply antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4f46e5] hover:bg-[#4338ca] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4f46e5];
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center px-4 py-2 border border-[#4f46e5] text-sm font-medium rounded-md text-[#4f46e5] bg-white hover:bg-opacity-10 hover:bg-[#4f46e5] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4f46e5];
+  }
+
+  .visitrack-gradient {
+    @apply bg-gradient-to-r from-[#00B2E3] to-[#4f46e5];
+  }
+  
+  .visitrack-button {
+    @apply px-4 py-2 text-white rounded-md bg-[#4f46e5] hover:bg-[#4338ca] transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-[#4f46e5] focus:ring-offset-2;
+  }
+
+  .visitrack-input {
+    @apply mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#4f46e5] focus:ring-[#4f46e5];
+  }
+} 
