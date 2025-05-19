@@ -1,6 +1,36 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  transpilePackages: [
+    '@ant-design/icons-svg',
+    'rc-util',
+    'rc-pagination',
+    'rc-picker',
+    'rc-table',
+    'rc-tree',
+    'rc-dialog',
+    'rc-drawer',
+    'rc-cascader',
+    'rc-select',
+    'rc-tree-select',
+    '@rc-component/color-picker',
+    '@rc-component/trigger',
+    '@rc-component/tour',
+    '@rc-component/portal',
+    '@rc-component/util',
+    '@ctrl/tinycolor',
+    'rc-motion',
+    'rc-field-form',
+    'rc-dropdown',
+    'rc-menu',
+    'rc-input',
+    'rc-textarea',
+    'rc-tooltip',
+    'rc-virtual-list'
+  ],
+  experimental: {
+    esmExternals: true
+  },
   images: {
     remotePatterns: [
       {
@@ -11,10 +41,27 @@ const nextConfig = {
     domains: ['images.unsplash.com'],
     unoptimized: true,
   },
-  experimental: {
-    optimizeCss: true,
-  },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        path: false,
+        module: false,
+      };
+    }
+    
+    config.module = {
+      ...config.module,
+      exprContextCritical: false,
+    };
+
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@': require('path').resolve(__dirname, './src'),
+      '@admin': require('path').resolve(__dirname, './src/components/admin'),
+    };
+
     config.module.rules.push({
       test: /\.svg$/,
       use: ['@svgr/webpack'],
