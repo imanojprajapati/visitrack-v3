@@ -7,37 +7,47 @@ import { UploadChangeParam } from 'antd/lib/upload';
 
 export function useEventForm() {
   const { messageApi } = useAppContext();
-  const [form] = Form.useForm<FormValues>();
-  const router = useRouter();  const handleImageUpload = useCallback((info: UploadChangeParam<UploadFile>) => {
+  const [form] = Form.useForm();
+  const router = useRouter();
+
+  const handleImageUpload = useCallback((info: UploadChangeParam<UploadFile>) => {
     const { status, response } = info.file;
     
     try {
       switch (status) {
         case 'uploading':
+          form.setFieldValue('banner', info.fileList);
           break;
         case 'done':
           if (response?.url) {
-            form.setFieldValue('banner', info.fileList);
+            const updatedFileList = info.fileList.map(file => ({
+              ...file,
+              url: file.response?.url || file.url,
+              status: 'done'
+            }));
+            form.setFieldValue('banner', updatedFileList);
             messageApi?.success('Image uploaded successfully');
           }
           break;
         case 'error':
           messageApi?.error('Failed to upload image');
+          form.setFieldValue('banner', []);
           break;
         case 'removed':
-          form.setFieldValue('banner', undefined);
+          form.setFieldValue('banner', []);
           break;
       }
     } catch (error) {
       console.error('Image upload error:', error);
       messageApi?.error('An error occurred while processing the image');
+      form.setFieldValue('banner', []);
     }
   }, [form, messageApi]);
-  const handleSubmit = async (values: FormValues) => {
+
+  const handleSubmit = async (values: FormValues, eventId?: string) => {
     try {
-      // Get the banner URL from the fileList if it exists
-      const banner = Array.isArray(values.banner) && values.banner.length > 0
-        ? values.banner[0]?.response?.url
+      const bannerUrl = Array.isArray(values.banner) && values.banner.length > 0
+        ? values.banner[0]?.response?.url || values.banner[0]?.url
         : values.banner;
 
       const formattedValues = {
@@ -48,30 +58,36 @@ export function useEventForm() {
         endDate: values.date?.format('YYYY-MM-DD'), // Same as start date if no end date provided
         time: values.time,
         location: values.venue,
+        venue: values.venue, // Add venue field explicitly
         organizer: 'Admin', // Default organizer
         status: values.status,
         capacity: values.capacity,
-        banner,
+        banner: bannerUrl, // Use the extracted banner URL
         registrationDeadline: values.registrationDeadline?.format('YYYY-MM-DD'),
       };
 
       const cleanedValues = Object.fromEntries(
-        Object.entries(formattedValues).filter(([_, v]) => v !== null)
+        Object.entries(formattedValues).filter(([_, v]) => v !== null && v !== undefined)
       );
       
-      const response = await fetch('/api/events', {
-        method: 'POST',
+      const url = eventId ? `/api/events/${eventId}` : '/api/events';
+      const method = eventId ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(cleanedValues),
-      });      if (!response.ok) {
+      });
+
+      if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create event');
+        throw new Error(errorData.error || `Failed to ${eventId ? 'update' : 'create'} event`);
       }
 
       messageApi?.success({
-        content: 'Event created successfully',
+        content: `Event ${eventId ? 'updated' : 'created'} successfully`,
         key: 'event-save',
       });
 
@@ -80,8 +96,9 @@ export function useEventForm() {
       
       return true;
     } catch (error) {
+      console.error('Event save error:', error);
       messageApi?.error({
-        content: 'Failed to create event',
+        content: `Failed to ${eventId ? 'update' : 'create'} event`,
         key: 'event-save',
       });
       return false;
