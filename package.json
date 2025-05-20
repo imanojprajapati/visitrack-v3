@@ -25,10 +25,12 @@
     "canvas": "^3.1.0",
     "critters": "^0.0.23",
     "dayjs": "^1.11.13",
+    "formidable": "^3.5.4",
     "googleapis": "^148.0.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^3.0.1",
     "jsqr": "^1.4.0",
+    "mongodb": "^5.7.0",
     "next": "^14.1.0",
     "nodemailer": "^7.0.2",
     "postcss": "^8.4.35",
@@ -43,13 +45,16 @@
     "react-webcam": "^7.2.0",
     "recharts": "^2.15.3",
     "sharp": "^0.34.1",
-    "tailwindcss": "^3.4.1"
+    "tailwindcss": "^3.4.1",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@tailwindcss/forms": "^0.5.10",
+    "@types/formidable": "^3.4.5",
     "@types/node": "^20.11.19",
     "@types/react": "^18.2.57",
     "@types/react-dom": "^18.2.19",
+    "@types/uuid": "^9.0.8",
     "eslint": "^8.56.0",
     "eslint-config-next": "^14.1.0",
     "typescript": "^5.3.3"

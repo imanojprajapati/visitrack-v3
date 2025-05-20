@@ -1,16 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   Button,
   Modal,
   Form,
   Input,
-  Switch,
   Space,
   Upload,
-  message,
   Card,
-  Tabs,
   Select,
   InputNumber,
   Progress,
@@ -23,30 +20,18 @@ import {
   PlusOutlined,
   EditOutlined,
   DeleteOutlined,
-  UploadOutlined,
   EyeOutlined,
-  LinkOutlined,
-  CalendarOutlined
 } from '@ant-design/icons';
 import { DatePicker, dayjs } from '../../utils/date';
 import AdminLayout from './layout';
+import { useAppContext } from '../../context/AppContext';
+import { useEventForm } from '../../hooks/useEventForm';
 
-const { TabPane } = Tabs;
 const { TextArea } = Input;
 
-interface Event {
-  id: number;
-  title: string;
-  venue: string;
-  date: string;
-  time: string;
-  status: 'active' | 'upcoming' | 'completed' | 'cancelled';
-  visitors: number;
-  capacity: number;
-  description: string;
-  banner?: string;
-  registrationDeadline?: string;
-}interface FormValues {
+import type { Event } from '../../types/event';
+
+export interface FormValues {
   title: string;
   venue: string;
   date: any; // dayjs object
@@ -59,65 +44,59 @@ interface Event {
 }
 
 export default function EventManagement() {
-  const [form] = Form.useForm<FormValues>();
+  const { messageApi } = useAppContext();
+  const { form, handleSubmit, handleImageUpload } = useEventForm();
   const [modalVisible, setModalVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState('1');
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
-
-  // Mock data - replace with API calls later
-  const events: Event[] = [
-    {
-      id: 1,
-      title: 'Tech Conference 2024',
-      venue: 'Convention Center',
-      date: '2024-03-15',
-      time: '09:00',
-      status: 'active',
-      visitors: 1200,
-      capacity: 1500,
-      description: 'Annual technology conference featuring industry leaders and innovators.',
-      banner: '/images/events/tech-conference.jpg'
-    },
-    {
-      id: 2,
-      title: 'Startup Expo',
-      venue: 'Innovation Hub',
-      date: '2024-04-20',
-      time: '10:00',
-      status: 'upcoming',
-      visitors: 800,
-      capacity: 1000,
-      description: 'Showcase of emerging startups and entrepreneurial innovations.',
-      banner: '/images/events/startup-expo.jpg'
-    },
-  ];
+  const [events, setEvents] = useState<Event[]>([]);
+  
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        const response = await fetch('/api/events');
+        if (!response.ok) {
+          throw new Error('Failed to fetch events');
+        }
+        const data = await response.json();
+        setEvents(data);
+      } catch (error) {
+        console.error('Failed to fetch events:', error);
+      }
+    };
+    
+    fetchEvents();
+  }, []);
 
   const columns: TableProps<Event>['columns'] = [
     {
       title: 'Event',
       dataIndex: 'title',
       key: 'title',
-      render: (text, record) => (
+      render: (text: string, record: Event) => (
         <Space>
-          <img 
-            src={record.banner} 
-            alt={text} 
-            style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 4 }}
-          />
+          {record.banner && (
+            <div style={{ width: 40, height: 40, position: 'relative', overflow: 'hidden', borderRadius: 4 }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img 
+                src={record.banner} 
+                alt={text}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+            </div>
+          )}
           <div>
             <div className="font-medium">{text}</div>
-            <div className="text-sm text-gray-500">{record.venue}</div>
+            <div className="text-sm text-gray-500">{record.location}</div>
           </div>
         </Space>
       ),
     },
     {
       title: 'Date & Time',
-      dataIndex: 'date',
       key: 'date',
-      render: (date, record) => (
+      render: (_, record) => (
         <div>
-          <div>{date}</div>
+          <div>{record.startDate}</div>
           <div className="text-sm text-gray-500">{record.time}</div>
         </div>
       ),
@@ -128,11 +107,11 @@ export default function EventManagement() {
       render: (_, record) => (
         <div>
           <Progress 
-            percent={Math.round((record.visitors / record.capacity) * 100)} 
+            percent={record.visitors ? Math.round((record.visitors / record.capacity) * 100) : 0} 
             size="small"
           />
           <div className="text-sm text-gray-500">
-            {record.visitors} / {record.capacity} visitors
+            {record.visitors || 0} / {record.capacity} visitors
           </div>
         </div>
       ),
@@ -140,7 +119,8 @@ export default function EventManagement() {
     {
       title: 'Status',
       dataIndex: 'status',
-      key: 'status',      render: (status: Event['status']) => {
+      key: 'status',
+      render: (status: Event['status']) => {
         const colors: Record<Event['status'], string> = {
           active: 'green',
           upcoming: 'blue',
@@ -181,26 +161,39 @@ export default function EventManagement() {
             danger
             onClick={() => {
               // Implement delete functionality
-              message.success('Event deleted successfully');
+              messageApi?.success('Event deleted successfully');
             }}
           />
         </Space>
       ),
     },
-  ];
-  const handleSubmit = (values: FormValues) => {
-    // Convert dayjs objects to string format
-    const formattedValues = {
-      ...values,
-      date: values.date?.format('YYYY-MM-DD'),
-      registrationDeadline: values.registrationDeadline?.format('YYYY-MM-DD'),
+  ];  
+
+  const getInitialValues = (event: Event | null) => {
+    if (!event) return undefined;
+
+    // Convert banner URL to fileList format that Upload component expects
+    const fileList = event.banner ? [{
+      uid: '-1',
+      name: event.banner.split('/').pop() || 'image.jpg',
+      status: 'done',
+      url: event.banner,
+    }] : undefined;
+
+    return {
+      ...event,
+      date: event.startDate ? dayjs(event.startDate) : undefined,
+      registrationDeadline: event.registrationDeadline ? dayjs(event.registrationDeadline) : undefined,
+      banner: fileList
     };
-    
-    console.log('Form values:', formattedValues);
-    // Implement form submission
-    message.success('Event saved successfully');
-    setModalVisible(false);
-    form.resetFields();
+  };
+
+  const onSubmit = async (values: FormValues) => {
+    const success = await handleSubmit(values);
+    if (success) {
+      setModalVisible(false);
+      form.resetFields();
+    }
   };
 
   return (
@@ -213,6 +206,7 @@ export default function EventManagement() {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => {
+                form.resetFields();
                 setSelectedEvent(null);
                 setModalVisible(true);
               }}
@@ -221,98 +215,57 @@ export default function EventManagement() {
             </Button>
           }
         >
-          <Tabs activeKey={activeTab} onChange={setActiveTab}>
-            <TabPane tab="All Events" key="1">
-              <Table
-                columns={columns}
-                dataSource={events}
-                rowKey="id"
-                pagination={{
-                  total: events.length,
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showTotal: (total) => `Total ${total} events`,
-                }}
-              />
-            </TabPane>
-            <TabPane tab="Active Events" key="2">
-              <Table
-                columns={columns}
-                dataSource={events.filter(e => e.status === 'active')}
-                rowKey="id"
-              />
-            </TabPane>
-            <TabPane tab="Upcoming Events" key="3">
-              <Table
-                columns={columns}
-                dataSource={events.filter(e => e.status === 'upcoming')}
-                rowKey="id"
-              />
-            </TabPane>
-          </Tabs>
+          <Table
+            columns={columns}
+            dataSource={events}
+            rowKey="id"
+            pagination={{
+              total: events.length,
+              pageSize: 10,
+              showSizeChanger: true,
+              showTotal: (total) => `Total ${total} events`,
+            }}
+          />
         </Card>
 
         <Modal
           title={selectedEvent ? 'Edit Event' : 'Create New Event'}
           open={modalVisible}
-          onCancel={() => setModalVisible(false)}
+          onCancel={() => {
+            form.resetFields();
+            setModalVisible(false);
+          }}
           footer={null}
           width={800}
-        >          <Form<FormValues>
+        >
+          <Form
             form={form}
             layout="vertical"
-            onFinish={handleSubmit}
-            initialValues={selectedEvent ? {
-              ...selectedEvent,
-              date: selectedEvent.date ? dayjs(selectedEvent.date) : undefined,
-              registrationDeadline: selectedEvent.registrationDeadline ? dayjs(selectedEvent.registrationDeadline) : undefined,
-            } : undefined}
+            onFinish={onSubmit}
+            initialValues={getInitialValues(selectedEvent)}
           >
             <Row gutter={16}>
               <Col span={16}>
                 <Form.Item
                   name="title"
                   label="Event Title"
-                  rules={[{ required: true }]}
-                >
-                  <Input />
-                </Form.Item>
-              </Col>
-              <Col span={8}>
-                <Form.Item
-                  name="status"
-                  label="Status"
-                  rules={[{ required: true }]}
-                >
-                  <Select>
-                    <Select.Option value="active">Active</Select.Option>
-                    <Select.Option value="upcoming">Upcoming</Select.Option>
-                    <Select.Option value="completed">Completed</Select.Option>
-                    <Select.Option value="cancelled">Cancelled</Select.Option>
                   </Select>
                 </Form.Item>
               </Col>
             </Row>
 
             <Row gutter={16}>
-              <Col span={12}>                <Form.Item
+              <Col span={12}>
+                <Form.Item
                   name="date"
-                  label="Event Date"                  rules={[
+                  label="Event Date"
+                  rules={[
                     { required: true, message: 'Please select the event date' },
-                    {
-                      validator: (_, value) => {
-                        if (!value || !dayjs(value).isValid()) {
-                          return Promise.reject('Please select a valid date');
-                        }
-                        return Promise.resolve();
-                      }
-                    }
                   ]}
                 >
                   <DatePicker 
                     style={{ width: '100%' }}
                     format="YYYY-MM-DD"
-                    allowClear={false}
                   />
                 </Form.Item>
               </Col>
@@ -320,7 +273,7 @@ export default function EventManagement() {
                 <Form.Item
                   name="time"
                   label="Event Time"
-                  rules={[{ required: true }]}
+                  rules={[{ required: true, message: 'Please enter event time' }]}
                 >
                   <Input />
                 </Form.Item>
@@ -330,7 +283,7 @@ export default function EventManagement() {
             <Form.Item
               name="venue"
               label="Venue"
-              rules={[{ required: true }]}
+              rules={[{ required: true, message: 'Please enter venue' }]}
             >
               <Input />
             </Form.Item>
@@ -340,27 +293,15 @@ export default function EventManagement() {
                 <Form.Item
                   name="capacity"
                   label="Capacity"
-                  rules={[{ required: true }]}
+                  rules={[{ required: true, message: 'Please enter capacity' }]}
                 >
-                  <InputNumber style={{ width: '100%' }} />
+                  <InputNumber style={{ width: '100%' }} min={1} />
                 </Form.Item>
               </Col>
-              <Col span={12}>                <Form.Item
+              <Col span={12}>
+                <Form.Item
                   name="registrationDeadline"
                   label="Registration Deadline"
-                  rules={[
-                    {                      validator: (_, value) => {
-                        if (value && !dayjs(value).isValid()) {
-                          return Promise.reject('Please select a valid date');
-                        }
-                        const eventDate = form.getFieldValue('date');
-                        if (value && eventDate && dayjs(value).isAfter(dayjs(eventDate))) {
-                          return Promise.reject('Registration deadline cannot be after event date');
-                        }
-                        return Promise.resolve();
-                      }
-                    }
-                  ]}
                 >
                   <DatePicker 
                     style={{ width: '100%' }}
@@ -375,31 +316,60 @@ export default function EventManagement() {
               label="Description"
             >
               <TextArea rows={4} />
-            </Form.Item>
-
-            <Form.Item
+            </Form.Item>            <Form.Item
               name="banner"
               label="Event Banner"
+              valuePropName="fileList"
+              getValueFromEvent={(e) => {
+                if (Array.isArray(e)) {
+                  return e;
+                }
+                return e?.fileList;
+              }}
             >
               <Upload
+                name="file"
                 action="/api/upload"
                 listType="picture-card"
                 maxCount={1}
                 accept="image/*"
+                showUploadList={{
+                  showPreviewIcon: true,
+                  showRemoveIcon: true,
+                }}
+                beforeUpload={(file) => {
+                  const isImage = file.type.startsWith('image/');
+                  if (!isImage) {
+                    messageApi?.error('You can only upload image files!');
+                    return false;
+                  }
+                  const isLt5M = file.size / 1024 / 1024 < 5;
+                  if (!isLt5M) {
+                    messageApi?.error('Image must be smaller than 5MB!');
+                    return false;
+                  }
+                  return true;
+                }}
+                onChange={handleImageUpload}
               >
-                <div>
-                  <PlusOutlined />
-                  <div style={{ marginTop: 8 }}>Upload</div>
-                </div>
+                {form.getFieldValue('banner')?.length >= 1 ? null : (
+                  <div>
+                    <PlusOutlined />
+                    <div style={{ marginTop: 8 }}>Upload</div>
+                  </div>
+                )}
               </Upload>
             </Form.Item>
 
-            <Form.Item className="mb-0">
+            <Form.Item>
               <Space>
                 <Button type="primary" htmlType="submit">
                   {selectedEvent ? 'Update Event' : 'Create Event'}
                 </Button>
-                <Button onClick={() => setModalVisible(false)}>
+                <Button onClick={() => {
+                  form.resetFields();
+                  setModalVisible(false);
+                }}>
                   Cancel
                 </Button>
               </Space>
@@ -409,12 +379,4 @@ export default function EventManagement() {
       </div>
     </AdminLayout>
   );
-}
-
-export async function getServerSideProps() {
-  return {
-    props: {
-      isAdminPage: true,
-    },
-  };
 }
