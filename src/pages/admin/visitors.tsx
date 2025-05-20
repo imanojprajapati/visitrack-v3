@@ -9,7 +9,6 @@ import {
   Form,
   Input,
   Select,
-  DatePicker,
   Upload,
   message,
   Popover,
@@ -18,6 +17,7 @@ import {
   Row,
   Col
 } from 'antd';
+import type { ColumnType } from 'antd/es/table';
 import {
   ExportOutlined,
   ImportOutlined,
@@ -27,53 +27,65 @@ import {
   DownloadOutlined,
   UserOutlined
 } from '@ant-design/icons';
+import { DatePicker } from '../../utils/date';
 import AdminLayout from './layout';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
+interface Visitor {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  designation: string;
+  event: string;
+  status: string;
+  registrationDate: string;
+  photo?: string;
+}
+
+interface SearchFormValues {
+  name?: string;
+  event?: string;
+  dateRange?: [string, string];
+  status?: string;
+}
+
 export default function VisitorManagement() {
-  const [form] = Form.useForm();
+  const [form] = Form.useForm<SearchFormValues>();
   const [showFilters, setShowFilters] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
-  const [selectedVisitor, setSelectedVisitor] = useState(null);
+  const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
 
   // Mock data - replace with API calls later
-  const visitors = [
+  const [visitors] = useState<Visitor[]>([
     {
       id: 1,
       name: 'John Doe',
       email: 'john@example.com',
       phone: '+1234567890',
       company: 'Tech Corp',
-      designation: 'Manager',
+      designation: 'Software Engineer',
       event: 'Tech Conference 2024',
-      registrationDate: '2024-03-01',
-      status: 'checked-in',
-      photo: null
-    },
-    // Add more mock data as needed
-  ];
+      status: 'registered',
+      registrationDate: '2024-03-15',
+      photo: undefined
+    }
+  ]);
 
-  const columns = [
+  const columns: ColumnType<Visitor>[] = [
     {
-      title: 'Visitor',
+      title: 'Name',
       dataIndex: 'name',
       key: 'name',
-      render: (text, record) => (
+      render: (text: string, record: Visitor) => (
         <Space>
-          <Avatar icon={<UserOutlined />} src={record.photo} />
-          <div>
-            <div>{text}</div>
-            <div className="text-sm text-gray-500">{record.email}</div>
-          </div>
+          <Avatar icon={<UserOutlined />} />
+          {text}
         </Space>
       ),
-    },
-    {
-      title: 'Company',
-      dataIndex: 'company',
-      key: 'company',
     },
     {
       title: 'Event',
@@ -81,16 +93,16 @@ export default function VisitorManagement() {
       key: 'event',
     },
     {
-      title: 'Registration Date',
-      dataIndex: 'registrationDate',
-      key: 'registrationDate',
+      title: 'Company',
+      dataIndex: 'company',
+      key: 'company',
     },
     {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status) => (
-        <Tag color={status === 'checked-in' ? 'green' : 'blue'}>
+      render: (status: string) => (
+        <Tag color={status === 'registered' ? 'blue' : 'green'}>
           {status.toUpperCase()}
         </Tag>
       ),
@@ -98,8 +110,8 @@ export default function VisitorManagement() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_, record) => (
-        <Space>
+      render: (_: any, record: Visitor) => (
+        <Space size="middle">
           <Button
             type="text"
             icon={<EyeOutlined />}
@@ -108,17 +120,25 @@ export default function VisitorManagement() {
               setShowProfile(true);
             }}
           />
-          <Popover content={<QRCode value={`VISITOR_${record.id}`} />} title="Visitor QR Code">
-            <Button type="text" icon={<DownloadOutlined />} />
+          <Popover
+            content={
+              <QRCode
+                value={JSON.stringify(record)}
+                size={200}
+              />
+            }
+            title="Visitor QR Code"
+            trigger="click"
+          >
+            <Button type="text">View QR</Button>
           </Popover>
         </Space>
       ),
     },
   ];
 
-  const handleSearch = (values) => {
+  const handleSearch = (values: SearchFormValues) => {
     console.log('Search values:', values);
-    // Implement search functionality
   };
 
   const handleExport = () => {

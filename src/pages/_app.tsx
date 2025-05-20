@@ -6,6 +6,8 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { ConfigProvider } from 'antd';
 import { StyleProvider } from '@ant-design/cssinjs';
+// Import dayjs
+import dayjs from '../utils/dayjs';
 
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();

@@ -5,7 +5,6 @@ import {
   Modal,
   Form,
   Input,
-  DatePicker,
   Switch,
   Space,
   Upload,
@@ -29,11 +28,11 @@ import {
   LinkOutlined,
   CalendarOutlined
 } from '@ant-design/icons';
+import { DatePicker, dayjs } from '../../utils/date';
 import AdminLayout from './layout';
 
 const { TabPane } = Tabs;
 const { TextArea } = Input;
-const { RangePicker } = DatePicker;
 
 interface Event {
   id: number;
@@ -46,18 +45,17 @@ interface Event {
   capacity: number;
   description: string;
   banner?: string;
-}
-
-interface FormValues {
+  registrationDeadline?: string;
+}interface FormValues {
   title: string;
   venue: string;
-  date: string;
+  date: any; // dayjs object
   time: string;
   status: Event['status'];
   capacity: number;
   description?: string;
   banner?: string;
-  registrationDeadline?: string;
+  registrationDeadline?: any; // dayjs object
 }
 
 export default function EventManagement() {
@@ -190,12 +188,19 @@ export default function EventManagement() {
       ),
     },
   ];
-
   const handleSubmit = (values: FormValues) => {
-    console.log('Form values:', values);
+    // Convert dayjs objects to string format
+    const formattedValues = {
+      ...values,
+      date: values.date?.format('YYYY-MM-DD'),
+      registrationDeadline: values.registrationDeadline?.format('YYYY-MM-DD'),
+    };
+    
+    console.log('Form values:', formattedValues);
     // Implement form submission
     message.success('Event saved successfully');
     setModalVisible(false);
+    form.resetFields();
   };
 
   return (
@@ -257,7 +262,11 @@ export default function EventManagement() {
             form={form}
             layout="vertical"
             onFinish={handleSubmit}
-            initialValues={selectedEvent || undefined}
+            initialValues={selectedEvent ? {
+              ...selectedEvent,
+              date: selectedEvent.date ? dayjs(selectedEvent.date) : undefined,
+              registrationDeadline: selectedEvent.registrationDeadline ? dayjs(selectedEvent.registrationDeadline) : undefined,
+            } : undefined}
           >
             <Row gutter={16}>
               <Col span={16}>
@@ -286,13 +295,25 @@ export default function EventManagement() {
             </Row>
 
             <Row gutter={16}>
-              <Col span={12}>
-                <Form.Item
+              <Col span={12}>                <Form.Item
                   name="date"
-                  label="Event Date"
-                  rules={[{ required: true }]}
+                  label="Event Date"                  rules={[
+                    { required: true, message: 'Please select the event date' },
+                    {
+                      validator: (_, value) => {
+                        if (!value || !dayjs(value).isValid()) {
+                          return Promise.reject('Please select a valid date');
+                        }
+                        return Promise.resolve();
+                      }
+                    }
+                  ]}
                 >
-                  <DatePicker style={{ width: '100%' }} />
+                  <DatePicker 
+                    style={{ width: '100%' }}
+                    format="YYYY-MM-DD"
+                    allowClear={false}
+                  />
                 </Form.Item>
               </Col>
               <Col span={12}>
@@ -324,12 +345,27 @@ export default function EventManagement() {
                   <InputNumber style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
-              <Col span={12}>
-                <Form.Item
+              <Col span={12}>                <Form.Item
                   name="registrationDeadline"
                   label="Registration Deadline"
+                  rules={[
+                    {                      validator: (_, value) => {
+                        if (value && !dayjs(value).isValid()) {
+                          return Promise.reject('Please select a valid date');
+                        }
+                        const eventDate = form.getFieldValue('date');
+                        if (value && eventDate && dayjs(value).isAfter(dayjs(eventDate))) {
+                          return Promise.reject('Registration deadline cannot be after event date');
+                        }
+                        return Promise.resolve();
+                      }
+                    }
+                  ]}
                 >
-                  <DatePicker style={{ width: '100%' }} />
+                  <DatePicker 
+                    style={{ width: '100%' }}
+                    format="YYYY-MM-DD"
+                  />
                 </Form.Item>
               </Col>
             </Row>

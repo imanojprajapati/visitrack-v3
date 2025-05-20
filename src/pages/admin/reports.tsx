@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Card, Table, DatePicker, Select, Button, Space, Tabs } from 'antd';
+import { Card, Table, Select, Button, Space, Tabs } from 'antd';
 import { DownloadOutlined } from '@ant-design/icons';
+import { DatePicker } from '../../utils/date';
 import AdminLayout from './layout';
 
 const { RangePicker } = DatePicker;

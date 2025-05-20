@@ -1,11 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import nodemailer from 'nodemailer';
 
-type ContactData = {
+type DemoRequestData = {
+  companyName: string;
   name: string;
   email: string;
-  subject: string;
-  message: string;
+  phone: string;
+  companySize: string;
+  requirements: string;
 };
 
 export default async function handler(
@@ -17,10 +19,17 @@ export default async function handler(
   }
 
   try {
-    const { name, email, subject, message }: ContactData = req.body;
+    const {
+      companyName,
+      name,
+      email,
+      phone,
+      companySize,
+      requirements
+    }: DemoRequestData = req.body;
 
     // Input validation
-    if (!name || !email || !subject || !message) {
+    if (!companyName || !name || !email || !phone || !companySize || !requirements) {
       return res.status(400).json({ error: 'All fields are required' });
     }
 
@@ -47,29 +56,48 @@ export default async function handler(
       from: process.env.GMAIL_USER,
       to: process.env.GMAIL_USER, // Send to yourself
       replyTo: email,
-      subject: `Contact Form: ${subject}`,
+      subject: `Demo Request from ${companyName}`,
       text: `
+        New Demo Request
+
+        Company Details:
+        ----------------
+        Company Name: ${companyName}
+        Company Size: ${companySize}
+
+        Contact Information:
+        -------------------
         Name: ${name}
         Email: ${email}
-        Subject: ${subject}
-        Message: ${message}
+        Phone: ${phone}
+
+        Requirements:
+        ------------
+        ${requirements}
       `,
       html: `
-        <h3>New Contact Form Submission</h3>
+        <h2>New Demo Request</h2>
+
+        <h3>Company Details:</h3>
+        <p><strong>Company Name:</strong> ${companyName}</p>
+        <p><strong>Company Size:</strong> ${companySize}</p>
+
+        <h3>Contact Information:</h3>
         <p><strong>Name:</strong> ${name}</p>
         <p><strong>Email:</strong> ${email}</p>
-        <p><strong>Subject:</strong> ${subject}</p>
-        <p><strong>Message:</strong></p>
-        <p>${message.replace(/\n/g, '<br>')}</p>
+        <p><strong>Phone:</strong> ${phone}</p>
+
+        <h3>Requirements:</h3>
+        <p>${requirements.replace(/\n/g, '<br>')}</p>
       `,
     };
 
     // Send email
     await transporter.sendMail(mailOptions);
 
-    res.status(200).json({ message: 'Message sent successfully!' });
+    res.status(200).json({ message: 'Demo request sent successfully!' });
   } catch (error) {
-    console.error('Contact form error:', error);
-    res.status(500).json({ error: 'Failed to send message. Please try again later.' });
+    console.error('Demo request error:', error);
+    res.status(500).json({ error: 'Failed to send demo request. Please try again later.' });
   }
 }
