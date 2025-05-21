@@ -23,7 +23,7 @@ interface MainLayoutProps {
 const menuItems = [
   { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard', path: '/admin' },
   { key: 'visitors', icon: <UserOutlined />, label: 'Visitor Management', path: '/admin/visitors' },
-  { key: 'badges', icon: <IdcardOutlined />, label: 'Badge Management', path: '/admin/badges' },
+  { key: 'badges', icon: <IdcardOutlined />, label: 'Badge Management', path: '/admin/badge-management' },
   { key: 'events', icon: <CalendarOutlined />, label: 'Event Management', path: '/admin/events' },
   { key: 'forms', icon: <FormOutlined />, label: 'Form Builder', path: '/admin/forms' },
   { key: 'messaging', icon: <MessageOutlined />, label: 'Messaging', path: '/admin/messaging' },
