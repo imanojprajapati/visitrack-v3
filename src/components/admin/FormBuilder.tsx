@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Input, Select, Button, Space, Card, Switch, InputNumber, message } from 'antd';
 import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
-import { FormField, FormFieldType } from '../../types/form';
+import { FormField, FormFieldType, EventForm } from '../../types/form';
 import { Event } from '../../types/event';
 import { useAppContext } from '../../context/AppContext';
 
@@ -9,9 +9,10 @@ const { Option } = Select;
 
 interface FormBuilderProps {
   onSave: (formData: { eventId: string; title: string; fields: FormField[] }) => Promise<void>;
+  initialData?: EventForm;
 }
 
-export default function FormBuilder({ onSave }: FormBuilderProps) {
+export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
   const [form] = Form.useForm();
   const [events, setEvents] = useState<Event[]>([]);
   const [fields, setFields] = useState<FormField[]>([]);
@@ -33,6 +34,17 @@ export default function FormBuilder({ onSave }: FormBuilderProps) {
 
     fetchEvents();
   }, [messageApi]);
+
+  // Initialize form with initialData if provided
+  useEffect(() => {
+    if (initialData) {
+      form.setFieldsValue({
+        eventId: initialData.eventId,
+        title: initialData.title,
+      });
+      setFields(initialData.fields);
+    }
+  }, [initialData, form]);
 
   const addField = () => {
     const newField: FormField = {

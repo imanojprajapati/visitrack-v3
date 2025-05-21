@@ -85,13 +85,13 @@ export default function FormsPage() {
           <Button
             type="text"
             icon={<EditOutlined />}
-            onClick={() => router.push(`/admin/forms/edit/${record.id}`)}
+            onClick={() => router.push(`/admin/forms/edit/${record._id}`)}
           />
           <Button
             type="text"
             danger
             icon={<DeleteOutlined />}
-            onClick={() => handleDeleteForm(record.id)}
+            onClick={() => handleDeleteForm(record._id)}
           />
         </Space>
       ),
@@ -137,7 +137,7 @@ export default function FormsPage() {
             <Table
               columns={columns}
               dataSource={forms}
-              rowKey="id"
+              rowKey="_id"
               loading={loading}
             />
           </Card>
