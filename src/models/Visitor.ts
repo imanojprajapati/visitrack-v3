@@ -54,7 +54,6 @@ const visitorSchema = new mongoose.Schema({
   },
   age: {
     type: Number,
-    required: true,
   },
   eventName: {
     type: String,
@@ -86,10 +85,16 @@ const visitorSchema = new mongoose.Schema({
     type: Date,
   },
   additionalData: {
-    type: Map,
-    of: mongoose.Schema.Types.Mixed,
-    default: {},
-  }
+    type: mongoose.Schema.Types.Mixed,
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now,
+  },
 }, {
   timestamps: true,
 });
@@ -99,5 +104,11 @@ visitorSchema.index({ eventId: 1, status: 1 });
 visitorSchema.index({ email: 1 });
 visitorSchema.index({ phone: 1 });
 visitorSchema.index({ createdAt: -1 });
+
+// Update the updatedAt timestamp before saving
+visitorSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
 
 export default mongoose.models.Visitor || mongoose.model<IVisitor>('Visitor', visitorSchema); 

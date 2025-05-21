@@ -31,6 +31,7 @@ import {
 import { DatePicker } from '../../utils/date';
 import AdminLayout from './layout';
 import { useRouter } from 'next/router';
+import moment from 'moment';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -49,6 +50,7 @@ interface Visitor {
   email: string;
   phone: string;
   age: number;
+  eventId: string;
   eventName: string;
   eventLocation: string;
   eventStartDate: Date;
@@ -62,10 +64,10 @@ interface Visitor {
 }
 
 interface SearchFormValues {
-  search: string;
-  eventId: string;
-  dateRange: [Date, Date];
-  status: 'registered' | 'checked_in' | 'checked_out' | 'cancelled';
+  search?: string;
+  eventId?: string;
+  status?: Visitor['status'];
+  dateRange?: [moment.Moment, moment.Moment];
 }
 
 export default function VisitorsPage() {
@@ -198,24 +200,27 @@ export default function VisitorsPage() {
   const handleSearch = (values: SearchFormValues) => {
     let filtered = [...visitors];
 
-    // Filter by search term (name)
+    // Filter by search term (name, email, or phone)
     if (values.search) {
       const searchTerm = values.search.toLowerCase();
       filtered = filtered.filter(visitor => 
-        visitor.name.toLowerCase().includes(searchTerm)
+        visitor.name.toLowerCase().includes(searchTerm) ||
+        visitor.email.toLowerCase().includes(searchTerm) ||
+        visitor.phone.toLowerCase().includes(searchTerm)
       );
     }
 
     // Filter by event
     if (values.eventId) {
       filtered = filtered.filter(visitor => 
-        visitor.eventName === values.eventId
+        visitor.eventId === values.eventId
       );
     }
 
     // Filter by date range
-    if (values.dateRange) {
-      const [startDate, endDate] = values.dateRange;
+    if (values.dateRange && values.dateRange[0] && values.dateRange[1]) {
+      const startDate = values.dateRange[0].startOf('day').toDate();
+      const endDate = values.dateRange[1].endOf('day').toDate();
       filtered = filtered.filter(visitor => {
         const visitorDate = new Date(visitor.createdAt);
         return visitorDate >= startDate && visitorDate <= endDate;
@@ -324,30 +329,16 @@ export default function VisitorsPage() {
   );
 
   const QRCodeModal = () => {
-    const generateVCard = (visitor: Visitor) => {
-      // Format dates for vCard
-      const formatDate = (date: Date | string) => {
-        if (!date) return '';
-        const d = new Date(date);
-        return d.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-      };
-
-      // Create vCard string
-      const vCard = [
-        'BEGIN:VCARD',
-        'VERSION:3.0',
-        `FN:${visitor.name}`,
-        `TEL;TYPE=CELL:${visitor.phone}`,
-        `EMAIL:${visitor.email}`,
-        `ORG:${visitor.eventName}`,
-        `NOTE:Event Location: ${visitor.eventLocation}`,
-        `NOTE:Event Date: ${formatDate(visitor.eventStartDate)}`,
-        `NOTE:Status: ${formatStatus(visitor.status)}`,
-        'END:VCARD'
-      ].join('\n');
-
-      return vCard;
+    const generateVisitorURL = (visitor: Visitor) => {
+      // Use the IP address to generate the URL with visitorId parameter
+      return `http://192.168.29.163:3000/visitor/${visitor._id}`;
     };
+
+    if (!selectedVisitor) {
+      return null;
+    }
+
+    const visitorUrl = generateVisitorURL(selectedVisitor);
 
     return (
       <Modal
@@ -360,28 +351,26 @@ export default function VisitorsPage() {
         footer={null}
         width={400}
       >
-        {selectedVisitor && (
-          <div className="text-center">
-            <QRCode
-              value={generateVCard(selectedVisitor)}
-              size={256}
-              className="mx-auto mb-4"
-              errorLevel="H"
-            />
-            <p className="text-sm text-gray-600 mb-2">
-              Scan this QR code to save visitor contact information
-            </p>
-            <p className="text-sm font-medium">
-              {selectedVisitor.name}
-            </p>
-            <p className="text-sm text-gray-600">
-              {selectedVisitor.eventName}
-            </p>
-            <p className="text-xs text-gray-500 mt-2">
-              When scanned, this QR code will show the visitor's contact details directly on your phone
-            </p>
-          </div>
-        )}
+        <div className="text-center">
+          <QRCode
+            value={visitorUrl}
+            size={256}
+            className="mx-auto mb-4"
+            errorLevel="M"
+          />
+          <p className="text-sm text-gray-600 mb-2">
+            Scan this QR code to view visitor details
+          </p>
+          <p className="text-sm font-medium">
+            {selectedVisitor.name}
+          </p>
+          <p className="text-sm text-gray-600">
+            {selectedVisitor.eventName}
+          </p>
+          <p className="text-xs text-gray-500 mt-2">
+            Opens visitor details in browser
+          </p>
+        </div>
       </Modal>
     );
   };
@@ -419,7 +408,7 @@ export default function VisitorsPage() {
               <Row gutter={16}>
                 <Col span={6}>
                   <Form.Item name="search" label="Search">
-                    <Input prefix={<SearchOutlined />} placeholder="Search by name" />
+                    <Input prefix={<SearchOutlined />} placeholder="Search by name, email, or phone" />
                   </Form.Item>
                 </Col>
                 <Col span={6}>

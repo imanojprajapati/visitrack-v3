@@ -6,8 +6,8 @@ export interface IEvent extends Document {
   location: string;
   startDate: Date;
   endDate: Date;
-  capacity: number;
-  status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
+  formId: mongoose.Types.ObjectId;
+  status: 'draft' | 'published' | 'cancelled';
   createdAt: Date;
   updatedAt: Date;
 }
@@ -16,37 +16,55 @@ const eventSchema = new mongoose.Schema({
   title: {
     type: String,
     required: true,
-    trim: true,
+    trim: true
   },
   description: {
     type: String,
-    required: true,
+    trim: true
   },
   location: {
     type: String,
     required: true,
+    trim: true
   },
   startDate: {
     type: Date,
-    required: true,
+    required: true
   },
   endDate: {
     type: Date,
-    required: true,
+    required: true
   },
-  capacity: {
-    type: Number,
-    required: true,
-    min: 1,
+  formId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Form',
+    required: true
   },
   status: {
     type: String,
-    enum: ['upcoming', 'ongoing', 'completed', 'cancelled'],
-    default: 'upcoming',
+    enum: ['draft', 'published', 'cancelled'],
+    default: 'draft'
   },
+  createdAt: {
+    type: Date,
+    default: Date.now
+  },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
 }, {
-  timestamps: true,
+  timestamps: true
 });
 
-// Create the model if it doesn't exist
+// Create indexes for common queries
+eventSchema.index({ status: 1, startDate: 1 });
+eventSchema.index({ createdAt: -1 });
+
+// Update the updatedAt timestamp before saving
+eventSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
+
 export default mongoose.models.Event || mongoose.model<IEvent>('Event', eventSchema); 

@@ -19,17 +19,16 @@ interface Visitor {
 
 export default function VisitorDetailsPage() {
   const router = useRouter();
-  const { visitorId } = router.query;
+  const { id } = router.query;
   const [visitor, setVisitor] = useState<Visitor | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchVisitor = async () => {
-      if (!visitorId) return;
+      if (!id) return;
 
       try {
-        // Use the visitors API endpoint
-        const response = await fetch(`/api/visitors/${visitorId}`);
+        const response = await fetch(`/api/visitors/${id}`);
         if (!response.ok) {
           if (response.status === 404) {
             message.error('Visitor not found');
@@ -39,7 +38,6 @@ export default function VisitorDetailsPage() {
           return;
         }
         const data = await response.json();
-        console.log('Fetched visitor data:', data); // Debug log
         setVisitor(data);
       } catch (error) {
         console.error('Error fetching visitor:', error);
@@ -49,10 +47,8 @@ export default function VisitorDetailsPage() {
       }
     };
 
-    if (visitorId) {
-      fetchVisitor();
-    }
-  }, [visitorId]);
+    fetchVisitor();
+  }, [id]);
 
   if (loading) {
     return (

@@ -1,54 +1,62 @@
 import mongoose, { Document } from 'mongoose';
-import { FormSubmission } from '../types/form';
 
-interface FormFieldData {
-  label: string;
-  value: any;
+export interface IRegistration extends Document {
+  eventId: mongoose.Types.ObjectId;
+  formId: mongoose.Types.ObjectId;
+  formData: Record<string, any>;
+  status: 'registered' | 'checked_in' | 'checked_out' | 'cancelled';
+  checkInTime?: Date;
+  checkOutTime?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-interface IRegistration extends Document {
-  _id: string;
-  formId: string;
-  eventId: string;
-  data: Record<string, FormFieldData>;
-  submittedAt: Date;
-  __v: number;
-}
-
-const formFieldDataSchema = new mongoose.Schema<FormFieldData>({
-  label: {
-    type: String,
-    required: true,
-  },
-  value: {
-    type: mongoose.Schema.Types.Mixed,
-    required: true,
-  },
-});
-
-const registrationSchema = new mongoose.Schema<IRegistration>({
-  formId: {
-    type: String,
-    required: true,
-  },
+const registrationSchema = new mongoose.Schema({
   eventId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
+    required: true
+  },
+  formId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Form',
+    required: true
+  },
+  formData: {
+    type: mongoose.Schema.Types.Mixed,
+    required: true
+  },
+  status: {
     type: String,
-    required: true,
+    enum: ['registered', 'checked_in', 'checked_out', 'cancelled'],
+    default: 'registered'
   },
-  data: {
-    type: Map,
-    of: formFieldDataSchema,
-    required: true,
+  checkInTime: {
+    type: Date
   },
-  submittedAt: {
+  checkOutTime: {
+    type: Date
+  },
+  createdAt: {
     type: Date,
-    default: Date.now,
+    default: Date.now
   },
+  updatedAt: {
+    type: Date,
+    default: Date.now
+  }
 }, {
-  versionKey: '__v'
+  timestamps: true
 });
 
-// Create and export the model
-const Registration = mongoose.models.Registration || mongoose.model<IRegistration>('Registration', registrationSchema);
+// Create indexes for common queries
+registrationSchema.index({ eventId: 1, status: 1 });
+registrationSchema.index({ createdAt: -1 });
 
-export default Registration; 
+// Update the updatedAt timestamp before saving
+registrationSchema.pre('save', function(next) {
+  this.updatedAt = new Date();
+  next();
+});
+
+export default mongoose.models.Registration || mongoose.model<IRegistration>('Registration', registrationSchema); 
