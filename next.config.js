@@ -10,6 +10,15 @@ const nextConfig = {
         pathname: '/uploads/**',
       },
     ],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+        pathname: '/dghizdjio/**',
+      },
+    ],
+    domains: ['res.cloudinary.com'],
+    unoptimized: true,
   },
   transpilePackages: [
     '@ant-design/icons-svg',
@@ -40,16 +49,6 @@ const nextConfig = {
   ],
   experimental: {
     esmExternals: true
-  },
-  images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
-    ],
-    domains: ['images.unsplash.com'],
-    unoptimized: true,
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -86,6 +85,15 @@ const nextConfig = {
           {
             key: 'Cache-Control',
             value: 'public, max-age=31536000, immutable',
+          },
+        ],
+      },
+      {
+        source: '/api/:path*',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'no-store, must-revalidate',
           },
         ],
       },
