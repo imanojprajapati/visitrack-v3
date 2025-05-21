@@ -6,74 +6,41 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import VideoBackground from '../components/VideoBackground';
-
-interface Event {
-  id: string;
-  name: string;
-  date: string;
-  location: string;
-  image: string;
-  description: string;
-}
+import { Event } from '../types/event';
 
 interface Feature {
-  name: string;
+  title: string;
   description: string;
-  image: string;
+  icon: string;
 }
 
 interface Client {
   name: string;
   logo: string;
-  width: number;
-  height: number;
 }
 
 const Home = () => {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
-  const [events, setEvents] = useState<Event[]>([
-    {
-      id: '1',
-      name: 'Tech Conference 2024',
-      date: 'March 15-17, 2024',
-      location: 'San Francisco, CA',
-      image: 'https://images.unsplash.com/photo-1505373877841-8d25f7d46678?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-      description: 'Join us for the biggest tech conference of the year featuring industry leaders and cutting-edge innovations.',
-    },
-    {
-      id: '2',
-      name: 'Marketing Summit',
-      date: 'April 5-7, 2024',
-      location: 'New York, NY',
-      image: 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-      description: 'Learn from marketing experts and discover the latest trends in digital marketing and brand strategy.',
-    },
-    {
-      id: '3',
-      name: 'Startup Expo',
-      date: 'May 10-12, 2024',
-      location: 'Austin, TX',
-      image: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-      description: 'Connect with innovative startups and investors at this premier startup networking event.',
-    },
-  ]);
+  const [events, setEvents] = useState<Event[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const [features, setFeatures] = useState<Feature[]>([
     {
-      name: 'Easy Registration',
+      title: 'Easy Registration',
       description: 'Streamline your event registration process with our user-friendly platform.',
-      image: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+      icon: 'https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
     },
     {
-      name: 'Real-time Analytics',
+      title: 'Real-time Analytics',
       description: 'Get instant insights into your event attendance and engagement.',
-      image: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+      icon: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
     },
     {
-      name: 'Quick Check-in',
+      title: 'Quick Check-in',
       description: 'Efficient check-in process with QR code scanning and digital badges.',
-      image: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
+      icon: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
     },
   ]);
 
@@ -81,38 +48,26 @@ const Home = () => {
     { 
       name: 'Google', 
       logo: 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-      width: 120,
-      height: 40
     },
     { 
       name: 'Amazon', 
       logo: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-      width: 120,
-      height: 40
     },
     { 
       name: 'Apple', 
       logo: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-      width: 120,
-      height: 40
     },
     { 
       name: 'Microsoft', 
       logo: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-      width: 120,
-      height: 40
     },
     { 
       name: 'Meta', 
       logo: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-      width: 120,
-      height: 40
     },
     { 
       name: 'Netflix', 
       logo: 'https://images.unsplash.com/photo-1611162616305-c69b3fa7fbe0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-      width: 120,
-      height: 40
     },
   ]);
 
@@ -129,7 +84,24 @@ const Home = () => {
 
   useEffect(() => {
     setMounted(true);
+    fetchUpcomingEvents();
   }, []);
+
+  const fetchUpcomingEvents = async () => {
+    try {
+      const response = await fetch('/api/events?status=upcoming');
+      if (!response.ok) {
+        throw new Error('Failed to fetch events');
+      }
+      const data = await response.json();
+      setEvents(data);
+    } catch (err) {
+      console.error('Error fetching events:', err);
+      setError('Failed to load upcoming events');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   if (!mounted) {
     return null;
@@ -170,38 +142,57 @@ const Home = () => {
         <h2 className="text-3xl font-extrabold text-gray-900 text-center mb-12">
           Upcoming Events
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {events.map((event) => (
-            <div
-              key={event.id}
-              className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
-            >
-              <div className="relative h-64">
-                <Image
-                  src={event.image}
-                  alt={event.name}
-                  fill
-                  className="object-cover"
-                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                />
+        {isLoading ? (
+          <div className="text-center">Loading events...</div>
+        ) : error ? (
+          <div className="text-center text-red-600">{error}</div>
+        ) : events.length === 0 ? (
+          <div className="text-center text-gray-500">No upcoming events found</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {events.map((event) => (
+              <div
+                key={event._id}
+                className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+              >
+                {event.banner && (
+                  <div className="relative h-64">
+                    <Image
+                      src={event.banner}
+                      alt={event.title}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    />
+                  </div>
+                )}
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      {event.category}
+                    </span>
+                    <span className="text-sm text-gray-500">
+                      {new Date(event.startDate).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">
+                    {event.title}
+                  </h3>
+                  <p className="text-gray-600 mb-2">{event.location}</p>
+                  <p className="text-gray-500 text-sm mb-4 line-clamp-2">
+                    {event.description}
+                  </p>
+                  <Link
+                    href={`/events/register/${event._id}`}
+                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA] transition-colors duration-300"
+                  >
+                    Register Now
+                  </Link>
+                </div>
               </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  {event.name}
-                </h3>
-                <p className="text-gray-600 mb-2">{event.date}</p>
-                <p className="text-gray-600 mb-4">{event.location}</p>
-                <p className="text-gray-500 text-sm mb-4">{event.description}</p>
-                <button
-                  onClick={() => router.push(`/register?event=${event.id}`)}
-                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded transition-colors duration-300"
-                >
-                  Register
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Features Section */}
@@ -218,16 +209,16 @@ const Home = () => {
               >
                 <div className="relative h-64">
                   <Image
-                    src={feature.image}
-                    alt={feature.name}
+                    src={feature.icon}
+                    alt={feature.title}
                     fill
                     className="object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 33vw, 33vw"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                   />
                 </div>
                 <div className="p-6">
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    {feature.name}
+                    {feature.title}
                   </h3>
                   <p className="text-gray-600">{feature.description}</p>
                 </div>
@@ -419,45 +410,33 @@ const Home = () => {
             { 
               name: 'Google', 
               logo: '/images/clients/google.svg',
-              width: 120,
-              height: 40
             },
             { 
               name: 'Amazon', 
               logo: '/images/clients/amazon.svg',
-              width: 120,
-              height: 40
             },
             { 
               name: 'Apple', 
               logo: '/images/clients/apple.svg',
-              width: 120,
-              height: 40
             },
             { 
               name: 'Microsoft', 
               logo: '/images/clients/microsoft.svg',
-              width: 120,
-              height: 40
             },
             { 
               name: 'Meta', 
               logo: '/images/clients/meta.svg',
-              width: 120,
-              height: 40
             },
             { 
               name: 'Netflix', 
               logo: '/images/clients/netflix.svg',
-              width: 120,
-              height: 40
             }
           ].map((client, index) => (
             <div
               key={index}
               className="flex items-center justify-center p-6 bg-white rounded-lg shadow hover:shadow-lg transition-shadow duration-300"
             >
-              <div className="relative" style={{ width: client.width, height: client.height }}>
+              <div className="relative" style={{ width: 120, height: 40 }}>
                 <Image
                   src={client.logo}
                   alt={client.name}

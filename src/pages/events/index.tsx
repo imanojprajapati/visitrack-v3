@@ -101,6 +101,14 @@ export default function EventsPage() {
                       <p>Location: {event.location}</p>
                       <p>Organizer: {event.organizer}</p>
                     </div>
+                    <div className="mt-4">
+                      <Link
+                        href={`/events/register/${event._id}`}
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA]"
+                      >
+                        Register Now
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
