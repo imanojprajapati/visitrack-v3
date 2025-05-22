@@ -1,5 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import dbConnect from '../../../lib/dbConnect';
+import { connectToDatabase } from '../../../lib/mongodb';
 import Registration from '../../../models/Registration';
 import Event, { IEvent } from '../../../models/Event';
 import Visitor from '../../../models/Visitor';
@@ -15,18 +15,22 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  await dbConnect();
-
   try {
+    // Connect to database
+    const conn = await connectToDatabase();
+    if (!conn) {
+      throw new Error('Failed to connect to database');
+    }
+
     switch (req.method) {
       case 'GET':
         // Get query parameters for filtering
-        const { eventId, formId } = req.query;
+        const { eventId: queryEventId, formId: queryFormId } = req.query;
 
         // Build the query
         const query: any = {};
-        if (eventId) query.eventId = eventId;
-        if (formId) query.formId = formId;
+        if (queryEventId) query.eventId = queryEventId;
+        if (queryFormId) query.formId = queryFormId;
 
         // Fetch registrations with event details
         const registrations = await Registration.find(query).lean();
@@ -70,85 +74,130 @@ export default async function handler(
       case 'POST':
         const { eventId: newEventId, formId: newFormId, data } = req.body;
 
+        // Validate required fields
         if (!newEventId || !newFormId || !data) {
-          return res.status(400).json({ error: 'Missing required fields' });
+          console.error('Missing required fields:', { newEventId, newFormId, hasData: !!data });
+          return res.status(400).json({ 
+            error: 'Missing required fields',
+            details: {
+              eventId: !newEventId,
+              formId: !newFormId,
+              data: !data
+            }
+          });
+        }
+
+        // Validate data structure
+        if (typeof data !== 'object' || Object.keys(data).length === 0) {
+          console.error('Invalid data structure:', data);
+          return res.status(400).json({ error: 'Invalid form data structure' });
         }
 
         // Verify that the event exists
         const event = await Event.findById(newEventId).lean() as IEvent;
         if (!event) {
+          console.error('Event not found:', newEventId);
           return res.status(404).json({ error: 'Event not found' });
         }
 
-        // Create the registration
-        const registration = await Registration.create({
-          eventId: newEventId,
-          formId: newFormId,
-          data,
-          status: 'registered',
-          submittedAt: new Date(),
-        });
+        try {
+          // Create the registration
+          const registration = await Registration.create({
+            eventId: newEventId,
+            formId: newFormId,
+            formData: data,
+            status: 'registered',
+            submittedAt: new Date(),
+          });
 
-        // Extract visitor data from registration
-        const registrationData = data as Record<string, { label: string; value: any }>;
-        
-        // Helper function to get field value by label
-        const getFieldValue = (label: string, possibleLabels: string[] = []): string => {
-          // First try the exact label
-          let field = Object.values(registrationData).find(f => f.label === label);
+          // Extract visitor data from registration
+          const registrationData = data as Record<string, { label: string; value: any }>;
           
-          // If not found and we have possible alternative labels, try those
-          if (!field && possibleLabels.length > 0) {
-            field = Object.values(registrationData).find(f => possibleLabels.includes(f.label));
+          // Helper function to get field value by label
+          const getFieldValue = (label: string, possibleLabels: string[] = []): string => {
+            // First try the exact label
+            let field = Object.values(registrationData).find(f => f.label === label);
+            
+            // If not found and we have possible alternative labels, try those
+            if (!field && possibleLabels.length > 0) {
+              field = Object.values(registrationData).find(f => possibleLabels.includes(f.label));
+            }
+            
+            // If still not found, try case-insensitive match
+            if (!field) {
+              field = Object.values(registrationData).find(f => 
+                f.label.toLowerCase() === label.toLowerCase() ||
+                possibleLabels.some(pl => pl.toLowerCase() === f.label.toLowerCase())
+              );
+            }
+            
+            return field ? String(field.value) : '';
+          };
+
+          // Create visitor record
+          const visitorData = {
+            registrationId: registration._id,
+            eventId: newEventId,
+            formId: newFormId,
+            name: getFieldValue('Name', ['Full Name', 'Visitor Name']),
+            email: getFieldValue('Email', ['Email ID', 'Enter a Email', 'Email Address']),
+            phone: getFieldValue('Phone', ['Phone No', 'Phone Number', 'Mobile Number']),
+            age: Number(getFieldValue('Age', ['Visitor Age'])) || 0,
+            eventName: event.title,
+            eventLocation: event.location,
+            eventStartDate: event.startDate,
+            eventEndDate: event.endDate,
+            status: 'registered',
+            additionalData: registrationData,
+          };
+
+          // Validate required visitor fields
+          const requiredFields = ['name', 'email', 'phone'];
+          const missingFields = requiredFields.filter(field => !visitorData[field as keyof typeof visitorData]);
+
+          if (missingFields.length > 0) {
+            console.error('Missing required visitor fields:', missingFields);
+            // Delete the registration since we can't create a visitor
+            await Registration.findByIdAndDelete(registration._id);
+            return res.status(400).json({ 
+              error: 'Missing required visitor information',
+              missingFields
+            });
           }
-          
-          // If still not found, try case-insensitive match
-          if (!field) {
-            field = Object.values(registrationData).find(f => 
-              f.label.toLowerCase() === label.toLowerCase() ||
-              possibleLabels.some(pl => pl.toLowerCase() === f.label.toLowerCase())
-            );
+
+          await Visitor.create(visitorData);
+
+          res.status(201).json({
+            success: true,
+            registration,
+            message: 'Registration submitted successfully'
+          });
+        } catch (error: any) {
+          console.error('Error creating registration/visitor:', error);
+          // If there's a validation error, return it with details
+          if (error.name === 'ValidationError') {
+            return res.status(400).json({
+              error: 'Validation Error',
+              details: Object.keys(error.errors).reduce((acc, key) => {
+                acc[key] = error.errors[key].message;
+                return acc;
+              }, {} as Record<string, string>)
+            });
           }
-          
-          return field ? String(field.value) : '';
-        };
-
-        // Create visitor record
-        const visitorData = {
-          registrationId: registration._id,
-          eventId: newEventId,
-          formId: newFormId,
-          name: getFieldValue('Name', ['Full Name', 'Visitor Name']),
-          email: getFieldValue('Email', ['Email ID', 'Enter a Email', 'Email Address']),
-          phone: getFieldValue('Phone', ['Phone No', 'Phone Number', 'Mobile Number']),
-          age: Number(getFieldValue('Age', ['Visitor Age'])) || 0,
-          eventName: event.title,
-          eventLocation: event.location,
-          eventStartDate: event.startDate,
-          eventEndDate: event.endDate,
-          status: 'registered',
-          additionalData: registrationData,
-        };
-
-        // Validate required fields
-        const requiredFields = ['name', 'email', 'phone'];
-        const missingFields = requiredFields.filter(field => !visitorData[field]);
-
-        if (missingFields.length > 0) {
-          throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+          throw error; // Re-throw other errors to be caught by outer try-catch
         }
-
-        await Visitor.create(visitorData);
-
-        res.status(201).json(registration);
         break;
 
       default:
         res.setHeader('Allow', ['GET', 'POST']);
         res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error handling registrations:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 } 

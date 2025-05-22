@@ -1,6 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Card, Spin, message } from 'antd';
+import { Card, Spin, message, Tag, Divider, Row, Col, Typography } from 'antd';
+import { 
+  UserOutlined, 
+  MailOutlined, 
+  PhoneOutlined, 
+  CalendarOutlined,
+  EnvironmentOutlined,
+  CheckCircleOutlined,
+  ClockCircleOutlined
+} from '@ant-design/icons';
+
+const { Title, Text } = Typography;
 
 interface Visitor {
   _id: string;
@@ -15,6 +26,8 @@ interface Visitor {
   status: 'registered' | 'checked_in' | 'checked_out' | 'cancelled';
   checkInTime?: Date;
   checkOutTime?: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export default function VisitorDetailsPage() {
@@ -28,7 +41,6 @@ export default function VisitorDetailsPage() {
       if (!visitorId) return;
 
       try {
-        // Use the visitors API endpoint
         const response = await fetch(`/api/visitors/${visitorId}`);
         if (!response.ok) {
           if (response.status === 404) {
@@ -39,7 +51,6 @@ export default function VisitorDetailsPage() {
           return;
         }
         const data = await response.json();
-        console.log('Fetched visitor data:', data); // Debug log
         setVisitor(data);
       } catch (error) {
         console.error('Error fetching visitor:', error);
@@ -53,6 +64,36 @@ export default function VisitorDetailsPage() {
       fetchVisitor();
     }
   }, [visitorId]);
+
+  const getStatusColor = (status: Visitor['status']) => {
+    switch (status) {
+      case 'checked_in':
+        return 'success';
+      case 'checked_out':
+        return 'error';
+      case 'registered':
+        return 'processing';
+      case 'cancelled':
+        return 'default';
+      default:
+        return 'default';
+    }
+  };
+
+  const formatStatus = (status: Visitor['status']) => {
+    switch (status) {
+      case 'checked_in':
+        return 'Checked In';
+      case 'checked_out':
+        return 'Checked Out';
+      case 'registered':
+        return 'Registered';
+      case 'cancelled':
+        return 'Cancelled';
+      default:
+        return status;
+    }
+  };
 
   if (loading) {
     return (
@@ -74,75 +115,124 @@ export default function VisitorDetailsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-md mx-auto">
+      <div className="max-w-2xl mx-auto">
         <Card className="shadow-lg">
-          <div className="text-center mb-6">
-            <h1 className="text-2xl font-bold text-gray-900">{visitor.name}</h1>
-            <p className="text-gray-600">{visitor.eventName}</p>
+          {/* Header Section */}
+          <div className="text-center mb-8">
+            <div className="inline-block p-3 bg-blue-50 rounded-full mb-4">
+              <UserOutlined className="text-4xl text-blue-500" />
+            </div>
+            <Title level={2} className="mb-2">{visitor.name}</Title>
+            <Tag color={getStatusColor(visitor.status)} className="text-base px-4 py-1">
+              {formatStatus(visitor.status)}
+            </Tag>
           </div>
 
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-500">Phone</label>
-              <p className="mt-1 text-gray-900">{visitor.phone}</p>
-            </div>
+          <Divider />
 
-            <div>
-              <label className="block text-sm font-medium text-gray-500">Email</label>
-              <p className="mt-1 text-gray-900">{visitor.email}</p>
-            </div>
+          {/* Contact Information */}
+          <div className="mb-8">
+            <Title level={4} className="mb-4">Contact Information</Title>
+            <Row gutter={[24, 16]}>
+              <Col span={12}>
+                <div className="flex items-center space-x-3">
+                  <MailOutlined className="text-gray-400 text-xl" />
+                  <div>
+                    <Text type="secondary" className="block text-sm">Email</Text>
+                    <Text strong>{visitor.email}</Text>
+                  </div>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div className="flex items-center space-x-3">
+                  <PhoneOutlined className="text-gray-400 text-xl" />
+                  <div>
+                    <Text type="secondary" className="block text-sm">Phone</Text>
+                    <Text strong>{visitor.phone}</Text>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </div>
 
-            {visitor.age && (
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Age</label>
-                <p className="mt-1 text-gray-900">{visitor.age}</p>
-              </div>
-            )}
+          {/* Event Information */}
+          <div className="mb-8">
+            <Title level={4} className="mb-4">Event Information</Title>
+            <Row gutter={[24, 16]}>
+              <Col span={24}>
+                <div className="flex items-center space-x-3">
+                  <CalendarOutlined className="text-gray-400 text-xl" />
+                  <div>
+                    <Text type="secondary" className="block text-sm">Event Name</Text>
+                    <Text strong>{visitor.eventName}</Text>
+                  </div>
+                </div>
+              </Col>
+              <Col span={24}>
+                <div className="flex items-center space-x-3">
+                  <EnvironmentOutlined className="text-gray-400 text-xl" />
+                  <div>
+                    <Text type="secondary" className="block text-sm">Event Location</Text>
+                    <Text strong>{visitor.eventLocation}</Text>
+                  </div>
+                </div>
+              </Col>
+              <Col span={12}>
+                <div className="flex items-center space-x-3">
+                  <ClockCircleOutlined className="text-gray-400 text-xl" />
+                  <div>
+                    <Text type="secondary" className="block text-sm">Event Date</Text>
+                    <Text strong>
+                      {new Date(visitor.eventStartDate).toLocaleDateString()}
+                    </Text>
+                  </div>
+                </div>
+              </Col>
+            </Row>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-500">Event Location</label>
-              <p className="mt-1 text-gray-900">{visitor.eventLocation}</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-500">Event Date</label>
-              <p className="mt-1 text-gray-900">
-                {new Date(visitor.eventStartDate).toLocaleDateString()}
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-500">Status</label>
-              <p className="mt-1">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                  ${visitor.status === 'checked_in' ? 'bg-green-100 text-green-800' :
-                    visitor.status === 'checked_out' ? 'bg-red-100 text-red-800' :
-                    visitor.status === 'cancelled' ? 'bg-gray-100 text-gray-800' :
-                    'bg-blue-100 text-blue-800'}`}>
-                  {visitor.status.split('_').map(word => 
-                    word.charAt(0).toUpperCase() + word.slice(1)
-                  ).join(' ')}
-                </span>
-              </p>
-            </div>
-
-            {visitor.checkInTime && (
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Check-in Time</label>
-                <p className="mt-1 text-gray-900">
-                  {new Date(visitor.checkInTime).toLocaleString()}
-                </p>
-              </div>
-            )}
-
-            {visitor.checkOutTime && (
-              <div>
-                <label className="block text-sm font-medium text-gray-500">Check-out Time</label>
-                <p className="mt-1 text-gray-900">
-                  {new Date(visitor.checkOutTime).toLocaleString()}
-                </p>
-              </div>
-            )}
+          {/* Registration Details */}
+          <div>
+            <Title level={4} className="mb-4">Registration Details</Title>
+            <Row gutter={[24, 16]}>
+              <Col span={12}>
+                <div className="flex items-center space-x-3">
+                  <CheckCircleOutlined className="text-gray-400 text-xl" />
+                  <div>
+                    <Text type="secondary" className="block text-sm">Registration Date</Text>
+                    <Text strong>
+                      {new Date(visitor.createdAt).toLocaleDateString()}
+                    </Text>
+                  </div>
+                </div>
+              </Col>
+              {visitor.checkInTime && (
+                <Col span={12}>
+                  <div className="flex items-center space-x-3">
+                    <ClockCircleOutlined className="text-gray-400 text-xl" />
+                    <div>
+                      <Text type="secondary" className="block text-sm">Check-in Time</Text>
+                      <Text strong>
+                        {new Date(visitor.checkInTime).toLocaleString()}
+                      </Text>
+                    </div>
+                  </div>
+                </Col>
+              )}
+              {visitor.checkOutTime && (
+                <Col span={12}>
+                  <div className="flex items-center space-x-3">
+                    <ClockCircleOutlined className="text-gray-400 text-xl" />
+                    <div>
+                      <Text type="secondary" className="block text-sm">Check-out Time</Text>
+                      <Text strong>
+                        {new Date(visitor.checkOutTime).toLocaleString()}
+                      </Text>
+                    </div>
+                  </div>
+                </Col>
+              )}
+            </Row>
           </div>
         </Card>
       </div>
