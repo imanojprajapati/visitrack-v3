@@ -40,14 +40,21 @@ interface ScannedVisitor extends VisitorData {
   scanTime: string;
 }
 
-// Dynamically import Webcam to avoid SSR issues
-const Webcam = dynamic<WebcamProps>(() => 
-  import('react-webcam').then(mod => {
-    const WebcamComponent = mod.default;
-    return WebcamComponent;
-  }), 
-  { ssr: false }
-);
+// Create a wrapper component for the Webcam
+const WebcamWrapper = React.forwardRef((props: any, ref: any) => {
+  const Webcam = dynamic(() => import('react-webcam'), {
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-[480px] flex items-center justify-center bg-gray-100">
+        <Text type="secondary">Loading camera...</Text>
+      </div>
+    ),
+  });
+
+  return <Webcam {...props} ref={ref} />;
+});
+
+WebcamWrapper.displayName = 'WebcamWrapper';
 
 const QRScanner = () => {
   const [form] = Form.useForm<VisitorData>();
@@ -59,7 +66,7 @@ const QRScanner = () => {
   const [visitorStatus, setVisitorStatus] = useState<boolean | null>(null);
   const [cameraError, setCameraError] = useState(false);
   const badgeRef = useRef<HTMLDivElement>(null);
-  const webcamRef = useRef<WebcamProps>(null);
+  const webcamRef = useRef<any>(null);
 
   const videoConstraints = {
     facingMode: "environment",
@@ -67,7 +74,7 @@ const QRScanner = () => {
     height: 720
   };
 
-  const handleError = (err: Error) => {
+  const handleError = (err: string | DOMException) => {
     console.error(err);
     setCameraError(true);
     message.error('Error accessing camera. Please check your camera permissions or try manual entry.');
@@ -104,7 +111,7 @@ const QRScanner = () => {
 
   const capture = useCallback(() => {
     if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot();
+      const imageSrc = webcamRef.current.getScreenshot?.();
       if (imageSrc) {
         // TODO: Implement QR code scanning using jsQR library
         message.info('QR code scanning simulation - implement actual scanning logic');
@@ -221,14 +228,18 @@ const QRScanner = () => {
                 </Text>
               </div>
             ) : (
-              <Webcam
-                audio={false}
-                ref={webcamRef}
-                screenshotFormat="image/jpeg"
-                videoConstraints={videoConstraints}
-                onUserMediaError={handleError}
-                className="w-full max-w-2xl"
-              />
+              <div className="relative w-full max-w-2xl">
+                <WebcamWrapper
+                  audio={false}
+                  ref={webcamRef}
+                  screenshotFormat="image/jpeg"
+                  videoConstraints={videoConstraints}
+                  onUserMediaError={handleError}
+                  className="w-full"
+                  mirrored={false}
+                />
+                <div className="absolute inset-0 border-2 border-dashed border-blue-500 pointer-events-none" />
+              </div>
             )}
           </div>
         </Modal>
