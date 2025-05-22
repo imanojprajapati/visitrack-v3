@@ -22,25 +22,44 @@ import {
 import dynamic from 'next/dynamic';
 import { QRCodeSVG } from 'qrcode.react';
 import AdminLayout from './layout';
+import type { WebcamProps } from 'react-webcam';
 
 const { Text } = Typography;
 
+interface VisitorData {
+  visitorId: string;
+  name: string;
+  company: string;
+  designation: string;
+  eventName: string;
+  endDate: string;
+}
+
+interface ScannedVisitor extends VisitorData {
+  key: string;
+  scanTime: string;
+}
+
 // Dynamically import Webcam to avoid SSR issues
-const Webcam = dynamic(() => import('react-webcam'), {
-  ssr: false
-});
+const Webcam = dynamic<WebcamProps>(() => 
+  import('react-webcam').then(mod => {
+    const WebcamComponent = mod.default;
+    return WebcamComponent;
+  }), 
+  { ssr: false }
+);
 
 const QRScanner = () => {
-  const [form] = Form.useForm();
-  const [scanResult, setScanResult] = useState('');
+  const [form] = Form.useForm<VisitorData>();
+  const [scanResult, setScanResult] = useState<VisitorData | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [scannedVisitors, setScannedVisitors] = useState([]);
-  const [visitorStatus, setVisitorStatus] = useState(null);
+  const [scannedVisitors, setScannedVisitors] = useState<ScannedVisitor[]>([]);
+  const [visitorStatus, setVisitorStatus] = useState<boolean | null>(null);
   const [cameraError, setCameraError] = useState(false);
-  const badgeRef = useRef(null);
-  const webcamRef = useRef(null);
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const webcamRef = useRef<WebcamProps>(null);
 
   const videoConstraints = {
     facingMode: "environment",
@@ -48,21 +67,19 @@ const QRScanner = () => {
     height: 720
   };
 
-  const handleError = (err: any) => {
+  const handleError = (err: Error) => {
     console.error(err);
     setCameraError(true);
     message.error('Error accessing camera. Please check your camera permissions or try manual entry.');
   };
 
-  const checkVisitorStatus = (visitorId: string) => {
-    // TODO: Implement API call to check visitor status
-    const hasVisited = scannedVisitors.some((v: any) => v.visitorId === visitorId);
-    return hasVisited;
+  const checkVisitorStatus = (visitorId: string): boolean => {
+    return scannedVisitors.some(v => v.visitorId === visitorId);
   };
 
   const processVisitorData = (data: string) => {
     try {
-      const visitorData = JSON.parse(data);
+      const visitorData: VisitorData = JSON.parse(data);
       const hasVisited = checkVisitorStatus(visitorData.visitorId);
       setVisitorStatus(hasVisited);
       setScanResult(visitorData);
@@ -86,29 +103,22 @@ const QRScanner = () => {
   };
 
   const capture = useCallback(() => {
-    const imageSrc = webcamRef.current?.getScreenshot();
-    if (imageSrc) {
-      // TODO: Implement QR code scanning using jsQR library
-      // This needs to be done in a Web Worker or using a different library for Next.js
-      message.info('QR code scanning simulation - implement actual scanning logic');
+    if (webcamRef.current) {
+      const imageSrc = webcamRef.current.getScreenshot();
+      if (imageSrc) {
+        // TODO: Implement QR code scanning using jsQR library
+        message.info('QR code scanning simulation - implement actual scanning logic');
+      }
     }
-  }, []);
+  }, [webcamRef]);
 
-  const handleManualEntry = (values: any) => {
-    const visitorData = {
-      visitorId: values.visitorId,
-      name: values.name,
-      company: values.company,
-      designation: values.designation,
-      eventName: values.eventName,
-      endDate: values.endDate,
-    };
-    processVisitorData(JSON.stringify(visitorData));
+  const handleManualEntry = (values: VisitorData) => {
+    processVisitorData(JSON.stringify(values));
     setShowManualEntry(false);
     form.resetFields();
   };
 
-  const handlePrint = async (visitor: any) => {
+  const handlePrint = async (visitor: VisitorData) => {
     if (badgeRef.current) {
       // TODO: Implement badge printing logic
       message.success('Badge printed successfully!');
@@ -294,14 +304,14 @@ const QRScanner = () => {
           open={showPreview}
           onCancel={() => setShowPreview(false)}
           footer={[
-            <Button key="print" type="primary" onClick={() => handlePrint(scanResult)}>
+            <Button key="print" type="primary" onClick={() => handlePrint(scanResult as VisitorData)}>
               Print Badge
             </Button>
           ]}
           width={400}
         >
           <div ref={badgeRef} className="w-[300px] p-5 border rounded-lg mx-auto text-center">
-            <h2 className="mb-2">{scanResult.eventName}</h2>
+            <h2 className="mb-2">{scanResult?.eventName}</h2>
             <Divider />
             <QRCodeSVG
               value={JSON.stringify(scanResult)}
@@ -309,11 +319,11 @@ const QRScanner = () => {
               className="mx-auto my-2"
             />
             <Divider />
-            <h3 className="my-2">{scanResult.name}</h3>
-            <p className="my-1">{scanResult.company}</p>
-            <p className="my-1">{scanResult.designation}</p>
+            <h3 className="my-2">{scanResult?.name}</h3>
+            <p className="my-1">{scanResult?.company}</p>
+            <p className="my-1">{scanResult?.designation}</p>
             <Divider />
-            <p className="my-1">Valid until: {scanResult.endDate}</p>
+            <p className="my-1">Valid until: {scanResult?.endDate}</p>
           </div>
         </Modal>
 

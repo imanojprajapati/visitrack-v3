@@ -43,10 +43,26 @@ export interface IBadgeTemplate extends Document {
     cloudinaryPublicId?: string;
     imageData?: string;
   };
+  logo: {
+    enabled: boolean;
+    position: { x: number; y: number };
+    size: { width: number; height: number };
+    cloudinaryUrl?: string;
+    cloudinaryPublicId?: string;
+  };
+  photo: {
+    enabled: boolean;
+    position: { x: number; y: number };
+    size: { width: number; height: number };
+    cloudinaryUrl?: string;
+    cloudinaryPublicId?: string;
+  };
   qrCode: {
     enabled: boolean;
     position: { x: number; y: number };
     size: { width: number; height: number };
+    cloudinaryUrl?: string;
+    cloudinaryPublicId?: string;
   };
   background?: {
     cloudinaryUrl?: string;
@@ -237,7 +253,13 @@ const badgeTemplateSchema = new mongoose.Schema({
         default: '',
       },
     },
-    required: false,
+    default: () => ({
+      enabled: false,
+      position: { x: 0.5, y: 0.2 },
+      size: { width: 1, height: 1 },
+      cloudinaryUrl: '',
+      cloudinaryPublicId: '',
+    }),
   },
   photo: {
     type: {
@@ -274,7 +296,13 @@ const badgeTemplateSchema = new mongoose.Schema({
         default: '',
       },
     },
-    required: false,
+    default: () => ({
+      enabled: true,
+      position: { x: 0.2, y: 0.5 },
+      size: { width: 1, height: 1.25 },
+      cloudinaryUrl: '',
+      cloudinaryPublicId: '',
+    }),
   },
   qrCode: {
     type: {
@@ -301,6 +329,14 @@ const badgeTemplateSchema = new mongoose.Schema({
           type: Number,
           default: 1,
         },
+      },
+      cloudinaryUrl: {
+        type: String,
+        default: '',
+      },
+      cloudinaryPublicId: {
+        type: String,
+        default: '',
       },
     },
     required: false,
