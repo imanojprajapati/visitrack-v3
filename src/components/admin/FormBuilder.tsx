@@ -7,6 +7,74 @@ import { useAppContext } from '../../context/AppContext';
 
 const { Option } = Select;
 
+// Default form fields
+const DEFAULT_FIELDS: FormField[] = [
+  {
+    id: 'name',
+    type: 'text',
+    label: 'Full Name',
+    required: true,
+    placeholder: 'Enter your full name'
+  },
+  {
+    id: 'email',
+    type: 'email',
+    label: 'Email',
+    required: true,
+    placeholder: 'Enter your email address'
+  },
+  {
+    id: 'phone',
+    type: 'tel',
+    label: 'Phone Number',
+    required: true,
+    placeholder: 'Enter your phone number'
+  },
+  {
+    id: 'company',
+    type: 'text',
+    label: 'Company',
+    required: true,
+    placeholder: 'Enter your company name'
+  },
+  {
+    id: 'city',
+    type: 'text',
+    label: 'City',
+    required: true,
+    placeholder: 'Enter your city'
+  },
+  {
+    id: 'state',
+    type: 'text',
+    label: 'State',
+    required: true,
+    placeholder: 'Enter your state'
+  },
+  {
+    id: 'country',
+    type: 'text',
+    label: 'Country',
+    required: true,
+    placeholder: 'Enter your country'
+  },
+  {
+    id: 'pincode',
+    type: 'text',
+    label: 'Pincode',
+    required: true,
+    placeholder: 'Enter your pincode'
+  },
+  {
+    id: 'source',
+    type: 'text',
+    label: 'Source',
+    required: true,
+    placeholder: 'Website',
+    readOnly: true
+  }
+];
+
 interface FormBuilderProps {
   onSave: (formData: { eventId: string; title: string; fields: FormField[] }) => Promise<void>;
   initialData?: EventForm;
@@ -35,7 +103,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
     fetchEvents();
   }, [messageApi]);
 
-  // Initialize form with initialData if provided
+  // Initialize form with initialData if provided, otherwise use default fields
   useEffect(() => {
     if (initialData) {
       form.setFieldsValue({
@@ -43,6 +111,8 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
         title: initialData.title,
       });
       setFields(initialData.fields);
+    } else {
+      setFields(DEFAULT_FIELDS);
     }
   }, [initialData, form]);
 
@@ -57,10 +127,22 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
   };
 
   const removeField = (id: string) => {
+    // Don't allow removing default fields
+    if (DEFAULT_FIELDS.some(field => field.id === id)) {
+      messageApi?.warning('Default fields cannot be removed');
+      return;
+    }
     setFields(fields.filter(field => field.id !== id));
   };
 
   const updateField = (id: string, updates: Partial<FormField>) => {
+    // Don't allow updating certain properties of default fields
+    if (DEFAULT_FIELDS.some(field => field.id === id)) {
+      if (updates.readOnly !== undefined || updates.type !== undefined) {
+        messageApi?.warning('Cannot modify default field properties');
+        return;
+      }
+    }
     setFields(fields.map(field => 
       field.id === id ? { ...field, ...updates } : field
     ));
@@ -75,7 +157,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
       });
       messageApi?.success('Form saved successfully');
       form.resetFields();
-      setFields([]);
+      setFields(DEFAULT_FIELDS);
     } catch (error) {
       console.error('Error saving form:', error);
       messageApi?.error('Failed to save form');
@@ -112,18 +194,8 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
             <Input placeholder="e.g., Registration Form for Tech Conference 2024" />
           </Form.Item>
 
-          <div className="mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium">Form Fields</h3>
-              <Button
-                type="dashed"
-                onClick={addField}
-                icon={<PlusOutlined />}
-              >
-                Add Field
-              </Button>
-            </div>
-
+          <div className="mb-4">
+            <h3 className="text-lg font-medium mb-4">Form Fields</h3>
             {fields.map((field, index) => (
               <Card key={field.id} className="mb-4">
                 <Space direction="vertical" style={{ width: '100%' }}>
@@ -135,6 +207,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       <Select
                         value={field.type}
                         onChange={(value) => updateField(field.id, { type: value })}
+                        disabled={field.readOnly}
                       >
                         <Option value="text">Text</Option>
                         <Option value="email">Email</Option>
@@ -153,6 +226,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       <Switch
                         checked={field.required}
                         onChange={(checked) => updateField(field.id, { required: checked })}
+                        disabled={field.readOnly}
                       />
                     </Form.Item>
 
@@ -161,6 +235,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       danger
                       icon={<DeleteOutlined />}
                       onClick={() => removeField(field.id)}
+                      disabled={field.readOnly}
                     />
                   </div>
 
@@ -169,6 +244,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       value={field.label}
                       onChange={(e) => updateField(field.id, { label: e.target.value })}
                       placeholder="Field label"
+                      disabled={field.readOnly}
                     />
                   </Form.Item>
 
@@ -177,6 +253,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       value={field.placeholder}
                       onChange={(e) => updateField(field.id, { placeholder: e.target.value })}
                       placeholder="Placeholder text"
+                      disabled={field.readOnly}
                     />
                   </Form.Item>
 
@@ -188,6 +265,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                         onChange={(values) => updateField(field.id, { options: values })}
                         placeholder="Enter options"
                         style={{ width: '100%' }}
+                        disabled={field.readOnly}
                       />
                     </Form.Item>
                   )}
@@ -201,6 +279,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                             validation: { ...field.validation, min: value || undefined }
                           })}
                           style={{ width: '100%' }}
+                          disabled={field.readOnly}
                         />
                       </Form.Item>
                       <Form.Item label="Max Value" style={{ flex: 1 }}>
@@ -210,6 +289,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                             validation: { ...field.validation, max: value || undefined }
                           })}
                           style={{ width: '100%' }}
+                          disabled={field.readOnly}
                         />
                       </Form.Item>
                     </div>
@@ -219,11 +299,18 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
             ))}
           </div>
 
-          <Form.Item>
-            <Button type="primary" htmlType="submit" disabled={fields.length === 0}>
+          <div className="flex justify-between items-center">
+            <Button
+              type="dashed"
+              onClick={addField}
+              icon={<PlusOutlined />}
+            >
+              Add Field
+            </Button>
+            <Button type="primary" htmlType="submit">
               Save Form
             </Button>
-          </Form.Item>
+          </div>
         </Form>
       </Card>
     </div>

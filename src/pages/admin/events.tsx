@@ -22,6 +22,7 @@ import {
   EditOutlined,
   DeleteOutlined,
   EyeOutlined,
+  ReloadOutlined
 } from '@ant-design/icons';
 import { DatePicker, dayjs } from '../../utils/date';
 import AdminLayout from './layout';
@@ -52,23 +53,57 @@ export default function EventManagement() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isViewMode, setIsViewMode] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        const response = await fetch('/api/events');
-        if (!response.ok) {
-          throw new Error('Failed to fetch events');
-        }
-        const data = await response.json();
-        setEvents(data);
-      } catch (error) {
-        console.error('Failed to fetch events:', error);
+  const refreshEvents = async (showMessage = true) => {
+    try {
+      setIsRefreshing(true);
+      const response = await fetch('/api/events');
+      if (!response.ok) {
+        throw new Error('Failed to fetch events');
       }
-    };
-    
-    fetchEvents();
+      const data = await response.json();
+      
+      // Sort events by date (newest first)
+      const sortedEvents = data.sort((a: Event, b: Event) => 
+        new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
+      );
+      
+      setEvents(sortedEvents);
+      if (showMessage) {
+        messageApi?.success('Events list refreshed');
+      }
+    } catch (error) {
+      console.error('Failed to fetch events:', error);
+      if (showMessage) {
+        messageApi?.error('Failed to refresh events list');
+      }
+    } finally {
+      setIsRefreshing(false);
+      setIsLoading(false);
+    }
+  };
+
+  // Initial load and periodic refresh
+  useEffect(() => {
+    // Initial fetch
+    refreshEvents(false);
+
+    // Set up periodic refresh every 30 seconds
+    const intervalId = setInterval(() => refreshEvents(false), 300000000);
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(intervalId);
   }, []);
+
+  // Add refresh after modal close
+  const handleModalClose = () => {
+    form.resetFields();
+    setModalVisible(false);
+    setIsViewMode(false);
+    refreshEvents(false); // Refresh events after modal closes without showing message
+  };
 
   const handleDeleteEvent = async (eventId: string) => {
     try {
@@ -83,10 +118,7 @@ export default function EventManagement() {
       }
 
       messageApi?.success('Event deleted successfully');
-      
-      // Refresh events list
-      const updatedEvents = events.filter(event => event._id !== eventId);
-      setEvents(updatedEvents);
+      refreshEvents(false); // Refresh events after deletion without showing message
     } catch (error) {
       console.error('Failed to delete event:', error);
       messageApi?.error(error instanceof Error ? error.message : 'Failed to delete event');
@@ -131,18 +163,27 @@ export default function EventManagement() {
     },
     {
       title: 'Capacity',
+      dataIndex: 'capacity',
       key: 'capacity',
-      render: (_, record) => (
-        <div>
-          <Progress 
-            percent={record.visitors ? Math.round((record.visitors / record.capacity) * 100) : 0} 
-            size="small"
-          />
-          <div className="text-sm text-gray-500">
-            {record.visitors || 0} / {record.capacity} visitors
+      render: (_, record) => {
+        const visitorCount = record.visitors ?? 0;
+        const isFull = visitorCount >= record.capacity;
+        return (
+          <div className="flex items-center gap-2">
+            <Progress 
+              percent={Math.round(visitorCount / record.capacity * 100)} 
+              size="small"
+              status={isFull ? 'exception' : 'active'}
+            />
+            <div>
+              {visitorCount} / {record.capacity}
+              {isFull && (
+                <Tag color="red" className="ml-2">Full</Tag>
+              )}
+            </div>
           </div>
-        </div>
-      ),
+        );
+      },
     },
     {
       title: 'Status',
@@ -234,19 +275,7 @@ export default function EventManagement() {
       setModalVisible(false);
       form.resetFields();
       setIsViewMode(false);
-      
-      // Refresh events list
-      try {
-        const response = await fetch('/api/events');
-        if (!response.ok) {
-          throw new Error('Failed to fetch events');
-        }
-        const data = await response.json();
-        setEvents(data);
-      } catch (error) {
-        console.error('Failed to fetch events:', error);
-        messageApi?.error('Failed to refresh events list');
-      }
+      refreshEvents(false); // Refresh events after submission without showing message
     }
   };
 
@@ -256,46 +285,50 @@ export default function EventManagement() {
         <Card
           title={<h1 className="text-2xl font-bold">Event Management</h1>}
           extra={
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => {
-                form.resetFields();
-                setSelectedEvent(null);
-                setIsViewMode(false);
-                setModalVisible(true);
-              }}
-            >
-              Create Event
-            </Button>
+            <Space>
+              <Button
+                icon={<ReloadOutlined spin={isRefreshing} />}
+                onClick={() => refreshEvents(true)} // Show message when manually refreshing
+                disabled={isRefreshing}
+                title="Refresh Events List"
+              >
+                Refresh
+              </Button>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  form.resetFields();
+                  setSelectedEvent(null);
+                  setIsViewMode(false);
+                  setModalVisible(true);
+                }}
+              >
+                Create Event
+              </Button>
+            </Space>
           }
         >
           <Table
             columns={columns}
             dataSource={events}
-            rowKey="id"
+            rowKey="_id"
             pagination={{
               total: events.length,
               pageSize: 10,
               showSizeChanger: true,
               showTotal: (total) => `Total ${total} events`,
             }}
+            loading={isLoading || isRefreshing}
           />
         </Card>
 
         <Modal
           title={isViewMode ? 'Event Details' : (selectedEvent ? 'Edit Event' : 'Create New Event')}
           open={modalVisible}
-          onCancel={() => {
-            form.resetFields();
-            setModalVisible(false);
-            setIsViewMode(false);
-          }}
+          onCancel={handleModalClose}
           footer={isViewMode ? [
-            <Button key="close" onClick={() => {
-              setModalVisible(false);
-              setIsViewMode(false);
-            }}>
+            <Button key="close" onClick={handleModalClose}>
               Close
             </Button>
           ] : null}
@@ -336,7 +369,27 @@ export default function EventManagement() {
                 </Col>
                 <Col span={12}>
                   <div className="font-semibold text-gray-600">Capacity</div>
-                  <div>{selectedEvent.visitors || 0} / {selectedEvent.capacity} visitors</div>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const visitorCount = selectedEvent.visitors ?? 0;
+                      const isFull = visitorCount >= selectedEvent.capacity;
+                      return (
+                        <>
+                          <Progress 
+                            percent={Math.round(visitorCount / selectedEvent.capacity * 100)} 
+                            size="small"
+                            status={isFull ? 'exception' : 'active'}
+                          />
+                          <div>
+                            {visitorCount} / {selectedEvent.capacity} visitors
+                            {isFull && (
+                              <Tag color="red" className="ml-2">Full</Tag>
+                            )}
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </Col>
                 <Col span={24}>
                   <div className="font-semibold text-gray-600">Description</div>

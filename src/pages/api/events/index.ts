@@ -1,23 +1,29 @@
-import { NextApiRequest, NextApiResponse } from 'next';
-import { CreateEventInput, Event } from '../../../types/event';
+import type { NextApiRequest, NextApiResponse } from 'next';
+import type { IEvent } from '../../../models/Event';
+import Event from '../../../models/Event';
+import mongoose from 'mongoose';
+import { connectToDatabase } from '../../../lib/mongodb';
+import { CreateEventInput } from '../../../types/event';
 import clientPromise from '../../../utils/mongodb';
 import { DB_NAME } from '../../../utils/constants';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
-) {  try {
-    const client = await clientPromise;
-    const db = client.db(DB_NAME);
+) {
+  try {
+    // Connect to database using mongoose
+    const conn = await connectToDatabase();
+    if (!conn) {
+      throw new Error('Failed to connect to database');
+    }
 
     switch (req.method) {
       case 'GET':
         try {
-          const events = await db
-            .collection("events")
-            .find({})
+          const events = await Event.find()
             .sort({ createdAt: -1 })
-            .toArray();
+            .lean();
           
           res.status(200).json(events);
         } catch (error) {
@@ -28,22 +34,18 @@ export default async function handler(
       
       case 'POST':
         try {
-          const eventData: CreateEventInput = req.body;
+          const eventData = req.body;
           
           console.log('Received event data:', eventData);
 
           // Validate required fields
-          if (!eventData.title || !eventData.description || !eventData.category || 
-              !eventData.startDate || !eventData.endDate || !eventData.location || 
-              !eventData.organizer) {
+          if (!eventData.title || !eventData.location || !eventData.startDate || 
+              !eventData.endDate) {
             console.error('Missing required fields:', {
               title: !eventData.title,
-              description: !eventData.description,
-              category: !eventData.category,
-              startDate: !eventData.startDate,
-              endDate: !eventData.endDate,
               location: !eventData.location,
-              organizer: !eventData.organizer
+              startDate: !eventData.startDate,
+              endDate: !eventData.endDate
             });
             return res.status(400).json({ error: 'Missing required fields' });
           }
@@ -57,36 +59,52 @@ export default async function handler(
             return res.status(400).json({ error: 'Invalid date format' });
           }
 
-          const newEvent: Omit<Event, '_id'> = {
-            ...eventData,
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            createdAt: new Date(),
-            updatedAt: new Date(),
+          // Create new event with proper initialization
+          const newEvent = {
+            title: eventData.title,
+            description: eventData.description || '',
+            location: eventData.location,
+            venue: eventData.venue || eventData.location,
+            startDate: startDate,
+            endDate: endDate,
+            time: eventData.time || '',
+            category: eventData.category || 'General',
+            organizer: eventData.organizer || 'Admin',
+            status: eventData.status || 'draft',
+            capacity: eventData.capacity || 100,
+            banner: eventData.banner || '',
+            registrationDeadline: eventData.registrationDeadline ? new Date(eventData.registrationDeadline) : undefined,
+            formId: eventData.formId ? new mongoose.Types.ObjectId(eventData.formId) : undefined,
+            visitors: 0 // Initialize visitor count to 0
           };
 
-          const result = await db.collection("events").insertOne(newEvent);
-          
-          if (!result.insertedId) {
-            throw new Error('Failed to insert event');
-          }
+          // Use the Event model to create the event
+          const event = await Event.create(newEvent);
 
           res.status(201).json({ 
+            success: true,
             message: 'Event created successfully',
-            eventId: result.insertedId 
+            event: event
           });
-        } catch (error) {
-          console.error('Failed to create event:', error);
-          res.status(500).json({ error: 'Failed to create event' });
+        } catch (error: any) {
+          console.error('Error creating event:', error);
+          res.status(500).json({ 
+            error: 'Failed to create event',
+            message: error.message,
+            details: error.errors // Include validation errors in response
+          });
         }
         break;
 
       default:
         res.setHeader('Allow', ['GET', 'POST']);
-        res.status(405).end(`Method ${req.method} Not Allowed`);
+        res.status(405).json({ error: `Method ${req.method} Not Allowed` });
     }
-  } catch (error) {
-    console.error('Database connection error:', error);
-    res.status(500).json({ error: 'Internal server error' });
+  } catch (error: any) {
+    console.error('Error handling events:', error);
+    res.status(500).json({ 
+      error: 'Internal Server Error',
+      message: error.message
+    });
   }
 }

@@ -1,206 +1,77 @@
-import React, { useState } from 'react';
-import { Card, Table, Select, Button, Space, Tabs } from 'antd';
-import { DownloadOutlined } from '@ant-design/icons';
-import { DatePicker } from '../../utils/date';
+import React from 'react';
+import { Tabs, Card, Typography, Space, Alert } from 'antd';
+import { UserOutlined, HistoryOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
+import RegistrationReport from './reports/registrations';
 
-const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
+const { Title, Text } = Typography;
 
-const Reports = () => {
-  const [selectedSource, setSelectedSource] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
-
-  // Mock data for registration report
-  const registrationData = [
-    {
-      key: '1',
-      name: 'John Doe',
-      email: 'john@example.com',
-      source: 'Online',
-      status: 'Visited',
-      registrationDate: '2023-06-01',
-      visitDate: '2023-06-15',
-    },
-  ];
-
-  // Mock data for entry log
-  const entryLogData = [
-    {
-      key: '1',
-      name: 'John Doe',
-      entryTime: '2023-06-15 09:30:00',
-      exitTime: '2023-06-15 17:00:00',
-      duration: '7h 30m',
-    },
-  ];
-
-  const registrationColumns = [
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-    },
-    {
-      title: 'Source',
-      dataIndex: 'source',
-      key: 'source',
-    },
-    {
-      title: 'Status',
-      dataIndex: 'status',
-      key: 'status',
-    },
-    {
-      title: 'Registration Date',
-      dataIndex: 'registrationDate',
-      key: 'registrationDate',
-    },
-    {
-      title: 'Visit Date',
-      dataIndex: 'visitDate',
-      key: 'visitDate',
-    },
-  ];
-
-  const entryLogColumns = [
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
-    },
-    {
-      title: 'Entry Time',
-      dataIndex: 'entryTime',
-      key: 'entryTime',
-    },
-    {
-      title: 'Exit Time',
-      dataIndex: 'exitTime',
-      key: 'exitTime',
-    },
-    {
-      title: 'Duration',
-      dataIndex: 'duration',
-      key: 'duration',
-    },
-  ];
-
-  const handleExport = (format: string) => {
-    // TODO: Implement export functionality
-    console.log(`Exporting report in ${format} format`);
-  };
-
+export default function ReportsPage() {
   return (
     <AdminLayout>
       <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Reports</h1>
-        
-        <Tabs defaultActiveKey="1">
-          <TabPane tab="Registration Report" key="1">
-            <Card>
-              <Space className="mb-4">
-                <RangePicker
-                  onChange={(dates) => console.log(dates)}
-                  className="w-64"
-                />
-                <Select
-                  value={selectedSource}
-                  onChange={setSelectedSource}
-                  className="w-40"
-                  options={[
-                    { value: 'all', label: 'All Sources' },
-                    { value: 'online', label: 'Online' },
-                    { value: 'pre-registered', label: 'Pre-registered' },
-                  ]}
-                />
-                <Select
-                  value={selectedStatus}
-                  onChange={setSelectedStatus}
-                  className="w-40"
-                  options={[
-                    { value: 'all', label: 'All Status' },
-                    { value: 'visited', label: 'Visited' },
-                    { value: 'not-visited', label: 'Not Visited' },
-                  ]}
-                />
-                <Button.Group>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    onClick={() => handleExport('csv')}
-                  >
-                    CSV
-                  </Button>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    onClick={() => handleExport('excel')}
-                  >
-                    Excel
-                  </Button>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    onClick={() => handleExport('pdf')}
-                  >
-                    PDF
-                  </Button>
-                </Button.Group>
-              </Space>
+        <div className="mb-6">
+          <Title level={2}>Reports</Title>
+          <Text type="secondary">View and analyze visitor registration data and entry logs</Text>
+        </div>
 
-              <Table
-                dataSource={registrationData}
-                columns={registrationColumns}
-                pagination={{ pageSize: 10 }}
-                scroll={{ x: true }}
-              />
-            </Card>
-          </TabPane>
-
-          <TabPane tab="Entry Log" key="2">
-            <Card>
-              <Space className="mb-4">
-                <RangePicker
-                  onChange={(dates) => console.log(dates)}
-                  className="w-64"
+        <Card>
+          <Tabs 
+            defaultActiveKey="registrations"
+            type="card"
+            size="large"
+            tabBarStyle={{ marginBottom: 24 }}
+          >
+            <TabPane 
+              tab={
+                <Space>
+                  <UserOutlined />
+                  <span>Registration Report</span>
+                </Space>
+              } 
+              key="registrations"
+            >
+              <RegistrationReport />
+            </TabPane>
+            
+            <TabPane 
+              tab={
+                <Space>
+                  <HistoryOutlined />
+                  <span>Entry Log</span>
+                </Space>
+              } 
+              key="entry-log"
+            >
+              <div className="p-6">
+                <Alert
+                  message="Entry Log Coming Soon"
+                  description="The entry log feature is currently under development. It will show detailed check-in and check-out records for all visitors."
+                  type="info"
+                  showIcon
+                  className="mb-6"
                 />
-                <Button.Group>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    onClick={() => handleExport('csv')}
-                  >
-                    CSV
-                  </Button>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    onClick={() => handleExport('excel')}
-                  >
-                    Excel
-                  </Button>
-                  <Button
-                    icon={<DownloadOutlined />}
-                    onClick={() => handleExport('pdf')}
-                  >
-                    PDF
-                  </Button>
-                </Button.Group>
-              </Space>
-
-              <Table
-                dataSource={entryLogData}
-                columns={entryLogColumns}
-                pagination={{ pageSize: 10 }}
-                scroll={{ x: true }}
-              />
-            </Card>
-          </TabPane>
-        </Tabs>
+                <Card>
+                  <div className="text-center py-12">
+                    <HistoryOutlined style={{ fontSize: 48, color: '#1890ff' }} />
+                    <Title level={4} className="mt-4">Entry Log Feature</Title>
+                    <Text type="secondary" className="block mt-2">
+                      This feature will provide:
+                    </Text>
+                    <ul className="text-left max-w-md mx-auto mt-4 text-gray-600">
+                      <li>• Real-time check-in and check-out tracking</li>
+                      <li>• Visitor movement history</li>
+                      <li>• Time-based analytics</li>
+                      <li>• Export capabilities for entry logs</li>
+                    </ul>
+                  </div>
+                </Card>
+              </div>
+            </TabPane>
+          </Tabs>
+        </Card>
       </div>
     </AdminLayout>
   );
-};
-
-export default Reports;
+}

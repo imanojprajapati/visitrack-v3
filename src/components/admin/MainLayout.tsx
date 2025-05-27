@@ -51,8 +51,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           top: 0,
           bottom: 0,
           zIndex: 1000,
+          boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)'
         }}
-      >        <div className="logo p-4 flex items-center justify-center">
+      >
+        <div className="logo p-4 flex items-center justify-center border-b border-gray-100">
           <Link href="/" className="flex items-center">
             {!collapsed ? (
               <img
@@ -83,17 +85,21 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             ),
           }))}
         />
-      </Sider>      <Layout style={{ 
-          marginLeft: collapsed ? 80 : 200, 
-          transition: 'all 0.2s',
-          minHeight: '100vh',
-          background: '#f5f5f5'
-        }}>
+      </Sider>
+      <Layout style={{ 
+        marginLeft: collapsed ? 80 : 200, 
+        transition: 'all 0.2s',
+        minHeight: '100vh',
+        background: '#f0f2f5'
+      }}>
         <Content style={{ 
-          margin: '24px',
+          padding: '24px',
           minHeight: 'calc(100vh - 48px)',
           display: 'flex',
-          flexDirection: 'column'
+          flexDirection: 'column',
+          width: '100%',
+          maxWidth: '100%',
+          overflow: 'hidden'
         }}>
           {children}
         </Content>

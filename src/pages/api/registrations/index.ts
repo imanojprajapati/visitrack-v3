@@ -4,12 +4,15 @@ import Registration from '../../../models/Registration';
 import Event, { IEvent } from '../../../models/Event';
 import Visitor from '../../../models/Visitor';
 import { Types } from 'mongoose';
+import mongoose from 'mongoose';
+
+interface RegistrationField {
+  label: string;
+  value: any;
+}
 
 interface RegistrationData {
-  [key: string]: {
-    label: string;
-    value: string | number;
-  };
+  [key: string]: RegistrationField;
 }
 
 type LeanEventDocument = {
@@ -60,25 +63,50 @@ export default async function handler(
         }, {});
 
         // Helper function to get visitor name from registration data
-        const getVisitorName = (data: RegistrationData): string => {
-          const nameField = Object.values(data).find(field => field.label === 'Name');
-          return nameField ? String(nameField.value) : 'Unknown';
+        const getVisitorName = (data: any): string => {
+          if (!data || typeof data !== 'object') return 'Unknown';
+          
+          try {
+            // Try to find name in formData
+            const formData = data.formData || data;
+            if (!formData || typeof formData !== 'object') return 'Unknown';
+
+            // Look for name field in various formats
+            const nameField = Object.values(formData).find((field: any) => {
+              if (!field || typeof field !== 'object') return false;
+              const label = String(field.label || '').toLowerCase();
+              return label.includes('name') || label.includes('full name') || label.includes('visitor name');
+            });
+
+            return nameField ? String(nameField.value || 'Unknown') : 'Unknown';
+          } catch (error) {
+            console.error('Error extracting visitor name:', error);
+            return 'Unknown';
+          }
         };
 
         // Combine registration and event data
         const visitors = registrations.map(registration => {
-          const registrationData = registration.data as RegistrationData;
-          const event = eventMap[registration.eventId.toString()];
-          return {
-            ...registration,
-            name: getVisitorName(registrationData),
-            event: event ? {
-              title: event.title,
-              location: event.location,
-              startDate: event.startDate,
-              endDate: event.endDate,
-            } : null
-          };
+          try {
+            const event = eventMap[registration.eventId.toString()];
+            return {
+              ...registration,
+              name: getVisitorName(registration),
+              event: event ? {
+                title: event.title,
+                location: event.location,
+                startDate: event.startDate,
+                endDate: event.endDate,
+              } : null
+            };
+          } catch (error) {
+            console.error('Error processing registration:', error);
+            return {
+              ...registration,
+              name: 'Unknown',
+              event: null
+            };
+          }
         });
 
         res.status(200).json(visitors);
@@ -100,104 +128,98 @@ export default async function handler(
           });
         }
 
-        // Validate data structure
-        if (typeof data !== 'object' || Object.keys(data).length === 0) {
-          console.error('Invalid data structure:', data);
-          return res.status(400).json({ error: 'Invalid form data structure' });
-        }
-
-        // Verify that the event exists
-        const event = await Event.findById(newEventId).lean() as IEvent;
-        if (!event) {
-          console.error('Event not found:', newEventId);
-          return res.status(404).json({ error: 'Event not found' });
-        }
+        // Start a session for transaction
+        const session = await mongoose.startSession();
+        session.startTransaction();
 
         try {
+          // Verify that the event exists and get current count
+          const eventDoc = await Event.findById(newEventId).session(session);
+          if (!eventDoc) {
+            throw new Error('Event not found');
+          }
+
+          // Check if event is at capacity
+          if (eventDoc.visitors >= eventDoc.capacity) {
+            throw new Error(`Event is at full capacity (${eventDoc.capacity} registrations)`);
+          }
+
           // Create the registration
-          const registration = await Registration.create({
+          const registration = await Registration.create([{
             eventId: newEventId,
             formId: newFormId,
             formData: data,
             status: 'registered',
             submittedAt: new Date(),
-          });
+          }], { session });
 
           // Extract visitor data from registration
-          const registrationData = data as Record<string, { label: string; value: any }>;
+          const registrationData = data as RegistrationData;
           
-          // Helper function to get field value by label
-          const getFieldValue = (label: string, possibleLabels: string[] = []): string => {
-            // First try the exact label
-            let field = Object.values(registrationData).find(f => f.label === label);
-            
-            // If not found and we have possible alternative labels, try those
-            if (!field && possibleLabels.length > 0) {
-              field = Object.values(registrationData).find(f => possibleLabels.includes(f.label));
-            }
-            
-            // If still not found, try case-insensitive match
-            if (!field) {
-              field = Object.values(registrationData).find(f => 
-                f.label.toLowerCase() === label.toLowerCase() ||
-                possibleLabels.some(pl => pl.toLowerCase() === f.label.toLowerCase())
-              );
-            }
-            
-            return field ? String(field.value) : '';
+          // Helper function to get field value with flexible label matching
+          const getFieldValue = (primaryLabel: string, alternativeLabels: string[] = []): string => {
+            const labels = [primaryLabel, ...alternativeLabels];
+            const field = Object.values(registrationData).find(f => 
+              labels.some(label => f.label.toLowerCase().includes(label.toLowerCase()))
+            );
+            return field ? String(field.value || '') : '';
           };
 
-          // Create visitor record
+          // Create visitor record with more flexible data extraction
           const visitorData = {
-            registrationId: registration._id,
+            registrationId: registration[0]._id,
             eventId: newEventId,
             formId: newFormId,
-            name: getFieldValue('Name', ['Full Name', 'Visitor Name']),
-            email: getFieldValue('Email', ['Email ID', 'Enter a Email', 'Email Address']),
-            phone: getFieldValue('Phone', ['Phone No', 'Phone Number', 'Mobile Number']),
-            age: Number(getFieldValue('Age', ['Visitor Age'])) || 0,
-            eventName: event.title,
-            eventLocation: event.location,
-            eventStartDate: event.startDate,
-            eventEndDate: event.endDate,
+            name: getFieldValue('Name', ['Full Name', 'Visitor Name', 'First Name', 'Last Name']),
+            email: getFieldValue('Email', ['Email ID', 'Enter a Email', 'Email Address', 'E-mail']),
+            phone: getFieldValue('Phone', ['Phone No', 'Phone Number', 'Mobile Number', 'Contact Number']),
+            age: Number(getFieldValue('Age', ['Visitor Age', 'Age Group'])) || 0,
+            eventName: eventDoc.title,
+            eventLocation: eventDoc.location,
+            eventStartDate: eventDoc.startDate,
+            eventEndDate: eventDoc.endDate,
             status: 'registered',
             additionalData: registrationData,
           };
 
-          // Validate required visitor fields
-          const requiredFields = ['name', 'email', 'phone'];
-          const missingFields = requiredFields.filter(field => !visitorData[field as keyof typeof visitorData]);
-
-          if (missingFields.length > 0) {
-            console.error('Missing required visitor fields:', missingFields);
-            // Delete the registration since we can't create a visitor
-            await Registration.findByIdAndDelete(registration._id);
-            return res.status(400).json({ 
-              error: 'Missing required visitor information',
-              missingFields
-            });
+          // More flexible validation - only require at least one contact method
+          const hasContactInfo = visitorData.email || visitorData.phone;
+          if (!visitorData.name || !hasContactInfo) {
+            throw new Error('Please provide at least a name and either an email or phone number');
           }
 
-          await Visitor.create(visitorData);
+          // Create visitor record
+          const visitor = await Visitor.create([visitorData], { session });
 
+          // Update event's visitor count using atomic operation
+          const updatedEvent = await Event.findByIdAndUpdate(
+            newEventId,
+            { $inc: { visitors: 1 } },
+            { new: true, session }
+          ).lean();
+
+          if (!updatedEvent) {
+            throw new Error('Failed to update event visitor count');
+          }
+
+          // Commit the transaction
+          await session.commitTransaction();
+
+          // Return the updated event data along with registration info
           res.status(201).json({
             success: true,
-            registration,
+            registration: registration[0],
+            visitor: visitor[0],
+            event: updatedEvent,
             message: 'Registration submitted successfully'
           });
         } catch (error: any) {
-          console.error('Error creating registration/visitor:', error);
-          // If there's a validation error, return it with details
-          if (error.name === 'ValidationError') {
-            return res.status(400).json({
-              error: 'Validation Error',
-              details: Object.keys(error.errors).reduce((acc, key) => {
-                acc[key] = error.errors[key].message;
-                return acc;
-              }, {} as Record<string, string>)
-            });
-          }
-          throw error; // Re-throw other errors to be caught by outer try-catch
+          // If an error occurred, abort the transaction
+          await session.abortTransaction();
+          throw error;
+        } finally {
+          // End the session
+          session.endSession();
         }
         break;
 

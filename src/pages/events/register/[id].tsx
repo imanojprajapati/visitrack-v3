@@ -19,6 +19,7 @@ export default function EventRegistrationPage() {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [registrationCount, setRegistrationCount] = useState(0);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -30,6 +31,13 @@ export default function EventRegistrationPage() {
         if (!eventResponse.ok) throw new Error('Failed to fetch event');
         const eventData = await eventResponse.json();
         setEvent(eventData);
+
+        // Fetch registration count
+        const registrationsResponse = await fetch(`/api/registrations?eventId=${id}`);
+        if (registrationsResponse.ok) {
+          const registrations = await registrationsResponse.json();
+          setRegistrationCount(registrations.length);
+        }
 
         // Fetch form for this event
         const formResponse = await fetch(`/api/forms?eventId=${id}`);
@@ -52,12 +60,27 @@ export default function EventRegistrationPage() {
     fetchData();
   }, [id, messageApi]);
 
+  // Add source field to form data when initializing
+  useEffect(() => {
+    if (eventForm) {
+      form.setFieldsValue({
+        source: 'Website' // Set default source value
+      });
+    }
+  }, [eventForm, form]);
+
   const handleSubmit = async (values: any) => {
-    if (!eventForm) return;
+    if (!event || !eventForm) return;
     
+    // Check capacity before submitting
+    if (registrationCount >= event.capacity) {
+      messageApi?.error('Sorry, this event has reached its maximum capacity');
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      setSubmitting(true);
-      // Format the data to match the desired structure
+      // Format the data to match the expected structure
       const formattedData = eventForm.fields.reduce((acc, field) => {
         acc[field.id] = {
           label: field.label,
@@ -65,6 +88,12 @@ export default function EventRegistrationPage() {
         };
         return acc;
       }, {} as Record<string, { label: string; value: any }>);
+
+      // Add source field
+      formattedData.source = {
+        label: 'Source',
+        value: 'Website'
+      };
 
       const response = await fetch('/api/registrations', {
         method: 'POST',
@@ -79,13 +108,28 @@ export default function EventRegistrationPage() {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit registration');
+        const error = await response.json();
+        throw new Error(error.message || 'Registration failed');
       }
 
       const result = await response.json();
+
+      // Update local registration count
+      setRegistrationCount(prev => prev + 1);
+
+      // Refresh event data to get updated capacity
+      const eventResponse = await fetch(`/api/events/${id}`);
+      if (eventResponse.ok) {
+        const updatedEvent = await eventResponse.json();
+        setEvent(updatedEvent);
+      }
+
       messageApi?.success('Registration submitted successfully!');
-      router.push('/');
+      
+      // Wait a moment before redirecting to show the success message
+      setTimeout(() => {
+        router.push(`/events/${id}/success`);
+      }, 1500);
     } catch (error) {
       console.error('Registration error:', error);
       messageApi?.error(error instanceof Error ? error.message : 'Failed to submit registration');
@@ -93,6 +137,26 @@ export default function EventRegistrationPage() {
       setSubmitting(false);
     }
   };
+
+  // Add a function to refresh registration count
+  const refreshRegistrationCount = async () => {
+    if (!id) return;
+    try {
+      const registrationsResponse = await fetch(`/api/registrations?eventId=${id}`);
+      if (registrationsResponse.ok) {
+        const registrations = await registrationsResponse.json();
+        setRegistrationCount(registrations.length);
+      }
+    } catch (error) {
+      console.error('Error refreshing registration count:', error);
+    }
+  };
+
+  // Only fetch registration count once when component mounts
+  useEffect(() => {
+    if (!id) return;
+    refreshRegistrationCount();
+  }, [id]);
 
   const getFieldRules = (field: FormField): Rule[] => {
     const rules: Rule[] = [];
@@ -196,6 +260,9 @@ export default function EventRegistrationPage() {
     );
   }
 
+  const isAtCapacity = registrationCount >= event.capacity;
+  const remainingSpots = event.capacity - registrationCount;
+
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto">
@@ -221,6 +288,14 @@ export default function EventRegistrationPage() {
                 <Text className="ml-2">{event.location}</Text>
               </div>
             </div>
+            <div className="mt-4">
+              <Text strong>Registration Status:</Text>
+              {isAtCapacity ? (
+                <Text type="danger">Event is at full capacity ({event.capacity} registrations)</Text>
+              ) : (
+                <Text type="success">{remainingSpots} spots remaining out of {event.capacity}</Text>
+              )}
+            </div>
           </div>
 
           <Divider />
@@ -229,8 +304,13 @@ export default function EventRegistrationPage() {
             form={form}
             layout="vertical"
             onFinish={handleSubmit}
-            requiredMark={false}
+            initialValues={{ source: 'Website' }}
           >
+            {/* Hidden source field */}
+            <Form.Item name="source" hidden>
+              <Input />
+            </Form.Item>
+
             {eventForm.fields.map(field => (
               <div key={field.id} className="mb-6">
                 {renderFormField(field)}
@@ -242,10 +322,11 @@ export default function EventRegistrationPage() {
                 type="primary"
                 htmlType="submit"
                 loading={submitting}
+                disabled={isAtCapacity}
                 block
                 size="large"
               >
-                Submit Registration
+                {isAtCapacity ? 'Event is Full' : 'Register for Event'}
               </Button>
             </Form.Item>
           </Form>

@@ -1,38 +1,40 @@
-export type EventCategory = 'Conference' | 'Workshop' | 'Seminar' | 'Meeting' | 'Other';
-export type EventStatus = 'active' | 'upcoming' | 'completed' | 'cancelled';
+export type EventCategory = 'Conference' | 'Workshop' | 'Seminar' | 'Meeting' | 'General' | 'Other';
+export type EventStatus = 'draft' | 'published' | 'cancelled' | 'upcoming';
 
 export interface Event {
   _id?: string;
-  id?: number;
   title: string;
   description: string;
-  category: EventCategory;
-  startDate: string;
-  endDate: string;
-  time: string;
+  category?: EventCategory;
+  startDate: string | Date;
+  endDate: string | Date;
+  time?: string;
   location: string;
   venue?: string;
-  organizer: string;
+  organizer?: string;
   banner?: string;
   status: EventStatus;
   capacity: number;
   visitors?: number;
-  registrationDeadline?: string;
+  registrationDeadline?: string | Date;
+  formId?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }
 
 export interface CreateEventInput {
   title: string;
-  description: string;
-  category: EventCategory;
-  startDate: string;
-  endDate: string;
-  time: string;
+  description?: string;
+  category?: EventCategory;
+  startDate: string | Date;
+  endDate: string | Date;
+  time?: string;
   location: string;
-  organizer: string;
+  venue?: string;
+  organizer?: string;
   banner?: string;
-  status: EventStatus;
-  capacity: number;
-  registrationDeadline?: string;
+  status?: EventStatus;
+  capacity?: number;
+  registrationDeadline?: string | Date;
+  formId?: string;
 }

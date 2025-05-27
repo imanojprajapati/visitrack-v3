@@ -4,10 +4,18 @@ export interface IEvent extends Document {
   title: string;
   description: string;
   location: string;
+  venue?: string;
   startDate: Date;
   endDate: Date;
-  formId: mongoose.Types.ObjectId;
-  status: 'draft' | 'published' | 'cancelled';
+  time?: string;
+  category?: string;
+  organizer?: string;
+  formId?: mongoose.Types.ObjectId;
+  status: 'draft' | 'published' | 'cancelled' | 'upcoming';
+  capacity: number;
+  visitors: number;
+  banner?: string;
+  registrationDeadline?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -27,6 +35,10 @@ const eventSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  venue: {
+    type: String,
+    trim: true
+  },
   startDate: {
     type: Date,
     required: true
@@ -35,15 +47,58 @@ const eventSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
+  time: {
+    type: String,
+    trim: true
+  },
+  category: {
+    type: String,
+    trim: true,
+    default: 'General'
+  },
+  organizer: {
+    type: String,
+    trim: true,
+    default: 'Admin'
+  },
   formId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Form',
-    required: true
+    ref: 'Form'
   },
   status: {
     type: String,
-    enum: ['draft', 'published', 'cancelled'],
+    enum: ['draft', 'published', 'cancelled', 'upcoming'],
     default: 'draft'
+  },
+  capacity: {
+    type: Number,
+    required: true,
+    default: 100,
+    min: 1,
+    validate: {
+      validator: function(v: number) {
+        return v > 0;
+      },
+      message: 'Capacity must be greater than 0'
+    }
+  },
+  visitors: {
+    type: Number,
+    default: 0,
+    min: 0,
+    validate: {
+      validator: function(v: number) {
+        return v >= 0;
+      },
+      message: 'Visitor count cannot be negative'
+    }
+  },
+  banner: {
+    type: String,
+    trim: true
+  },
+  registrationDeadline: {
+    type: Date
   },
   createdAt: {
     type: Date,
@@ -64,6 +119,14 @@ eventSchema.index({ createdAt: -1 });
 // Update the updatedAt timestamp before saving
 eventSchema.pre('save', function(next) {
   this.updatedAt = new Date();
+  next();
+});
+
+// Ensure visitors count is initialized to 0 for new events
+eventSchema.pre('save', function(next) {
+  if (this.isNew) {
+    this.visitors = 0;
+  }
   next();
 });
 
