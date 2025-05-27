@@ -52,7 +52,7 @@ export default async function handler(
         background: template.background,
       },
       event: {
-        name: event.name,
+        title: event.title,
         description: event.description,
         startDate: event.startDate,
         endDate: event.endDate,
@@ -62,10 +62,15 @@ export default async function handler(
         name: visitor.name,
         email: visitor.email,
         phone: visitor.phone,
-        company: visitor.company,
-        photoUrl: visitor.photoUrl,
+        age: visitor.age,
+        eventName: visitor.eventName,
+        eventLocation: visitor.eventLocation,
+        eventStartDate: visitor.eventStartDate,
+        eventEndDate: visitor.eventEndDate,
+        status: visitor.status,
         checkInTime: visitor.checkInTime,
         checkOutTime: visitor.checkOutTime,
+        additionalData: visitor.additionalData
       },
     });
   } catch (error: any) {

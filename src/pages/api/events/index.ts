@@ -59,8 +59,8 @@ export default async function handler(
 
           const newEvent: Omit<Event, '_id'> = {
             ...eventData,
-            startDate,
-            endDate,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
             createdAt: new Date(),
             updatedAt: new Date(),
           };

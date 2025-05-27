@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   Card,
   Button,
@@ -19,10 +19,8 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined
 } from '@ant-design/icons';
-import dynamic from 'next/dynamic';
 import { QRCodeSVG } from 'qrcode.react';
 import AdminLayout from './layout';
-import type { WebcamProps } from 'react-webcam';
 
 const { Text } = Typography;
 
@@ -40,22 +38,6 @@ interface ScannedVisitor extends VisitorData {
   scanTime: string;
 }
 
-// Create a wrapper component for the Webcam
-const WebcamWrapper = React.forwardRef((props: any, ref: any) => {
-  const Webcam = dynamic(() => import('react-webcam'), {
-    ssr: false,
-    loading: () => (
-      <div className="w-full h-[480px] flex items-center justify-center bg-gray-100">
-        <Text type="secondary">Loading camera...</Text>
-      </div>
-    ),
-  });
-
-  return <Webcam {...props} ref={ref} />;
-});
-
-WebcamWrapper.displayName = 'WebcamWrapper';
-
 const QRScanner = () => {
   const [form] = Form.useForm<VisitorData>();
   const [scanResult, setScanResult] = useState<VisitorData | null>(null);
@@ -66,13 +48,48 @@ const QRScanner = () => {
   const [visitorStatus, setVisitorStatus] = useState<boolean | null>(null);
   const [cameraError, setCameraError] = useState(false);
   const badgeRef = useRef<HTMLDivElement>(null);
-  const webcamRef = useRef<any>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
 
-  const videoConstraints = {
-    facingMode: "environment",
-    width: 1280,
-    height: 720
-  };
+  const startCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "environment",
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+      }
+    } catch (err) {
+      console.error('Error accessing camera:', err);
+      setCameraError(true);
+      message.error('Error accessing camera. Please check your camera permissions or try manual entry.');
+    }
+  }, []);
+
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showScanner) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera();
+  }, [showScanner, startCamera, stopCamera]);
 
   const handleError = (err: string | DOMException) => {
     console.error(err);
@@ -110,14 +127,11 @@ const QRScanner = () => {
   };
 
   const capture = useCallback(() => {
-    if (webcamRef.current) {
-      const imageSrc = webcamRef.current.getScreenshot?.();
-      if (imageSrc) {
-        // TODO: Implement QR code scanning using jsQR library
-        message.info('QR code scanning simulation - implement actual scanning logic');
-      }
+    if (videoRef.current) {
+      // TODO: Implement QR code scanning using jsQR library
+      message.info('QR code scanning simulation - implement actual scanning logic');
     }
-  }, [webcamRef]);
+  }, []);
 
   const handleManualEntry = (values: VisitorData) => {
     processVisitorData(JSON.stringify(values));
@@ -211,6 +225,7 @@ const QRScanner = () => {
           onCancel={() => {
             setShowScanner(false);
             setCameraError(false);
+            stopCamera();
           }}
           footer={[
             <Button key="scan" type="primary" onClick={capture} disabled={cameraError}>
@@ -229,14 +244,12 @@ const QRScanner = () => {
               </div>
             ) : (
               <div className="relative w-full max-w-2xl">
-                <WebcamWrapper
-                  audio={false}
-                  ref={webcamRef}
-                  screenshotFormat="image/jpeg"
-                  videoConstraints={videoConstraints}
-                  onUserMediaError={handleError}
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
                   className="w-full"
-                  mirrored={false}
+                  style={{ transform: 'scaleX(-1)' }}
                 />
                 <div className="absolute inset-0 border-2 border-dashed border-blue-500 pointer-events-none" />
               </div>

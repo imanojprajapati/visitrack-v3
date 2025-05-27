@@ -3,6 +3,7 @@ import { connectToDatabase } from '../../../lib/mongodb';
 import Registration from '../../../models/Registration';
 import Event, { IEvent } from '../../../models/Event';
 import Visitor from '../../../models/Visitor';
+import { Types } from 'mongoose';
 
 interface RegistrationData {
   [key: string]: {
@@ -10,6 +11,17 @@ interface RegistrationData {
     value: string | number;
   };
 }
+
+type LeanEventDocument = {
+  _id: Types.ObjectId;
+  title: string;
+  description: string;
+  location: string;
+  startDate: Date;
+  endDate: Date;
+  status: string;
+  __v: number;
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -39,10 +51,10 @@ export default async function handler(
         const eventIds = Array.from(new Set(registrations.map(reg => reg.eventId.toString())));
         
         // Fetch all related events
-        const events = await Event.find({ _id: { $in: eventIds } }).lean();
+        const events = (await Event.find({ _id: { $in: eventIds } }).lean()) as unknown as LeanEventDocument[];
         
         // Create a map of events for easy lookup
-        const eventMap = events.reduce((map: Record<string, IEvent>, event: IEvent) => {
+        const eventMap = events.reduce((map: Record<string, LeanEventDocument>, event) => {
           map[event._id.toString()] = event;
           return map;
         }, {});
@@ -56,14 +68,15 @@ export default async function handler(
         // Combine registration and event data
         const visitors = registrations.map(registration => {
           const registrationData = registration.data as RegistrationData;
+          const event = eventMap[registration.eventId.toString()];
           return {
             ...registration,
             name: getVisitorName(registrationData),
-            event: eventMap[registration.eventId.toString()] ? {
-              title: eventMap[registration.eventId.toString()].title,
-              location: eventMap[registration.eventId.toString()].location,
-              startDate: eventMap[registration.eventId.toString()].startDate,
-              endDate: eventMap[registration.eventId.toString()].endDate,
+            event: event ? {
+              title: event.title,
+              location: event.location,
+              startDate: event.startDate,
+              endDate: event.endDate,
             } : null
           };
         });

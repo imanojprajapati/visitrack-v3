@@ -1,12 +1,18 @@
-export type FormFieldType = 'text' | 'email' | 'number' | 'tel' | 'date' | 'select' | 'textarea';
+export type FormFieldType = 'text' | 'textarea' | 'email' | 'number' | 'select' | 'date';
+
+export interface FormFieldOption {
+  label: string;
+  value: string;
+}
 
 export interface FormField {
   id: string;
   type: FormFieldType;
   label: string;
   required: boolean;
+  description?: string;
   placeholder?: string;
-  options?: string[]; // For select fields
+  options?: FormFieldOption[]; // Updated to use FormFieldOption type
   validation?: {
     min?: number;
     max?: number;

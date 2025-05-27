@@ -60,8 +60,8 @@ export default async function handler(
 
           const updateData = {
             ...eventData,
-            startDate,
-            endDate,
+            startDate: startDate.toISOString(),
+            endDate: endDate.toISOString(),
             updatedAt: new Date(),
           };
 

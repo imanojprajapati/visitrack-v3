@@ -5,13 +5,20 @@ import AdminLayout from './layout';
 
 const { Option } = Select;
 
+interface Role {
+  key: string;
+  name: string;
+  description: string;
+  permissions: string[];
+}
+
 const Settings = () => {
   const [form] = Form.useForm();
   const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingRole, setEditingRole] = useState(null);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
 
   // Mock data for roles
-  const [roles, setRoles] = useState([
+  const [roles, setRoles] = useState<Role[]>([
     {
       key: '1',
       name: 'Admin',
