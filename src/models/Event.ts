@@ -7,7 +7,8 @@ export interface IEvent extends Document {
   venue?: string;
   startDate: Date;
   endDate: Date;
-  time?: string;
+  time: string;
+  endTime: string;
   category?: string;
   organizer?: string;
   formId?: mongoose.Types.ObjectId;
@@ -49,6 +50,12 @@ const eventSchema = new mongoose.Schema({
   },
   time: {
     type: String,
+    required: true,
+    trim: true
+  },
+  endTime: {
+    type: String,
+    required: true,
     trim: true
   },
   category: {

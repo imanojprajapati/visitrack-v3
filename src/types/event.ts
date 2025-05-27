@@ -10,7 +10,8 @@ export interface Event {
   category?: EventCategory;
   startDate: string | Date;
   endDate: string | Date;
-  time?: string;
+  time: string;
+  endTime: string;
   location: string;
   venue?: string;
   organizer?: string;
@@ -31,7 +32,8 @@ export interface CreateEventInput {
   category?: EventCategory;
   startDate: string | Date;
   endDate: string | Date;
-  time?: string;
+  time: string;
+  endTime: string;
   location: string;
   venue?: string;
   organizer?: string;

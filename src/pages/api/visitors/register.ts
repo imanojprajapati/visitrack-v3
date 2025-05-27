@@ -35,6 +35,31 @@ const formatDate = (date: Date | string): string => {
   return `${day}-${month}-${year}`;
 };
 
+// Helper function to convert 12-hour time to 24-hour format
+const convertTo24HourFormat = (time: string): string => {
+  // If already in 24-hour format (HH:mm), return as is
+  if (/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
+    return time;
+  }
+
+  // Parse 12-hour format (h:mm AM/PM)
+  const match = time.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+  if (!match) {
+    throw new Error('Invalid time format');
+  }
+
+  let [_, hours, minutes, period] = match;
+  hours = parseInt(hours, 10);
+  
+  if (period.toUpperCase() === 'PM' && hours !== 12) {
+    hours += 12;
+  } else if (period.toUpperCase() === 'AM' && hours === 12) {
+    hours = 0;
+  }
+
+  return `${String(hours).padStart(2, '0')}:${minutes}`;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -153,6 +178,8 @@ export default async function handler(
         eventLocation: event.location,
         eventStartDate: formatDate(event.startDate),
         eventEndDate: formatDate(event.endDate),
+        eventStartTime: convertTo24HourFormat(event.time),
+        eventEndTime: event.endTime ? convertTo24HourFormat(event.endTime) : convertTo24HourFormat(event.time), // Use start time as fallback
         status: 'registered',
         createdAt: formattedDate,
         updatedAt: formattedDate,

@@ -1,16 +1,23 @@
-import { useCallback } from 'react';
+import { useCallback, useState, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Form, UploadFile, UploadProps } from 'antd';
-import { FormValues } from '../pages/admin/events';
-import { useRouter } from 'next/router';
-import { UploadChangeParam } from 'antd/lib/upload';
+import { Form } from 'antd';
+import type { FormValues } from '../pages/admin/events';
+import type { UploadChangeParam, UploadFile } from 'antd/lib/upload';
+import { dayjs } from '../utils/date';
+import type { CreateEventInput } from '../types/event';
+
+interface UploadResponse {
+  url: string;
+}
 
 export function useEventForm() {
   const { messageApi } = useAppContext();
-  const [form] = Form.useForm();
-  const router = useRouter();
+  const [form] = Form.useForm<FormValues>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleImageUpload = useCallback((info: UploadChangeParam<UploadFile>) => {
+    if (!info.file) return;
+
     const { status, response } = info.file;
     
     try {
@@ -44,70 +51,79 @@ export function useEventForm() {
     }
   }, [form, messageApi]);
 
-  const handleSubmit = async (values: FormValues, eventId?: string) => {
+  const handleSubmit = useCallback(async (values: FormValues, eventId?: string) => {
     try {
-      const bannerUrl = Array.isArray(values.banner) && values.banner.length > 0
-        ? values.banner[0]?.response?.url || values.banner[0]?.url
-        : values.banner;
+      setIsSubmitting(true);
 
-      const formattedValues = {
+      // Get banner URL from either string or upload response
+      const bannerUrl = typeof values.banner === 'string' 
+        ? values.banner 
+        : (values.banner?.[0] as unknown as (UploadFile & { response?: UploadResponse }))?.response?.url;
+
+      // Format dates and times and create properly typed event input
+      const formattedData: CreateEventInput = {
         title: values.title,
-        category: 'Conference', // Default category
-        description: values.description || '',
-        startDate: values.date?.format('YYYY-MM-DD'),
-        endDate: values.date?.format('YYYY-MM-DD'), // Same as start date if no end date provided
-        time: values.time,
         location: values.venue,
-        venue: values.venue, // Add venue field explicitly
-        organizer: 'Admin', // Default organizer
+        startDate: values.date?.format('YYYY-MM-DD') ?? '',
+        endDate: values.endDate?.format('YYYY-MM-DD') ?? '',
+        time: values.time,
+        endTime: values.endTime,
         status: values.status,
         capacity: values.capacity,
-        banner: bannerUrl, // Use the extracted banner URL
+        description: values.description,
         registrationDeadline: values.registrationDeadline?.format('YYYY-MM-DD'),
+        banner: bannerUrl
       };
 
-      const cleanedValues = Object.fromEntries(
-        Object.entries(formattedValues).filter(([_, v]) => v !== null && v !== undefined)
-      );
-      
-      const url = eventId ? `/api/events/${eventId}` : '/api/events';
-      const method = eventId ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
+      // Remove venue field as we're using location
+      delete formattedData.venue;
+
+      // Validate end time is after start time
+      if (values.time && values.endTime) {
+        const startTime = dayjs(`2000-01-01 ${values.time}`);
+        const endTime = dayjs(`2000-01-01 ${values.endTime}`);
+        if (endTime.isBefore(startTime)) {
+          messageApi?.error('End time must be after start time');
+          return false;
+        }
+      }
+
+      // Validate end date is after or equal to start date
+      if (values.date && values.endDate) {
+        if (values.endDate.isBefore(values.date)) {
+          messageApi?.error('End date must be after or equal to start date');
+          return false;
+        }
+      }
+
+      const response = await fetch(eventId ? `/api/events/${eventId}` : '/api/events', {
+        method: eventId ? 'PUT' : 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(cleanedValues),
+        body: JSON.stringify(formattedData),
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Failed to ${eventId ? 'update' : 'create'} event`);
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to save event');
       }
 
-      messageApi?.success({
-        content: `Event ${eventId ? 'updated' : 'created'} successfully`,
-        key: 'event-save',
-      });
-
-      // Redirect to events list
-      router.push('/admin/events');
-      
+      messageApi?.success(`Event ${eventId ? 'updated' : 'created'} successfully`);
       return true;
     } catch (error) {
-      console.error('Event save error:', error);
-      messageApi?.error({
-        content: `Failed to ${eventId ? 'update' : 'create'} event`,
-        key: 'event-save',
-      });
+      console.error('Error saving event:', error);
+      messageApi?.error(error instanceof Error ? error.message : 'Failed to save event');
       return false;
+    } finally {
+      setIsSubmitting(false);
     }
-  };
+  }, [messageApi]);
 
-  return {
+  return useMemo(() => ({
     form,
     handleSubmit,
     handleImageUpload,
-  };
+    isSubmitting,
+  }), [form, handleSubmit, handleImageUpload, isSubmitting]);
 }

@@ -28,16 +28,17 @@ import { DatePicker, dayjs } from '../../utils/date';
 import AdminLayout from './layout';
 import { useAppContext } from '../../context/AppContext';
 import { useEventForm } from '../../hooks/useEventForm';
+import type { Event, EventStatus } from '../../types/event';
 
 const { TextArea } = Input;
-
-import type { Event } from '../../types/event';
 
 export interface FormValues {
   title: string;
   venue: string;
-  date: any; // dayjs object
+  date: any; // dayjs object for start date
+  endDate: any; // dayjs object for end date
   time: string;
+  endTime: string;
   status: Event['status'];
   capacity: number;
   description?: string;
@@ -189,12 +190,12 @@ export default function EventManagement() {
       title: 'Status',
       dataIndex: 'status',
       key: 'status',
-      render: (status: Event['status']) => {
-        const colors: Record<Event['status'], string> = {
-          active: 'green',
-          upcoming: 'blue',
-          completed: 'gray',
-          cancelled: 'red'
+      render: (status: EventStatus) => {
+        const colors: Record<EventStatus, string> = {
+          draft: 'gray',
+          published: 'green',
+          cancelled: 'red',
+          upcoming: 'blue'
         };
         return (
           <Tag color={colors[status]}>
@@ -260,7 +261,9 @@ export default function EventManagement() {
       title: event.title,
       venue: event.venue || event.location, // Use venue if available, fallback to location
       date: event.startDate ? dayjs(event.startDate) : undefined,
+      endDate: event.endDate ? dayjs(event.endDate) : undefined,
       time: event.time,
+      endTime: event.endTime,
       status: event.status,
       capacity: event.capacity,
       description: event.description,
@@ -351,14 +354,20 @@ export default function EventManagement() {
                 </Col>
                 <Col span={12}>
                   <div className="font-semibold text-gray-600">Date & Time</div>
-                  <div>{selectedEvent.startDate} at {selectedEvent.time}</div>
+                  <div>
+                    {typeof selectedEvent.startDate === 'string' 
+                      ? new Date(selectedEvent.startDate).toLocaleDateString()
+                      : selectedEvent.startDate instanceof Date 
+                        ? selectedEvent.startDate.toLocaleDateString()
+                        : ''} at {selectedEvent.time}
+                  </div>
                 </Col>
                 <Col span={12}>
                   <div className="font-semibold text-gray-600">Status</div>
                   <Tag color={
-                    selectedEvent.status === 'active' ? 'green' :
+                    selectedEvent.status === 'published' ? 'green' :
                     selectedEvent.status === 'upcoming' ? 'blue' :
-                    selectedEvent.status === 'completed' ? 'gray' : 'red'
+                    selectedEvent.status === 'draft' ? 'gray' : 'red'
                   }>
                     {selectedEvent.status.toUpperCase()}
                   </Tag>
@@ -398,7 +407,13 @@ export default function EventManagement() {
                 {selectedEvent.registrationDeadline && (
                   <Col span={12}>
                     <div className="font-semibold text-gray-600">Registration Deadline</div>
-                    <div>{selectedEvent.registrationDeadline}</div>
+                    <div>
+                      {typeof selectedEvent.registrationDeadline === 'string'
+                        ? new Date(selectedEvent.registrationDeadline).toLocaleDateString()
+                        : selectedEvent.registrationDeadline instanceof Date
+                          ? selectedEvent.registrationDeadline.toLocaleDateString()
+                          : ''}
+                    </div>
                   </Col>
                 )}
               </Row>
@@ -427,9 +442,9 @@ export default function EventManagement() {
                     rules={[{ required: true, message: 'Please select status' }]}
                   >
                     <Select>
-                      <Select.Option value="active">Active</Select.Option>
+                      <Select.Option value="published">Published</Select.Option>
                       <Select.Option value="upcoming">Upcoming</Select.Option>
-                      <Select.Option value="completed">Completed</Select.Option>
+                      <Select.Option value="draft">Draft</Select.Option>
                       <Select.Option value="cancelled">Cancelled</Select.Option>
                     </Select>
                   </Form.Item>
@@ -440,9 +455,9 @@ export default function EventManagement() {
                 <Col span={12}>
                   <Form.Item
                     name="date"
-                    label="Event Date"
+                    label="Start Date"
                     rules={[
-                      { required: true, message: 'Please select the event date' },
+                      { required: true, message: 'Please select the event start date' },
                     ]}
                   >
                     <DatePicker 
@@ -453,11 +468,45 @@ export default function EventManagement() {
                 </Col>
                 <Col span={12}>
                   <Form.Item
-                    name="time"
-                    label="Event Time"
-                    rules={[{ required: true, message: 'Please enter event time' }]}
+                    name="endDate"
+                    label="End Date"
+                    rules={[
+                      { required: true, message: 'Please select the event end date' },
+                      ({ getFieldValue }) => ({
+                        validator(_, value) {
+                          if (!value || !getFieldValue('date') || value.isAfter(getFieldValue('date'))) {
+                            return Promise.resolve();
+                          }
+                          return Promise.reject(new Error('End date must be after start date'));
+                        },
+                      }),
+                    ]}
                   >
-                    <Input />
+                    <DatePicker 
+                      style={{ width: '100%' }}
+                      format="YYYY-MM-DD"
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={16}>
+                <Col span={12}>
+                  <Form.Item
+                    name="time"
+                    label="Start Time"
+                    rules={[{ required: true, message: 'Please enter event start time' }]}
+                  >
+                    <Input placeholder="e.g., 09:00 AM" />
+                  </Form.Item>
+                </Col>
+                <Col span={12}>
+                  <Form.Item
+                    name="endTime"
+                    label="End Time"
+                    rules={[{ required: true, message: 'Please enter event end time' }]}
+                  >
+                    <Input placeholder="e.g., 05:00 PM" />
                   </Form.Item>
                 </Col>
               </Row>

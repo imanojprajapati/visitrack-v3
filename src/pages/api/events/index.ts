@@ -40,12 +40,14 @@ export default async function handler(
 
           // Validate required fields
           if (!eventData.title || !eventData.location || !eventData.startDate || 
-              !eventData.endDate) {
+              !eventData.endDate || !eventData.time || !eventData.endTime) {
             console.error('Missing required fields:', {
               title: !eventData.title,
               location: !eventData.location,
               startDate: !eventData.startDate,
-              endDate: !eventData.endDate
+              endDate: !eventData.endDate,
+              time: !eventData.time,
+              endTime: !eventData.endTime
             });
             return res.status(400).json({ error: 'Missing required fields' });
           }
@@ -67,7 +69,8 @@ export default async function handler(
             venue: eventData.venue || eventData.location,
             startDate: startDate,
             endDate: endDate,
-            time: eventData.time || '',
+            time: eventData.time,
+            endTime: eventData.endTime,
             category: eventData.category || 'General',
             organizer: eventData.organizer || 'Admin',
             status: eventData.status || 'draft',

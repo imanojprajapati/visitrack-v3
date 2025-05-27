@@ -14,6 +14,8 @@ export interface IVisitor extends Document {
   eventLocation: string;                   // Event location (denormalized)
   eventStartDate: string;                  // Event start date in DD-MM-YY format
   eventEndDate: string;                    // Event end date in DD-MM-YY format
+  eventStartTime: string;                  // Event start time in HH:mm format
+  eventEndTime: string;                    // Event end time in HH:mm format
   status: 'registered' | 'checked_in' | 'checked_out' | 'cancelled';
   checkInTime?: string;                    // When visitor checked in (DD-MM-YY HH:mm)
   checkOutTime?: string;                   // When visitor checked out (DD-MM-YY HH:mm)
@@ -43,6 +45,9 @@ const formatDateTime = (date: Date): string => {
 // Date string validation regex
 const dateRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/;
 const dateTimeRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2} ([01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+// Time string validation regex
+const timeRegex = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
 // Schema type for date strings that prevents type casting
 const dateStringSchemaType = {
@@ -126,6 +131,26 @@ const visitorSchema = new mongoose.Schema({
         return dateRegex.test(v);
       },
       message: 'Event end date must be in DD-MM-YY format'
+    }
+  },
+  eventStartTime: {
+    type: String,
+    required: true,
+    validate: {
+      validator: function(v: string) {
+        return timeRegex.test(v);
+      },
+      message: 'Event start time must be in HH:mm format'
+    }
+  },
+  eventEndTime: {
+    type: String,
+    required: true,
+    validate: {
+      validator: function(v: string) {
+        return timeRegex.test(v);
+      },
+      message: 'Event end time must be in HH:mm format'
     }
   },
   status: {
