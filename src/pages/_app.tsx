@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { AppProvider } from '../components/AppProvider';
 import { useEffect, useState } from 'react';
+import { App as AntApp } from 'antd';
 
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -43,9 +44,11 @@ function MyApp({ Component, pageProps }: AppProps) {
   }
 
   return (
-    <AppProvider>
-      {content}
-    </AppProvider>
+    <AntApp>
+      <AppProvider>
+        {content}
+      </AppProvider>
+    </AntApp>
   );
 }
 

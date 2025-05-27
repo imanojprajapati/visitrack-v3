@@ -42,6 +42,7 @@ import { v2 as cloudinary } from 'cloudinary';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReactDOM from 'react-dom/client';
+import { QRCodeComponent, generateVerificationURL } from '../../lib/qrcode';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -422,7 +423,7 @@ const BadgeManagement: React.FC = () => {
       qrCodeComponent.style.height = '100%';
       tempDiv.appendChild(qrCodeComponent);
 
-      // Use ReactDOM to render the QR code with specific IP address
+      // Use ReactDOM to render the QR code with verification URL
       const root = ReactDOM.createRoot(qrCodeComponent);
       root.render(
         <div style={{ 
@@ -432,13 +433,13 @@ const BadgeManagement: React.FC = () => {
           width: '100%',
           height: '100%'
         }}>
-          <QRCodeSVG
-            value={`http://192.168.29.163:3000/verify/${templateId}`}
+          <QRCodeComponent
+            data={{
+              visitorId: 'template',
+              eventId: eventId,
+              registrationId: templateId
+            }}
             size={1000}
-            level="H"
-            bgColor="#ffffff"
-            fgColor="#000000"
-            includeMargin={true}
           />
         </div>
       );

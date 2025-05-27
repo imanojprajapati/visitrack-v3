@@ -9,21 +9,17 @@ const { Title, Text } = Typography;
 
 interface Visitor {
   _id: string;
+  registrationId: string;
   name: string;
   email: string;
   phone: string;
-  company: string;
-  city: string;
-  state: string;
-  country: string;
-  pincode: string;
-  source: string;
+  company?: string;
   eventName: string;
   eventLocation: string;
   eventStartDate: string;
   eventEndDate: string;
   status: string;
-  submittedAt: string;
+  createdAt: string;
   additionalData: Record<string, { label: string; value: any }>;
 }
 
@@ -36,11 +32,6 @@ export default function RegistrationReportPage() {
     email: '',
     phone: '',
     company: '',
-    city: '',
-    state: '',
-    country: '',
-    pincode: '',
-    source: '',
     eventId: '',
     dateRange: null as [string, string] | null,
   });
@@ -111,11 +102,6 @@ export default function RegistrationReportPage() {
       email: '',
       phone: '',
       company: '',
-      city: '',
-      state: '',
-      country: '',
-      pincode: '',
-      source: '',
       eventId: '',
       dateRange: null,
     });
@@ -123,20 +109,17 @@ export default function RegistrationReportPage() {
 
   const handleExport = () => {
     // Convert visitors data to CSV
-    const headers = ['Name', 'Email', 'Phone', 'Company', 'City', 'State', 'Country', 'Pincode', 'Source', 'Event', 'Status', 'Registration Date'];
+    const headers = ['Name', 'Email', 'Phone', 'Company', 'Event', 'Location', 'Date', 'Status', 'Registration Date'];
     const csvData = visitors.map(visitor => [
       visitor.name,
       visitor.email,
       visitor.phone,
-      visitor.company,
-      visitor.city,
-      visitor.state,
-      visitor.country,
-      visitor.pincode,
-      visitor.source,
+      visitor.company || visitor.additionalData?.company?.value || '',
       visitor.eventName,
+      visitor.eventLocation,
+      new Date(visitor.eventStartDate).toLocaleDateString(),
       visitor.status,
-      new Date(visitor.submittedAt).toLocaleString()
+      new Date(visitor.createdAt).toLocaleString()
     ]);
 
     const csvContent = [
@@ -161,50 +144,63 @@ export default function RegistrationReportPage() {
       dataIndex: 'name',
       key: 'name',
       sorter: (a: Visitor, b: Visitor) => a.name.localeCompare(b.name),
+      render: (name: string, record: Visitor) => name || record.additionalData?.name?.value || '-'
     },
     {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
+      render: (email: string, record: Visitor) => email || record.additionalData?.email?.value || '-'
     },
     {
       title: 'Phone',
       dataIndex: 'phone',
       key: 'phone',
+      render: (phone: string, record: Visitor) => phone || record.additionalData?.phone?.value || '-'
     },
     {
       title: 'Company',
       dataIndex: 'company',
       key: 'company',
+      render: (company: string, record: Visitor) => 
+        company || record.additionalData?.company?.value || '-'
     },
     {
-      title: 'Location',
-      key: 'location',
-      render: (record: Visitor) => {
-        const city = record.additionalData?.city?.value || record.city;
-        const state = record.additionalData?.state?.value || record.state;
-        const country = record.additionalData?.country?.value || record.country;
-        const pincode = record.additionalData?.pincode?.value || record.pincode;
-        
-        return (
-          <span>
-            {[city, state, country].filter(Boolean).join(', ')}
-            {pincode ? ` - ${pincode}` : ''}
-          </span>
-        );
-      },
-    },
-    {
-      title: 'Source',
-      dataIndex: 'source',
-      key: 'source',
-      render: (source: string, record: Visitor) => 
-        record.additionalData?.source?.value || source || 'Website'
+      title: 'Country',
+      dataIndex: 'country',
+      key: 'country',
+      render: (_: any, record: Visitor) => 
+        record.additionalData?.country?.value || '-'
     },
     {
       title: 'Event',
       dataIndex: 'eventName',
       key: 'eventName',
+    },
+    {
+      title: 'Location',
+      dataIndex: 'eventLocation',
+      key: 'eventLocation',
+    },
+    {
+      title: 'Date',
+      dataIndex: 'eventStartDate',
+      key: 'eventStartDate',
+      render: (date: string) => {
+        try {
+          if (!date) return '-';
+          const dateObj = new Date(date);
+          if (isNaN(dateObj.getTime())) return '-';
+          return dateObj.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+          });
+        } catch (error) {
+          console.error('Error formatting date:', error);
+          return '-';
+        }
+      },
     },
     {
       title: 'Status',
@@ -223,9 +219,25 @@ export default function RegistrationReportPage() {
     },
     {
       title: 'Registration Date',
-      dataIndex: 'submittedAt',
-      key: 'submittedAt',
-      render: (date: string) => new Date(date).toLocaleString(),
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (date: string) => {
+        try {
+          if (!date) return '-';
+          const dateObj = new Date(date);
+          if (isNaN(dateObj.getTime())) return '-';
+          return dateObj.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        } catch (error) {
+          console.error('Error formatting date:', error);
+          return '-';
+        }
+      },
     },
   ];
 
@@ -299,46 +311,6 @@ export default function RegistrationReportPage() {
               placeholder="Search by company"
               value={filters.company}
               onChange={(e) => handleFilterChange('company', e.target.value)}
-              prefix={<SearchOutlined className="text-gray-400" />}
-              allowClear
-              className="hover:border-blue-400 focus:border-blue-400"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Input
-              placeholder="Search by city"
-              value={filters.city}
-              onChange={(e) => handleFilterChange('city', e.target.value)}
-              prefix={<SearchOutlined className="text-gray-400" />}
-              allowClear
-              className="hover:border-blue-400 focus:border-blue-400"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Input
-              placeholder="Search by state"
-              value={filters.state}
-              onChange={(e) => handleFilterChange('state', e.target.value)}
-              prefix={<SearchOutlined className="text-gray-400" />}
-              allowClear
-              className="hover:border-blue-400 focus:border-blue-400"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Input
-              placeholder="Search by country"
-              value={filters.country}
-              onChange={(e) => handleFilterChange('country', e.target.value)}
-              prefix={<SearchOutlined className="text-gray-400" />}
-              allowClear
-              className="hover:border-blue-400 focus:border-blue-400"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Input
-              placeholder="Search by pincode"
-              value={filters.pincode}
-              onChange={(e) => handleFilterChange('pincode', e.target.value)}
               prefix={<SearchOutlined className="text-gray-400" />}
               allowClear
               className="hover:border-blue-400 focus:border-blue-400"

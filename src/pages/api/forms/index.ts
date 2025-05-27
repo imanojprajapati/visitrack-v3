@@ -1,6 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import connectDB from '../../../lib/db';
 import Form from '../../../models/Form';
+import Event from '../../../models/Event';
+import mongoose from 'mongoose';
 
 export default async function handler(
   req: NextApiRequest,
@@ -26,6 +28,9 @@ export default async function handler(
   }
 
   if (req.method === 'POST') {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
     try {
       const { eventId, title, fields } = req.body;
 
@@ -34,17 +39,42 @@ export default async function handler(
         return res.status(400).json({ error: 'Missing required fields' });
       }
 
+      // Validate eventId format
+      if (!mongoose.Types.ObjectId.isValid(eventId)) {
+        return res.status(400).json({ error: 'Invalid event ID format' });
+      }
+
+      // Check if event exists
+      const event = await Event.findById(eventId).session(session);
+      if (!event) {
+        await session.abortTransaction();
+        return res.status(404).json({ error: 'Event not found' });
+      }
+
       // Create new form
-      const form = await Form.create({
+      const form = await Form.create([{
         eventId,
         title,
         fields,
-      });
+      }], { session });
 
-      return res.status(201).json(form);
+      // Update event with form reference
+      await Event.findByIdAndUpdate(
+        eventId,
+        { formId: form[0]._id },
+        { session }
+      );
+
+      // Commit the transaction
+      await session.commitTransaction();
+
+      return res.status(201).json(form[0]);
     } catch (error) {
+      await session.abortTransaction();
       console.error('Error creating form:', error);
       return res.status(500).json({ error: 'Failed to create form' });
+    } finally {
+      session.endSession();
     }
   }
 

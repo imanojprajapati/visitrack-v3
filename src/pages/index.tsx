@@ -183,8 +183,8 @@ const Home = () => {
                     {event.description}
                   </p>
                   <Link
-                    href={`/events/register/${event._id}`}
-                    className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA] transition-colors duration-300"
+                    href={`/events/${event._id}/register`}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA]"
                   >
                     Register Now
                   </Link>

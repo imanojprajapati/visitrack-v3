@@ -15,8 +15,13 @@ interface IFormField {
   };
 }
 
-interface IForm extends Document, Omit<EventForm, 'id'> {
-  _id: string;
+interface IForm extends Document {
+  _id: mongoose.Types.ObjectId;
+  eventId: mongoose.Types.ObjectId;
+  title: string;
+  fields: IFormField[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 const formFieldSchema = new mongoose.Schema<IFormField>({
@@ -45,7 +50,8 @@ const formFieldSchema = new mongoose.Schema<IFormField>({
 
 const formSchema = new mongoose.Schema<IForm>({
   eventId: {
-    type: String,
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
     required: true
   },
   title: {

@@ -180,7 +180,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
             <Select placeholder="Choose an event">
               {events.map(event => (
                 <Option key={event._id} value={event._id}>
-                  {event.title} ({event.startDate})
+                  {event.title} ({new Date(event.startDate).toLocaleDateString()})
                 </Option>
               ))}
             </Select>

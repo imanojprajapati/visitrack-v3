@@ -156,7 +156,7 @@ export default function EventManagement() {
       key: 'date',
       render: (_, record) => (
         <div>
-          <div>{record.startDate}</div>
+          <div>{typeof record.startDate === 'string' ? new Date(record.startDate).toLocaleDateString() : record.startDate?.toLocaleDateString?.() ?? ''}</div>
           <div className="text-sm text-gray-500">{record.time}</div>
         </div>
       ),

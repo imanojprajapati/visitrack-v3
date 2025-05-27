@@ -7,18 +7,53 @@ export interface IVisitor extends Document {
   name: string;                            // Visitor's name
   email: string;                           // Visitor's email
   phone: string;                           // Visitor's phone
-  age: number;                             // Visitor's age
+  company?: string;                        // Visitor's company
+  age?: number;                            // Visitor's age
+  qrCode: string;                          // QR code for visitor check-in
   eventName: string;                       // Event name (denormalized for easy querying)
   eventLocation: string;                   // Event location (denormalized)
-  eventStartDate: Date;                    // Event start date (denormalized)
-  eventEndDate: Date;                      // Event end date (denormalized)
+  eventStartDate: string;                  // Event start date in DD-MM-YY format
+  eventEndDate: string;                    // Event end date in DD-MM-YY format
   status: 'registered' | 'checked_in' | 'checked_out' | 'cancelled';
-  checkInTime?: Date;                      // When visitor checked in
-  checkOutTime?: Date;                     // When visitor checked out
+  checkInTime?: string;                    // When visitor checked in (DD-MM-YY HH:mm)
+  checkOutTime?: string;                   // When visitor checked out (DD-MM-YY HH:mm)
   additionalData: Record<string, any>;     // Any additional form fields
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;                       // Registration date in DD-MM-YY format
+  updatedAt: string;                       // Last update date in DD-MM-YY format
 }
+
+// Helper function to format date to DD-MM-YY
+const formatDate = (date: Date): string => {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear() % 100).padStart(2, '0');
+  return `${day}-${month}-${year}`;
+};
+
+// Helper function to format date to DD-MM-YY HH:mm
+const formatDateTime = (date: Date): string => {
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear() % 100).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${day}-${month}-${year} ${hours}:${minutes}`;
+};
+
+// Date string validation regex
+const dateRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/;
+const dateTimeRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2} ([01][0-9]|2[0-3]):[0-5][0-9]$/;
+
+// Schema type for date strings that prevents type casting
+const dateStringSchemaType = {
+  type: String,
+  get: (v: string) => v,
+  set: (v: any) => {
+    if (typeof v === 'string') return v;
+    if (v instanceof Date) return formatDate(v);
+    return String(v);
+  }
+};
 
 const visitorSchema = new mongoose.Schema({
   registrationId: {
@@ -52,8 +87,16 @@ const visitorSchema = new mongoose.Schema({
     required: true,
     trim: true,
   },
+  company: {
+    type: String,
+    trim: true,
+  },
   age: {
     type: Number,
+  },
+  qrCode: {
+    type: String,
+    required: true,
   },
   eventName: {
     type: String,
@@ -66,12 +109,24 @@ const visitorSchema = new mongoose.Schema({
     trim: true,
   },
   eventStartDate: {
-    type: Date,
+    ...dateStringSchemaType,
     required: true,
+    validate: {
+      validator: function(v: string) {
+        return dateRegex.test(v);
+      },
+      message: 'Event start date must be in DD-MM-YY format'
+    }
   },
   eventEndDate: {
-    type: Date,
+    ...dateStringSchemaType,
     required: true,
+    validate: {
+      validator: function(v: string) {
+        return dateRegex.test(v);
+      },
+      message: 'Event end date must be in DD-MM-YY format'
+    }
   },
   status: {
     type: String,
@@ -79,24 +134,52 @@ const visitorSchema = new mongoose.Schema({
     default: 'registered',
   },
   checkInTime: {
-    type: Date,
+    ...dateStringSchemaType,
+    validate: {
+      validator: function(v: string) {
+        if (!v) return true;
+        return dateTimeRegex.test(v);
+      },
+      message: 'Check-in time must be in DD-MM-YY HH:mm format'
+    }
   },
   checkOutTime: {
-    type: Date,
+    ...dateStringSchemaType,
+    validate: {
+      validator: function(v: string) {
+        if (!v) return true;
+        return dateTimeRegex.test(v);
+      },
+      message: 'Check-out time must be in DD-MM-YY HH:mm format'
+    }
   },
   additionalData: {
     type: mongoose.Schema.Types.Mixed,
   },
   createdAt: {
-    type: Date,
-    default: Date.now,
+    ...dateStringSchemaType,
+    required: true,
+    validate: {
+      validator: function(v: string) {
+        return dateRegex.test(v);
+      },
+      message: 'Created date must be in DD-MM-YY format'
+    }
   },
   updatedAt: {
-    type: Date,
-    default: Date.now,
-  },
+    ...dateStringSchemaType,
+    required: true,
+    validate: {
+      validator: function(v: string) {
+        return dateRegex.test(v);
+      },
+      message: 'Updated date must be in DD-MM-YY format'
+    }
+  }
 }, {
-  timestamps: true,
+  timestamps: false, // Disable automatic timestamps since we're handling them manually
+  toJSON: { getters: true },
+  toObject: { getters: true }
 });
 
 // Create indexes for common queries
@@ -105,10 +188,33 @@ visitorSchema.index({ email: 1 });
 visitorSchema.index({ phone: 1 });
 visitorSchema.index({ createdAt: -1 });
 
-// Update the updatedAt timestamp before saving
+// Update timestamps before saving
 visitorSchema.pre('save', function(next) {
-  this.updatedAt = new Date();
+  const now = new Date();
+  const formattedDate = formatDate(now);
+  
+  // Always set updatedAt
+  this.updatedAt = formattedDate;
+  
+  // Set createdAt only for new documents
+  if (this.isNew) {
+    this.createdAt = formattedDate;
+  }
+  
   next();
 });
 
-export default mongoose.models.Visitor || mongoose.model<IVisitor>('Visitor', visitorSchema); 
+// Add pre-validate middleware to ensure updatedAt is set
+visitorSchema.pre('validate', function(next) {
+  if (!this.updatedAt) {
+    this.updatedAt = formatDate(new Date());
+  }
+  next();
+});
+
+// Delete the model if it exists to prevent schema conflicts
+if (mongoose.models.Visitor) {
+  delete mongoose.models.Visitor;
+}
+
+export default mongoose.model<IVisitor>('Visitor', visitorSchema); 

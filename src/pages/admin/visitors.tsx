@@ -49,18 +49,20 @@ interface Visitor {
   name: string;
   email: string;
   phone: string;
-  age: number;
+  company?: string;
+  age?: number;
   eventId: string;
   eventName: string;
   eventLocation: string;
-  eventStartDate: Date;
-  eventEndDate: Date;
+  eventStartDate: string;
+  eventEndDate: string;
   status: 'registered' | 'checked_in' | 'checked_out' | 'cancelled';
-  checkInTime?: Date;
-  checkOutTime?: Date;
-  additionalData: Record<string, any>;
-  createdAt: Date;
-  updatedAt: Date;
+  checkInTime?: string;
+  checkOutTime?: string;
+  additionalData: Record<string, { label: string; value: any }>;
+  createdAt: string;
+  updatedAt: string;
+  qrCode?: string;
 }
 
 interface SearchFormValues {
@@ -142,16 +144,38 @@ export default function VisitorsPage() {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
+      render: (name: string, record: Visitor) => name || record.additionalData?.name?.value || '-'
+    },
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+      render: (email: string, record: Visitor) => email || record.additionalData?.email?.value || '-'
+    },
+    {
+      title: 'Phone',
+      dataIndex: 'phone',
+      key: 'phone',
+      render: (phone: string, record: Visitor) => phone || record.additionalData?.phone?.value || '-'
+    },
+    {
+      title: 'Company',
+      dataIndex: 'company',
+      key: 'company',
+      render: (company: string, record: Visitor) => 
+        company || record.additionalData?.company?.value || '-'
     },
     {
       title: 'Event',
       dataIndex: 'eventName',
       key: 'eventName',
+      render: (eventName: string) => eventName || '-'
     },
     {
       title: 'Location',
       dataIndex: 'eventLocation',
       key: 'eventLocation',
+      render: (location: string) => location || '-'
     },
     {
       title: 'Status',
@@ -167,7 +191,23 @@ export default function VisitorsPage() {
       title: 'Registration Date',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (date: string) => date ? new Date(date).toLocaleDateString() : 'N/A',
+      render: (date: string) => {
+        try {
+          if (!date) return '-';
+          const dateObj = new Date(date);
+          if (isNaN(dateObj.getTime())) return '-';
+          return dateObj.toLocaleString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+        } catch (error) {
+          console.error('Error formatting date:', error);
+          return '-';
+        }
+      },
     },
     {
       title: 'Actions',
@@ -194,7 +234,7 @@ export default function VisitorsPage() {
           />
         </Space>
       ),
-    },
+    }
   ];
 
   const handleSearch = (values: SearchFormValues) => {
@@ -265,36 +305,42 @@ export default function VisitorsPage() {
         <div className="space-y-4">
           <Card title="Personal Information" className="mb-4">
             <div className="mb-2">
-              <strong>Name:</strong> {selectedVisitor.name}
+              <strong>Name:</strong> {selectedVisitor.name || selectedVisitor.additionalData?.name?.value || '-'}
             </div>
             <div className="mb-2">
-              <strong>Email:</strong> {selectedVisitor.email}
+              <strong>Email:</strong> {selectedVisitor.email || selectedVisitor.additionalData?.email?.value || '-'}
             </div>
             <div className="mb-2">
-              <strong>Phone:</strong> {selectedVisitor.phone}
+              <strong>Phone:</strong> {selectedVisitor.phone || selectedVisitor.additionalData?.phone?.value || '-'}
             </div>
-            <div className="mb-2">
-              <strong>Age:</strong> {selectedVisitor.age}
-            </div>
+            {selectedVisitor.age && (
+              <div className="mb-2">
+                <strong>Age:</strong> {selectedVisitor.age}
+              </div>
+            )}
           </Card>
           <Card title="Event Information" className="mb-4">
             <div className="mb-2">
-              <strong>Event:</strong> {selectedVisitor.eventName}
+              <strong>Event:</strong> {selectedVisitor.eventName || '-'}
             </div>
             <div className="mb-2">
-              <strong>Location:</strong> {selectedVisitor.eventLocation}
+              <strong>Location:</strong> {selectedVisitor.eventLocation || '-'}
             </div>
             <div className="mb-2">
               <strong>Date:</strong>{' '}
               {selectedVisitor.eventStartDate 
-                ? new Date(selectedVisitor.eventStartDate).toLocaleDateString()
-                : 'N/A'}
+                ? new Date(selectedVisitor.eventStartDate).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                  })
+                : '-'}
             </div>
             <div className="mb-2">
               <strong>Time:</strong>{' '}
               {selectedVisitor.eventStartDate && selectedVisitor.eventEndDate
                 ? `${new Date(selectedVisitor.eventStartDate).toLocaleTimeString()} - ${new Date(selectedVisitor.eventEndDate).toLocaleTimeString()}`
-                : 'N/A'}
+                : '-'}
             </div>
           </Card>
           <Card title="Registration Information">
@@ -307,19 +353,37 @@ export default function VisitorsPage() {
             <div className="mb-2">
               <strong>Registration Date:</strong>{' '}
               {selectedVisitor.createdAt
-                ? new Date(selectedVisitor.createdAt).toLocaleString()
-                : 'N/A'}
+                ? new Date(selectedVisitor.createdAt).toLocaleString('en-US', {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
+                : '-'}
             </div>
             {selectedVisitor.checkInTime && (
               <div className="mb-2">
                 <strong>Check-in Time:</strong>{' '}
-                {new Date(selectedVisitor.checkInTime).toLocaleString()}
+                {new Date(selectedVisitor.checkInTime).toLocaleString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
               </div>
             )}
             {selectedVisitor.checkOutTime && (
               <div className="mb-2">
                 <strong>Check-out Time:</strong>{' '}
-                {new Date(selectedVisitor.checkOutTime).toLocaleString()}
+                {new Date(selectedVisitor.checkOutTime).toLocaleString('en-US', {
+                  year: 'numeric',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                })}
               </div>
             )}
           </Card>

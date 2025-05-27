@@ -22,12 +22,9 @@ export interface FormField {
 }
 
 export interface EventForm {
-  _id: string;
-  eventId: string;
+  id: string;
   title: string;
   fields: FormField[];
-  createdAt: Date;
-  updatedAt: Date;
 }
 
 export interface FormSubmission {

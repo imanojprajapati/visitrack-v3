@@ -1,3 +1,5 @@
+import { EventForm } from './form';
+
 export type EventCategory = 'Conference' | 'Workshop' | 'Seminar' | 'Meeting' | 'General' | 'Other';
 export type EventStatus = 'draft' | 'published' | 'cancelled' | 'upcoming';
 
@@ -18,6 +20,7 @@ export interface Event {
   visitors?: number;
   registrationDeadline?: string | Date;
   formId?: string;
+  form?: EventForm;
   createdAt?: Date;
   updatedAt?: Date;
 }

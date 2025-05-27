@@ -19,13 +19,12 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined
 } from '@ant-design/icons';
-import { QRCodeSVG } from 'qrcode.react';
+import { QRCodeComponent, parseCompactQRData, type QRCodeData } from '../../lib/qrcode';
 import AdminLayout from './layout';
 
 const { Text } = Typography;
 
-interface VisitorData {
-  visitorId: string;
+interface VisitorData extends QRCodeData {
   name: string;
   company: string;
   designation: string;
@@ -103,7 +102,27 @@ const QRScanner = () => {
 
   const processVisitorData = (data: string) => {
     try {
-      const visitorData: VisitorData = JSON.parse(data);
+      // Try parsing as compact format first
+      const qrData = parseCompactQRData(data);
+      
+      if (!qrData) {
+        throw new Error('Invalid QR code format');
+      }
+
+      // Create visitor data with default values for optional fields
+      const visitorData: VisitorData = {
+        ...qrData,
+        name: qrData.name || 'Unknown',
+        company: qrData.company || 'Unknown',
+        designation: 'Visitor',
+        eventName: qrData.eventName || 'Unknown Event',
+        endDate: new Date().toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: '2-digit'
+        }).replace(/\//g, '-')
+      };
+
       const hasVisited = checkVisitorStatus(visitorData.visitorId);
       setVisitorStatus(hasVisited);
       setScanResult(visitorData);
@@ -134,7 +153,15 @@ const QRScanner = () => {
   }, []);
 
   const handleManualEntry = (values: VisitorData) => {
-    processVisitorData(JSON.stringify(values));
+    // Convert form values to QR code data format
+    const qrData: QRCodeData = {
+      visitorId: values.visitorId,
+      eventId: values.eventId,
+      name: values.name,
+      company: values.company,
+      eventName: values.eventName
+    };
+    processVisitorData(JSON.stringify(qrData));
     setShowManualEntry(false);
     form.resetFields();
   };
@@ -280,6 +307,13 @@ const QRScanner = () => {
               <Input />
             </Form.Item>
             <Form.Item
+              name="eventId"
+              label="Event ID"
+              rules={[{ required: true, message: 'Please input event ID!' }]}
+            >
+              <Input />
+            </Form.Item>
+            <Form.Item
               name="name"
               label="Name"
               rules={[{ required: true, message: 'Please input name!' }]}
@@ -294,23 +328,9 @@ const QRScanner = () => {
               <Input />
             </Form.Item>
             <Form.Item
-              name="designation"
-              label="Designation"
-              rules={[{ required: true, message: 'Please input designation!' }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
               name="eventName"
               label="Event Name"
               rules={[{ required: true, message: 'Please input event name!' }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="endDate"
-              label="Valid Until"
-              rules={[{ required: true, message: 'Please select end date!' }]}
             >
               <Input />
             </Form.Item>
@@ -337,11 +357,12 @@ const QRScanner = () => {
           <div ref={badgeRef} className="w-[300px] p-5 border rounded-lg mx-auto text-center">
             <h2 className="mb-2">{scanResult?.eventName}</h2>
             <Divider />
-            <QRCodeSVG
-              value={JSON.stringify(scanResult)}
-              size={200}
-              className="mx-auto my-2"
-            />
+            {scanResult && (
+              <QRCodeComponent
+                data={scanResult}
+                size={180}
+              />
+            )}
             <Divider />
             <h3 className="my-2">{scanResult?.name}</h3>
             <p className="my-1">{scanResult?.company}</p>
