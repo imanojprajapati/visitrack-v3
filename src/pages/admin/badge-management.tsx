@@ -101,6 +101,12 @@ interface BadgeTemplate {
     cloudinaryUrl?: string;
     cloudinaryPublicId?: string;
     imageData?: string;
+    size: {
+      width: number;
+      widthUnit: '%' | 'px';
+      height: number;
+      heightUnit: 'px';
+    };
   };
   qrCode: {
     enabled: boolean;
@@ -165,7 +171,13 @@ const BadgeManagement: React.FC = () => {
     badge: {
       cloudinaryUrl: undefined,
       cloudinaryPublicId: undefined,
-      imageData: undefined
+      imageData: undefined,
+      size: {
+        width: 100,
+        widthUnit: '%',
+        height: 200,
+        heightUnit: 'px'
+      }
     },
     qrCode: {
       enabled: true,
@@ -253,13 +265,19 @@ const BadgeManagement: React.FC = () => {
 
       const data = await response.json();
 
-      // Update template with badge data
+      // Update template with badge data while preserving size
       setTemplate(prev => ({
         ...prev,
         badge: {
           cloudinaryUrl: data.url,
           cloudinaryPublicId: data.publicId,
-          imageData: base64
+          imageData: base64,
+          size: prev.badge?.size || {
+            width: 100,
+            widthUnit: '%',
+            height: 200,
+            heightUnit: 'px'
+          }
         }
       }));
 
@@ -320,16 +338,60 @@ const BadgeManagement: React.FC = () => {
   };
 
   const handleEdit = (record: BadgeTemplate) => {
+    // Ensure we have default values for size
+    const defaultSize = {
+      width: 3.375,
+      height: 2.125,
+      unit: 'inches'
+    };
+
+    // Convert mm to inches for display
+    const sizeInInches = {
+      width: record.size?.unit === 'mm' ? record.size.width / 25.4 : (record.size?.width || defaultSize.width),
+      height: record.size?.unit === 'mm' ? record.size.height / 25.4 : (record.size?.height || defaultSize.height),
+      unit: 'inches'
+    };
+
+    // Set default badge size values
+    const defaultBadgeSize = {
+      width: 100,
+      widthUnit: '%',
+      height: 200,
+      heightUnit: 'px'
+    };
+
+    // Get badge size from record or use defaults
+    const badgeSize = record.badge?.size || defaultBadgeSize;
+
+    // Set form values with both sizes
     form.setFieldsValue({
       ...record,
-      size: {
-        ...record.size,
-        width: record.size.unit === 'mm' ? record.size.width / 25.4 : record.size.width,
-        height: record.size.unit === 'mm' ? record.size.height / 25.4 : record.size.height,
-        unit: record.size.unit
+      size: sizeInInches,
+      badge: {
+        ...record.badge,
+        size: {
+          width: Number(badgeSize.width) || defaultBadgeSize.width,
+          widthUnit: badgeSize.widthUnit || defaultBadgeSize.widthUnit,
+          height: Number(badgeSize.height) || defaultBadgeSize.height,
+          heightUnit: 'px' // Always px for height
+        }
       }
     });
-    setTemplate(record);
+
+    // Update template state with the record
+    setTemplate({
+      ...record,
+      size: sizeInInches,
+      badge: {
+        ...record.badge,
+        size: {
+          width: Number(badgeSize.width) || defaultBadgeSize.width,
+          widthUnit: badgeSize.widthUnit || defaultBadgeSize.widthUnit,
+          height: Number(badgeSize.height) || defaultBadgeSize.height,
+          heightUnit: 'px' // Always px for height
+        }
+      }
+    });
     setSelectedTemplate(record);
   };
 
@@ -337,18 +399,45 @@ const BadgeManagement: React.FC = () => {
     try {
       setLoading(true);
       
+      // Ensure we have default values for size
+      const defaultSize = {
+        width: 85.725, // 3.375 inches in mm
+        height: 53.975, // 2.125 inches in mm
+        unit: 'mm'
+      };
+
+      // Get form values with defaults
+      const formSize = values.size || defaultSize;
+      const defaultBadgeSize = {
+        width: 100,
+        widthUnit: '%',
+        height: 200,
+        heightUnit: 'px'
+      };
+      
+      const formBadgeSize = values.badge?.size || defaultBadgeSize;
+      
+      // Always store size in millimeters
+      const sizeInMm = {
+        width: formSize.unit === 'inches' ? formSize.width * 25.4 : formSize.width,
+        height: formSize.unit === 'inches' ? formSize.height * 25.4 : formSize.height,
+        unit: 'mm' // Always store in mm
+      };
+
+      // Create the template data with both sizes properly set
       const templateData = {
         ...values,
         _id: template._id,
-        size: {
-          ...values.size,
-          width: values.size.unit === 'inches' ? values.size.width * 25.4 : values.size.width,
-          height: values.size.unit === 'inches' ? values.size.height * 25.4 : values.size.height,
-          unit: 'mm'
-        },
+        size: sizeInMm, // This will always be in mm
         badge: template.badge?.cloudinaryUrl ? {
           cloudinaryUrl: template.badge.cloudinaryUrl,
-          cloudinaryPublicId: template.badge.cloudinaryPublicId
+          cloudinaryPublicId: template.badge.cloudinaryPublicId,
+          size: {
+            width: Number(formBadgeSize.width) || defaultBadgeSize.width,
+            widthUnit: formBadgeSize.widthUnit || defaultBadgeSize.widthUnit,
+            height: Number(formBadgeSize.height) || defaultBadgeSize.height,
+            heightUnit: 'px' // Always px for height
+          }
         } : undefined,
         qrCode: {
           enabled: values.showQRCode || false,
@@ -356,6 +445,12 @@ const BadgeManagement: React.FC = () => {
           size: { width: 1, height: 1 }
         }
       };
+
+      // Log the data being sent to verify values
+      console.log('Saving template with data:', {
+        size: sizeInMm,
+        badgeSize: templateData.badge?.size
+      });
 
       const isUpdate = template._id !== undefined;
       const url = isUpdate ? `/api/badge-templates/${template._id}` : '/api/badge-templates';
@@ -657,9 +752,10 @@ const BadgeManagement: React.FC = () => {
     {
       title: 'Size',
       key: 'size',
-      render: (text: string, record: BadgeTemplate) => (
-        `${record.size.width} x ${record.size.height} ${record.size.unit}`
-      ),
+      render: (text: string, record: BadgeTemplate) => {
+        const size = record.size || { width: 3.375, height: 2.125, unit: 'inches' };
+        return `${size.width} x ${size.height} ${size.unit}`;
+      },
     },
     {
       title: 'Orientation',
@@ -709,6 +805,47 @@ const BadgeManagement: React.FC = () => {
     },
   ];
 
+  // Update the handleBadgeSizeChange function to handle both sizes
+  const handleBadgeSizeChange = (changedValues: any, allValues: any) => {
+    if (changedValues.badge?.size) {
+      const { width, widthUnit, height } = changedValues.badge.size;
+      const defaultBadgeSize = {
+        width: 100,
+        widthUnit: '%',
+        height: 200,
+        heightUnit: 'px'
+      };
+      
+      // Update template with new badge size values
+      setTemplate((prev: BadgeTemplate) => ({
+        ...prev,
+        badge: {
+          ...prev.badge,
+          size: {
+            width: width ?? defaultBadgeSize.width,
+            widthUnit: widthUnit ?? defaultBadgeSize.widthUnit,
+            height: height ?? defaultBadgeSize.height,
+            heightUnit: 'px' // Always px for height
+          }
+        }
+      }));
+    }
+
+    if (changedValues.size) {
+      const { width, height, unit } = changedValues.size;
+      
+      // Update template with new template size values
+      setTemplate((prev: BadgeTemplate) => ({
+        ...prev,
+        size: {
+          width: width ?? prev.size?.width ?? 3.375,
+          height: height ?? prev.size?.height ?? 2.125,
+          unit: unit ?? prev.size?.unit ?? 'inches'
+        }
+      }));
+    }
+  };
+
   return (
     <AdminLayout>
       <div className="p-6">
@@ -744,6 +881,7 @@ const BadgeManagement: React.FC = () => {
             form={form}
             layout="vertical"
             onFinish={handleSaveTemplate}
+            onValuesChange={handleBadgeSizeChange}
             initialValues={defaultTemplate}
           >
             <Row gutter={24}>
@@ -785,31 +923,82 @@ const BadgeManagement: React.FC = () => {
                 </Form.Item>
 
                 <Form.Item label="Badge Size">
-                  <Space>
-                    <Form.Item
-                      name={['size', 'width']}
-                      rules={[{ required: true }]}
-                      noStyle
-                    >
-                      <InputNumber min={1} max={20} step={0.125} placeholder="Width" />
-                    </Form.Item>
-                    <span>x</span>
-                    <Form.Item
-                      name={['size', 'height']}
-                      rules={[{ required: true }]}
-                      noStyle
-                    >
-                      <InputNumber min={1} max={20} step={0.125} placeholder="Height" />
-                    </Form.Item>
-                    <Form.Item
-                      name={['size', 'unit']}
-                      noStyle
-                    >
-                      <Select style={{ width: 100 }}>
-                        <Option value="inches">inches</Option>
-                        <Option value="mm">mm</Option>
-                      </Select>
-                    </Form.Item>
+                  <Space direction="vertical" style={{ width: '100%' }}>
+                    <Space>
+                      <Form.Item
+                        name={['badge', 'size', 'width']}
+                        rules={[
+                          { required: true, message: 'Please enter width' },
+                          ({ getFieldValue }) => ({
+                            validator(_, value) {
+                              const widthUnit = getFieldValue(['badge', 'size', 'widthUnit']);
+                              if (widthUnit === '%' && (value < 1 || value > 100)) {
+                                return Promise.reject(new Error('Width must be between 1 and 100 for percentage'));
+                              }
+                              if (widthUnit === 'px' && (value < 50 || value > 500)) {
+                                return Promise.reject(new Error('Width must be between 50 and 500 for pixels'));
+                              }
+                              return Promise.resolve();
+                            },
+                          }),
+                        ]}
+                        noStyle
+                      >
+                        <InputNumber 
+                          min={1}
+                          max={100}
+                          step={1}
+                          placeholder="Width"
+                          style={{ width: '120px' }}
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        name={['badge', 'size', 'widthUnit']}
+                        noStyle
+                      >
+                        <Select 
+                          style={{ width: '80px' }}
+                          onChange={(value) => {
+                            const currentWidth = form.getFieldValue(['badge', 'size', 'width']);
+                            if (value === '%' && currentWidth > 100) {
+                              form.setFieldValue(['badge', 'size', 'width'], 100);
+                            } else if (value === 'px' && currentWidth < 50) {
+                              form.setFieldValue(['badge', 'size', 'width'], 50);
+                            }
+                          }}
+                        >
+                          <Option value="%">%</Option>
+                          <Option value="px">px</Option>
+                        </Select>
+                      </Form.Item>
+                    </Space>
+                    <Space>
+                      <Form.Item
+                        name={['badge', 'size', 'height']}
+                        rules={[
+                          { required: true, message: 'Please enter height' },
+                          { type: 'number', min: 50, max: 500, message: 'Height must be between 50 and 500 pixels' }
+                        ]}
+                        noStyle
+                      >
+                        <InputNumber 
+                          min={50}
+                          max={500}
+                          step={10}
+                          placeholder="Height (px)"
+                          style={{ width: '120px' }}
+                        />
+                      </Form.Item>
+                      <Form.Item
+                        name={['badge', 'size', 'heightUnit']}
+                        noStyle
+                        initialValue="px"
+                      >
+                        <Select style={{ width: '80px' }} disabled>
+                          <Option value="px">px</Option>
+                        </Select>
+                      </Form.Item>
+                    </Space>
                   </Space>
                 </Form.Item>
 
@@ -941,7 +1130,7 @@ const BadgeManagement: React.FC = () => {
                 {/* First Row: Badge Image */}
                 <div style={{
                   width: '100%',
-                  height: '220px',
+                  height: selectedTemplate.badge?.size?.height || 200,
                   display: 'flex',
                   justifyContent: 'center',
                   alignItems: 'center',
@@ -952,8 +1141,10 @@ const BadgeManagement: React.FC = () => {
                 }}>
                   {selectedTemplate.badge?.cloudinaryUrl && (
                     <div style={{
-                      width: '100%',
-                      height: '220px',
+                      width: selectedTemplate.badge?.size?.widthUnit === '%' 
+                        ? `${selectedTemplate.badge?.size?.width || 100}%` 
+                        : `${selectedTemplate.badge?.size?.width || 200}px`,
+                      height: `${selectedTemplate.badge?.size?.height || 200}px`,
                       display: 'flex',
                       justifyContent: 'center',
                       alignItems: 'center',
@@ -964,7 +1155,7 @@ const BadgeManagement: React.FC = () => {
                         alt="Badge"
                         style={{
                           width: '100%',
-                          height: '220px',
+                          height: '100%',
                           objectFit: 'contain'
                         }}
                         preview={false}

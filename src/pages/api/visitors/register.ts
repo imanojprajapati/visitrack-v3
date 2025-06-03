@@ -194,6 +194,16 @@ export default async function handler(
         throw new Error('Failed to create visitor record');
       }
 
+      // Increment the event's visitors count
+      const updatedEvent = await Event.findByIdAndUpdate(
+        event._id,
+        { $inc: { visitors: 1 } },
+        { new: true, session }
+      );
+      if (!updatedEvent) {
+        throw new Error('Failed to update event visitor count');
+      }
+
       // Update registration with visitor ID
       await Registration.findByIdAndUpdate(
         registration[0]._id,
