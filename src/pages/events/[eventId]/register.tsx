@@ -316,150 +316,40 @@ export default function EventRegistration() {
     }
   };
 
-  const handlePrintPDF = async () => {
+  const handleDownloadPDF = async () => {
     if (!visitor || !event) return;
-
     try {
-      // Create a temporary div to render QR code
-      const tempDiv = document.createElement('div');
-      tempDiv.style.width = '200px';
-      tempDiv.style.height = '200px';
-      tempDiv.style.position = 'absolute';
-      tempDiv.style.left = '-9999px';
-      tempDiv.style.background = '#ffffff';
-      document.body.appendChild(tempDiv);
-
-      // Create QR code container
-      const qrContainer = document.createElement('div');
-      qrContainer.id = 'qr-code-container';
-      tempDiv.appendChild(qrContainer);
-
-      // Create a promise that resolves when the QR code is rendered
-      const qrCodePromise = new Promise<HTMLCanvasElement>((resolve, reject) => {
-        // Render QR code using ReactDOM
-        const root = ReactDOM.createRoot(qrContainer);
-        root.render(
-          <QRCodeComponent
-            data={{
-              visitorId: visitor._id,
-              eventId: visitor.eventId,
-              registrationId: visitor.registrationId,
-              name: visitor.name,
-              company: visitor.company,
-              eventName: visitor.eventName
-            }}
-            size={200}
-          />
-        );
-
-        // Function to convert SVG to canvas
-        const convertSVGToCanvas = (svgElement: SVGElement): Promise<HTMLCanvasElement> => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('Failed to get canvas context');
-
-          // Set canvas size
-          canvas.width = 200;
-          canvas.height = 200;
-
-          // Create an image from the SVG
-          const img = new Image();
-          const svgData = new XMLSerializer().serializeToString(svgElement);
-          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-          const url = URL.createObjectURL(svgBlob);
-
-          return new Promise((resolveCanvas, rejectCanvas) => {
-            img.onload = () => {
-              // Draw the image on canvas
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              URL.revokeObjectURL(url);
-              resolveCanvas(canvas);
-            };
-            img.onerror = () => {
-              URL.revokeObjectURL(url);
-              rejectCanvas(new Error('Failed to load SVG image'));
-            };
-            img.src = url;
-          });
-        };
-
-        // Function to check for SVG and convert it
-        const checkAndConvertSVG = async () => {
-          const svgElement = qrContainer.querySelector('svg');
-          if (svgElement) {
-            try {
-              const canvas = await convertSVGToCanvas(svgElement);
-              resolve(canvas);
-            } catch (error) {
-              reject(error);
-            }
-          } else {
-            // Try again after a short delay
-            setTimeout(checkAndConvertSVG, 50);
-          }
-        };
-
-        // Start checking for SVG
-        checkAndConvertSVG();
-
-        // Set a timeout to reject if SVG doesn't appear
-        // Set a timeout to reject if canvas doesn't appear
-        setTimeout(() => {
-          reject(new Error('QR code generation timed out'));
-        }, 5000); // 5 second timeout
-      });
-
-      // Wait for QR code to be rendered
-      const canvas = await qrCodePromise;
-
-      // Create PDF
-      const doc = new jsPDF();
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      
-      // Add event name at the top
-      doc.setFontSize(24);
-      doc.text(event.title, pageWidth / 2, 30, { align: 'center' as const });
-      
-      // Add QR code in the middle
-      doc.addImage(canvas.toDataURL('image/png'), 'PNG', (pageWidth - 150) / 2, 50, 150, 150);
-      
-      // Add VISITRACK text at the bottom
-      doc.setFontSize(20);
-      doc.text('VISITRACK', pageWidth / 2, pageHeight - 30, { align: 'center' as const });
-      
-      // Add visitor details in small text
-      doc.setFontSize(10);
-      const visitorDetails = [
-        `Name: ${visitor.name}`,
-        `Email: ${visitor.email}`,
-        `Phone: ${visitor.phone}`,
-        `Event: ${visitor.eventName}`,
-        `Location: ${visitor.eventLocation}`,
-        `Date: ${new Date(visitor.eventStartDate).toLocaleDateString()}`,
-        `Registration Date: ${new Date(visitor.createdAt).toLocaleString()}`
-      ];
-
-      visitorDetails.forEach((detail, index) => {
-        doc.text(detail, 20, pageHeight - 50 + (index * 5));
-      });
-      
-      doc.save(`visitrack-${event.title}-${visitor.name}.pdf`);
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      message.error(error instanceof Error ? error.message : 'Failed to generate PDF');
-    } finally {
-      // Cleanup
-      const tempDiv = document.getElementById('qr-code-container')?.parentElement;
-      if (tempDiv) {
-        const root = (tempDiv as any)._reactRootContainer;
-        if (root) {
-          root.unmount();
-        }
-        document.body.removeChild(tempDiv);
+      // Fetch badge template for this event
+      const templateRes = await fetch(`/api/badge-templates?eventId=${event._id}`);
+      const templates = await templateRes.json();
+      if (!Array.isArray(templates) || templates.length === 0) {
+        message.error('No badge template found for this event.');
+        return;
       }
+      const templateId = templates[0]._id;
+      const response = await fetch('/api/badge-templates/download', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          templateId,
+          visitorData: visitor
+        })
+      });
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `visitrack-badge-${visitor.name}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      message.error(error instanceof Error ? error.message : 'Failed to download PDF');
     }
   };
 
@@ -521,12 +411,12 @@ export default function EventRegistration() {
                       Download QR Code
                     </Button>
                     <Button
-                      icon={<PrinterOutlined />}
-                      onClick={handlePrintPDF}
+                      icon={<DownloadOutlined />}
+                      onClick={handleDownloadPDF}
                       type="primary"
                       size="large"
                     >
-                      Print PDF
+                      Download PDF
                     </Button>
                   </Space>
                 </div>
@@ -665,12 +555,12 @@ export default function EventRegistration() {
                   Download QR Code
                 </Button>
                 <Button
-                  icon={<PrinterOutlined />}
-                  onClick={handlePrintPDF}
+                  icon={<DownloadOutlined />}
+                  onClick={handleDownloadPDF}
                   type="primary"
                   size="large"
                 >
-                  Print PDF
+                  Download PDF
                 </Button>
               </Space>
             </div>
