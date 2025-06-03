@@ -4,6 +4,7 @@ import Visitor from '../../../models/Visitor';
 import Event, { IEvent } from '../../../models/Event';
 import Registration from '../../../models/Registration';
 import mongoose from 'mongoose';
+import nodemailer from 'nodemailer';
 
 interface RegistrationData {
   [key: string]: {
