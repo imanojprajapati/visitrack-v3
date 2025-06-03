@@ -109,6 +109,7 @@ interface BadgeTemplate {
     cloudinaryUrl?: string;
   };
   showQRCode: boolean;
+  isPreview: boolean;
 }
 
 const BadgeManagement: React.FC = () => {
@@ -127,7 +128,8 @@ const BadgeManagement: React.FC = () => {
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
   const badgeRef = useRef<HTMLDivElement>(null);
 
-  const [template, setTemplate] = useState<BadgeTemplate>({
+  // Define default template values
+  const defaultTemplate: BadgeTemplate = {
     name: '',
     eventId: '',
     size: {
@@ -170,8 +172,28 @@ const BadgeManagement: React.FC = () => {
       position: { x: 0.8, y: 0.5 },
       size: { width: 1, height: 1 }
     },
-    showQRCode: true
-  });
+    showQRCode: true,
+    isPreview: false
+  };
+
+  // Update the handleNewTemplate function
+  const handleNewTemplate = () => {
+    // Reset form with default values
+    form.setFieldsValue(defaultTemplate);
+    
+    // Reset template state with default values
+    setTemplate(defaultTemplate);
+    
+    // Clear selected template
+    setSelectedTemplate(null);
+    
+    // Clear any uploaded files
+    setLogoFile(null);
+    setBackgroundFile(null);
+  };
+
+  // Update the initial template state
+  const [template, setTemplate] = useState<BadgeTemplate>(defaultTemplate);
 
   useEffect(() => {
     fetchEvents();
@@ -297,25 +319,37 @@ const BadgeManagement: React.FC = () => {
     }
   };
 
+  const handleEdit = (record: BadgeTemplate) => {
+    form.setFieldsValue({
+      ...record,
+      size: {
+        ...record.size,
+        width: record.size.unit === 'mm' ? record.size.width / 25.4 : record.size.width,
+        height: record.size.unit === 'mm' ? record.size.height / 25.4 : record.size.height,
+        unit: record.size.unit
+      }
+    });
+    setTemplate(record);
+    setSelectedTemplate(record);
+  };
+
   const handleSaveTemplate = async (values: BadgeTemplate) => {
     try {
       setLoading(true);
       
-      // Convert dimensions to mm if needed
       const templateData = {
         ...values,
+        _id: template._id,
         size: {
           ...values.size,
           width: values.size.unit === 'inches' ? values.size.width * 25.4 : values.size.width,
           height: values.size.unit === 'inches' ? values.size.height * 25.4 : values.size.height,
           unit: 'mm'
         },
-        // Ensure badge data is included
         badge: template.badge?.cloudinaryUrl ? {
           cloudinaryUrl: template.badge.cloudinaryUrl,
           cloudinaryPublicId: template.badge.cloudinaryPublicId
         } : undefined,
-        // Set default values for optional fields
         qrCode: {
           enabled: values.showQRCode || false,
           position: { x: 0.8, y: 0.5 },
@@ -323,65 +357,28 @@ const BadgeManagement: React.FC = () => {
         }
       };
 
-      const response = await fetch('/api/badge-templates', {
-        method: 'POST',
+      const isUpdate = template._id !== undefined;
+      const url = isUpdate ? `/api/badge-templates/${template._id}` : '/api/badge-templates';
+      const method = isUpdate ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(templateData),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || 'Failed to save template');
+        throw new Error(error.message || `Failed to ${isUpdate ? 'update' : 'save'} template`);
       }
       
-      message.success('Template saved successfully');
+      message.success(`Template ${isUpdate ? 'updated' : 'saved'} successfully`);
       fetchTemplates();
-      form.resetFields();
-      setTemplate({
-        name: '',
-        eventId: '',
-        size: {
-          width: 3.375,
-          height: 2.125,
-          unit: 'inches'
-        },
-        orientation: 'portrait',
-        title: {
-          enabled: true,
-          text: 'Visitor Badge',
-          fontSize: 24,
-          fontFamily: 'Arial',
-          color: '#000000',
-          position: { x: 0.5, y: 0.5 }
-        },
-        subtitle: {
-          enabled: true,
-          text: 'Event Name',
-          fontSize: 18,
-          fontFamily: 'Arial',
-          color: '#666666',
-          position: { x: 0.5, y: 0.7 }
-        },
-        additionalInfo: {
-          enabled: true,
-          text: 'Additional information will appear here',
-          fontSize: 14,
-          fontFamily: 'Arial',
-          color: '#333333',
-          position: { x: 0.5, y: 0.85 }
-        },
-        badge: {
-          cloudinaryUrl: undefined,
-          cloudinaryPublicId: undefined,
-          imageData: undefined
-        },
-        qrCode: {
-          enabled: true,
-          position: { x: 0.8, y: 0.5 },
-          size: { width: 1, height: 1 }
-        },
-        showQRCode: true
-      });
+      
+      if (!isUpdate) {
+        form.resetFields();
+        setTemplate(defaultTemplate);
+      }
     } catch (error) {
       console.error('Error saving template:', error);
       message.error(error instanceof Error ? error.message : 'Failed to save template');
@@ -390,18 +387,15 @@ const BadgeManagement: React.FC = () => {
     }
   };
 
-  // Update the generateAndUploadQRCode function
   const generateAndUploadQRCode = async (templateId: string, eventId: string) => {
     try {
       setIsGeneratingQR(true);
       
-      // Get event details
       const event = events.find(e => e._id === eventId);
       if (!event) {
         throw new Error('Event not found');
       }
 
-      // Create a temporary div to render QR code
       const tempDiv = document.createElement('div');
       tempDiv.style.width = '1000px';
       tempDiv.style.height = '1000px';
@@ -413,7 +407,6 @@ const BadgeManagement: React.FC = () => {
       tempDiv.style.alignItems = 'center';
       document.body.appendChild(tempDiv);
 
-      // Render QR code using ReactDOM
       const qrCodeComponent = document.createElement('div');
       qrCodeComponent.id = 'qr-code-container';
       qrCodeComponent.style.display = 'flex';
@@ -423,7 +416,6 @@ const BadgeManagement: React.FC = () => {
       qrCodeComponent.style.height = '100%';
       tempDiv.appendChild(qrCodeComponent);
 
-      // Use ReactDOM to render the QR code with verification URL
       const root = ReactDOM.createRoot(qrCodeComponent);
       root.render(
         <div style={{ 
@@ -444,35 +436,28 @@ const BadgeManagement: React.FC = () => {
         </div>
       );
 
-      // Wait for the QR code to render
       await new Promise(resolve => setTimeout(resolve, 1000));
 
-      // Convert QR code to image using html2canvas
       const canvas = await html2canvas(qrCodeComponent, {
         background: '#ffffff',
         logging: false,
         useCORS: true,
-        width: 1000, // Increased size for better quality
+        width: 1000,
         height: 1000
       });
 
-      // Create a new canvas for the final size with high quality
       const finalCanvas = document.createElement('canvas');
       finalCanvas.width = 500;
       finalCanvas.height = 500;
       const ctx = finalCanvas.getContext('2d');
       if (ctx) {
-        // Enable high-quality image scaling
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
-        // Draw the larger canvas onto the smaller one with high quality
         ctx.drawImage(canvas, 0, 0, 1000, 1000, 0, 0, 500, 500);
       }
 
-      // Convert canvas to base64
       const imageData = finalCanvas.toDataURL('image/png', 1.0);
 
-      // Upload to Cloudinary through our API
       const response = await fetch('/api/upload/qr-code', {
         method: 'POST',
         headers: {
@@ -492,7 +477,6 @@ const BadgeManagement: React.FC = () => {
 
       const data = await response.json();
 
-      // Update template with QR code URL
       const updateResponse = await fetch(`/api/badge-templates/${templateId}`, {
         method: 'PUT',
         headers: {
@@ -513,7 +497,6 @@ const BadgeManagement: React.FC = () => {
         throw new Error('Failed to update template with QR code');
       }
 
-      // Cleanup
       root.unmount();
       document.body.removeChild(tempDiv);
       return data.url;
@@ -526,218 +509,156 @@ const BadgeManagement: React.FC = () => {
     }
   };
 
-  // Update the handlePreview function
-  const handlePreview = async (template: BadgeTemplate) => {
-    try {
-      setSelectedTemplate(template);
-      setIsGeneratingQR(true);
-      
-      // Always generate a new QR code when previewing
-      const qrUrl = await generateAndUploadQRCode(template._id!, template.eventId);
-      
-      // Update template with QR code URL
-      const updatedTemplate = {
-        ...template,
-        qrCode: {
-          ...template.qrCode,
-          cloudinaryUrl: qrUrl
-        }
-      };
-      setSelectedTemplate(updatedTemplate);
-      setPreviewDrawerVisible(true);
-    } catch (error) {
-      console.error('Error in preview:', error);
-      message.error('Failed to generate preview');
-    } finally {
-      setIsGeneratingQR(false);
-    }
+  const handlePreview = (template: BadgeTemplate) => {
+    setSelectedTemplate({ ...template, isPreview: true });
+    setPreviewDrawerVisible(true);
   };
 
-  // Update the handlePrint function
-  const handlePrint = async () => {
-    if (!selectedTemplate) return;
-
+  const handleDownload = async (template: BadgeTemplate) => {
     try {
-      message.loading('Preparing badge for print...', 0);
+      setLoading(true);
+      const downloadTemplate = { 
+        ...template, 
+        isPreview: false,
+        showQRCode: false
+      };
+      setSelectedTemplate(downloadTemplate);
       
-      // Generate QR code if not exists
-      if (!selectedTemplate.qrCode?.cloudinaryUrl) {
-        await generateAndUploadQRCode(selectedTemplate._id!, selectedTemplate.eventId);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      if (!badgeRef.current) {
+        throw new Error('Badge preview element not found');
       }
 
-      // Create a new window for printing
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        message.error('Please allow popups to print the badge');
-        return;
-      }
-
-      // Get event details
-      const event = events.find(e => e._id === selectedTemplate.eventId);
-      if (!event) {
-        throw new Error('Event not found');
-      }
-
-      // Create print content with proper styling
-      const printContent = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Badge Print Preview</title>
-            <style>
-              @page {
-                size: ${selectedTemplate.orientation === 'portrait' ? 'A4 portrait' : 'A4 landscape'};
-                margin: 0;
-              }
-              body {
-                margin: 0;
-                padding: 20px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                min-height: 100vh;
-                background: #ffffff;
-              }
-              .badge-container {
-                width: ${selectedTemplate.size.width}${selectedTemplate.size.unit};
-                height: ${selectedTemplate.size.height}${selectedTemplate.size.unit};
-                background: white;
-                position: relative;
-                box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-                padding: 20px;
-                box-sizing: border-box;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-              }
-              .badge-content {
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-                justify-content: space-between;
-              }
-              .badge-header {
-                text-align: center;
-                margin-bottom: 20px;
-              }
-              .badge-body {
-                flex: 1;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                margin: 20px 0;
-              }
-              .badge-info {
-                flex: 1;
-                padding-right: 20px;
-              }
-              .badge-qr {
-                width: 150px;
-                height: 150px;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-              }
-              .badge-qr img {
-                max-width: 100%;
-                max-height: 100%;
-                object-fit: contain;
-              }
-              .badge-footer {
-                text-align: center;
-                font-size: 12px;
-                color: #666;
-                margin-top: 20px;
-              }
-              @media print {
-                body {
-                  background: white;
-                  padding: 0;
-                }
-                .badge-container {
-                  box-shadow: none;
-                  border: 1px solid #ddd;
-                }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="badge-container">
-              <div class="badge-content">
-                ${selectedTemplate.badge?.cloudinaryUrl ? `
-                  <div class="badge-header">
-                    <img 
-                      src="${selectedTemplate.badge.cloudinaryUrl}" 
-                      alt="Badge" 
-                      style="max-width: 100%; max-height: 200px; object-fit: contain;"
-                    />
-                  </div>
-                ` : ''}
-                <div class="badge-body">
-                  <div class="badge-info">
-                    ${selectedTemplate.title?.enabled ? `
-                      <h1 style="
-                        font-size: ${selectedTemplate.title.fontSize}px;
-                        font-family: ${selectedTemplate.title.fontFamily};
-                        color: ${selectedTemplate.title.color};
-                        margin: 0 0 10px 0;
-                      ">${selectedTemplate.title.text}</h1>
-                    ` : ''}
-                    ${selectedTemplate.subtitle?.enabled ? `
-                      <h2 style="
-                        font-size: ${selectedTemplate.subtitle.fontSize}px;
-                        font-family: ${selectedTemplate.subtitle.fontFamily};
-                        color: ${selectedTemplate.subtitle.color};
-                        margin: 0 0 10px 0;
-                      ">${selectedTemplate.subtitle.text}</h2>
-                    ` : ''}
-                    ${selectedTemplate.additionalInfo?.enabled ? `
-                      <div style="
-                        font-size: ${selectedTemplate.additionalInfo.fontSize}px;
-                        font-family: ${selectedTemplate.additionalInfo.fontFamily};
-                        color: ${selectedTemplate.additionalInfo.color};
-                      ">${selectedTemplate.additionalInfo.text}</div>
-                    ` : ''}
-                  </div>
-                  ${selectedTemplate.qrCode?.enabled && selectedTemplate.qrCode.cloudinaryUrl ? `
-                    <div class="badge-qr">
-                      <img src="${selectedTemplate.qrCode.cloudinaryUrl}" alt="QR Code" />
-                    </div>
-                  ` : ''}
-                </div>
-                <div class="badge-footer">
-                  <div>${event.title}</div>
-                  <div>${event.location}</div>
-                  <div>${new Date(event.startDate).toLocaleDateString()}</div>
-                  <div>Generated on ${new Date().toLocaleDateString()}</div>
-                </div>
-              </div>
-            </div>
-            <script>
-              window.onload = function() {
-                setTimeout(() => {
-                  window.print();
-                  window.onafterprint = function() {
-                    window.close();
-                  };
-                }, 1000);
-              };
-            </script>
-          </body>
-        </html>
+      const badgeElement = badgeRef.current.cloneNode(true) as HTMLElement;
+      
+      // Set container styles with proper width constraints
+      badgeElement.style.cssText = `
+        position: absolute;
+        left: -9999px;
+        top: 0;
+        width: 190mm; /* Reduced from 210mm to account for padding */
+        height: 297mm;
+        background: white;
+        padding: 10mm;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        box-sizing: border-box;
+        min-height: 297mm;
+        overflow: hidden;
       `;
 
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      message.destroy();
+      // Ensure content container maintains structure with proper width
+      const contentContainer = badgeElement.querySelector('div[style*="flex: 1"]');
+      if (contentContainer instanceof HTMLElement) {
+        contentContainer.style.cssText = `
+          display: flex;
+          flex-direction: column;
+          flex: 1;
+          position: relative;
+          min-height: 277mm;
+          width: 100%;
+          max-width: 190mm;
+          margin: 0 auto;
+        `;
+      }
+
+      // Fix width of all rows
+      const rows = badgeElement.querySelectorAll('div[style*="display: flex"]');
+      rows.forEach((row) => {
+        if (row instanceof HTMLElement) {
+          row.style.width = '100%';
+          row.style.maxWidth = '190mm';
+          row.style.margin = '0 auto';
+        }
+      });
+
+      // Ensure third row (QR code space) is properly sized
+      const qrCodeContainer = badgeElement.querySelector('div[style*="height: 350px"]');
+      if (qrCodeContainer instanceof HTMLElement) {
+        qrCodeContainer.style.cssText = `
+          height: 350px;
+          width: 100%;
+          max-width: 190mm;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          padding: 5mm;
+          border: 1px dashed #e5e7eb;
+          border-radius: 4px;
+          background-color: #fafafa;
+          margin: 0 auto 20mm auto;
+        `;
+      }
+
+      // Ensure VISITRACK text container is properly positioned and sized
+      const visitrackContainer = badgeElement.querySelector('div[style*="position: absolute"]');
+      if (visitrackContainer instanceof HTMLElement) {
+        visitrackContainer.style.cssText = `
+          width: 100%;
+          max-width: 190mm;
+          padding: 5mm 0;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          position: absolute;
+          bottom: 10mm;
+          left: 50%;
+          transform: translateX(-50%);
+          background-color: white;
+          z-index: 10;
+        `;
+      }
+
+      // Remove any QR code elements
+      const qrCodeElements = badgeElement.querySelectorAll('svg');
+      qrCodeElements.forEach(element => element.remove());
+
+      // Ensure all images are properly contained
+      const images = badgeElement.querySelectorAll('img');
+      images.forEach((img) => {
+        if (img instanceof HTMLElement) {
+          img.style.maxWidth = '100%';
+          img.style.height = 'auto';
+        }
+      });
+
+      document.body.appendChild(badgeElement);
+
+      try {
+        const canvas = await html2canvas(badgeElement, {
+          useCORS: true,
+          logging: false,
+          background: '#ffffff',
+          width: 595.28,
+          height: 841.89,
+          allowTaint: true
+        });
+
+        const pdf = new jsPDF({
+          orientation: 'p',
+          unit: 'pt',
+          format: 'a4',
+          compress: true
+        });
+
+        const imgData = canvas.toDataURL('image/png', 1.0);
+        pdf.addImage(imgData, 'PNG', 0, 0, 595.28, 841.89, undefined, 'FAST');
+        
+        pdf.save(`${template.name}-badge.pdf`);
+        message.success('Badge downloaded successfully');
+      } finally {
+        document.body.removeChild(badgeElement);
+      }
     } catch (error) {
-      console.error('Error printing badge:', error);
-      message.error('Failed to generate print preview');
-      message.destroy();
+      console.error('Error downloading badge:', error);
+      message.error('Failed to download badge');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Update the table columns
   const columns = [
     {
       title: 'Name',
@@ -796,10 +717,7 @@ const BadgeManagement: React.FC = () => {
           />
           <Button
             icon={<EditOutlined />}
-            onClick={() => {
-              form.setFieldsValue(record);
-              setSelectedTemplate(record);
-            }}
+            onClick={() => handleEdit(record)}
             title="Edit"
           />
           <Button
@@ -835,10 +753,7 @@ const BadgeManagement: React.FC = () => {
               <Button 
                 type="primary" 
                 icon={<PlusOutlined />}
-                onClick={() => {
-                  form.resetFields();
-                  setSelectedTemplate(null);
-                }}
+                onClick={handleNewTemplate}
               >
                 New Template
               </Button>
@@ -855,7 +770,7 @@ const BadgeManagement: React.FC = () => {
               >
                 Save Template
               </Button>
-              <Button onClick={() => form.resetFields()}>Reset</Button>
+              <Button onClick={handleNewTemplate}>Reset</Button>
             </Space>
           }
         >
@@ -863,7 +778,7 @@ const BadgeManagement: React.FC = () => {
             form={form}
             layout="vertical"
             onFinish={handleSaveTemplate}
-            initialValues={template}
+            initialValues={defaultTemplate}
           >
             <Row gutter={24}>
               <Col span={12}>
@@ -1014,258 +929,172 @@ const BadgeManagement: React.FC = () => {
         </Card>
 
         <Drawer
-          title={
+          title="Badge Preview"
+          placement="right"
+          width={800}
+          onClose={() => setPreviewDrawerVisible(false)}
+          open={previewDrawerVisible}
+          extra={
             <Space>
-              <Title level={4} style={{ margin: 0 }}>Template Preview</Title>
-              {selectedTemplate && (
-                <Space>
-                  <Tag color="blue">
-                    {events.find(e => e._id === selectedTemplate.eventId)?.title || 'No Event'}
-                  </Tag>
-                  <Button
-                    type="primary"
-                    icon={<PrinterOutlined />}
-                    onClick={handlePrint}
-                    loading={isGeneratingQR}
-                  >
-                    Print Badge
-                  </Button>
-                </Space>
-              )}
+              <Button
+                type="primary"
+                icon={<PrinterOutlined />}
+                onClick={() => selectedTemplate && handleDownload(selectedTemplate)}
+                loading={loading}
+              >
+                Download Badge
+              </Button>
             </Space>
           }
-          placement="right"
-          width="100%"
-          onClose={() => setPreviewDrawerVisible(false)}
-          visible={previewDrawerVisible}
-          bodyStyle={{ 
-            padding: 0,
-            background: '#f0f2f5',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            minHeight: '100vh'
-          }}
         >
           {selectedTemplate && (
-            <div className="preview-container" style={{ 
-              width: '210mm', // A4 width
-              minHeight: '297mm', // A4 height
-              background: 'white',
-              margin: '20px auto',
-              padding: '20mm',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '30mm'
-            }}>
-              {/* First Row: Badge Image */}
-              <div style={{
+            <div 
+              ref={badgeRef}
+              className="badge-preview"
+              style={{
+                width: '210mm',
+                height: '297mm',
+                margin: '0 auto',
+                background: 'white',
+                padding: '10mm',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                 display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                minHeight: '100mm',
-                paddingTop: '20mm'
-              }}>
-                {selectedTemplate.badge?.cloudinaryUrl ? (
-                  <div style={{
-                    width: `${selectedTemplate.size.width}${selectedTemplate.size.unit}`,
-                    height: `${selectedTemplate.size.height}${selectedTemplate.size.unit}`,
-                    position: 'relative',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    border: '1px solid #e8e8e8',
-                    overflow: 'hidden',
-                    background: 'white',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center'
-                  }}>
-                    <Image
-                      src={selectedTemplate.badge.cloudinaryUrl}
-                      alt="Badge Template"
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        width: 'auto',
-                        height: 'auto',
-                        objectFit: 'contain'
-                      }}
-                      preview={false}
-                    />
-                  </div>
-                ) : (
-                  <div style={{
-                    width: `${selectedTemplate.size.width}${selectedTemplate.size.unit}`,
-                    height: `${selectedTemplate.size.height}${selectedTemplate.size.unit}`,
-                    background: '#fafafa',
-                    border: '1px dashed #d9d9d9',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    color: '#999'
-                  }}>
-                    <Space direction="vertical" align="center">
-                      <UploadOutlined style={{ fontSize: '24px' }} />
-                      <Text>No Badge Image Uploaded</Text>
-                    </Space>
-                  </div>
-                )}
-              </div>
-
-              {/* Second Row: User Input Data */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                minHeight: '80mm'
-              }}>
-                <Card 
-                  style={{ 
-                    width: '160mm',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
-                  }}
-                  title={
-                    <Title level={4} style={{ margin: 0 }}>
-                      Badge Content Preview
-                    </Title>
-                  }
-                >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10mm' }}>
-                    {/* Title Section */}
-                    {selectedTemplate.title?.enabled && (
-                      <div>
-                        <Text strong style={{ display: 'block', marginBottom: '4px' }}>Title</Text>
-                        <div style={{
-                          fontSize: `${selectedTemplate.title.fontSize}px`,
-                          fontFamily: selectedTemplate.title.fontFamily,
-                          color: selectedTemplate.title.color,
-                          padding: '8px',
-                          background: '#fafafa',
-                          borderRadius: '4px'
-                        }}>
-                          {selectedTemplate.title.text}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Subtitle Section */}
-                    {selectedTemplate.subtitle?.enabled && (
-                      <div>
-                        <Text strong style={{ display: 'block', marginBottom: '4px' }}>Subtitle</Text>
-                        <div style={{
-                          fontSize: `${selectedTemplate.subtitle.fontSize}px`,
-                          fontFamily: selectedTemplate.subtitle.fontFamily,
-                          color: selectedTemplate.subtitle.color,
-                          padding: '8px',
-                          background: '#fafafa',
-                          borderRadius: '4px'
-                        }}>
-                          {selectedTemplate.subtitle.text}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Additional Info Section */}
-                    {selectedTemplate.additionalInfo?.enabled && (
-                      <div>
-                        <Text strong style={{ display: 'block', marginBottom: '4px' }}>Additional Information</Text>
-                        <div style={{
-                          fontSize: `${selectedTemplate.additionalInfo.fontSize}px`,
-                          fontFamily: selectedTemplate.additionalInfo.fontFamily,
-                          color: selectedTemplate.additionalInfo.color,
-                          padding: '8px',
-                          background: '#fafafa',
-                          borderRadius: '4px',
-                          whiteSpace: 'pre-wrap'
-                        }}>
-                          {selectedTemplate.additionalInfo.text}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </Card>
-              </div>
-
-              {/* Third Row: QR Code */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
                 flexDirection: 'column',
-                minHeight: '80mm',
-                gap: '10mm'
+                position: 'relative',
+                boxSizing: 'border-box',
+                minHeight: '297mm'
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                flex: 1,
+                position: 'relative',
+                minHeight: '277mm'
               }}>
-                <Title level={4} style={{ margin: 0 }}>QR Code for Verification</Title>
-                {selectedTemplate.qrCode?.enabled && (
-                  <div style={{ 
-                    background: 'white',
-                    padding: '10mm',
-                    borderRadius: '4px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                    border: '1px solid #e8e8e8',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '5mm',
-                    width: '70mm',
-                    height: '70mm'
-                  }}>
-                    {isGeneratingQR ? (
-                      <div style={{ 
-                        width: '50mm',
-                        height: '50mm',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        color: '#999',
-                        border: '1px dashed #d9d9d9',
-                        borderRadius: '4px'
-                      }}>
-                        <Spin size="large" />
-                        <div style={{ marginTop: '8px' }}>Generating QR Code...</div>
-                      </div>
-                    ) : selectedTemplate.qrCode.cloudinaryUrl ? (
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: '100%',
-                        height: '100%'
-                      }}>
-                        <Image
-                          src={selectedTemplate.qrCode.cloudinaryUrl}
-                          alt="QR Code"
-                          style={{ 
-                            width: '50mm',
-                            height: '50mm',
-                            objectFit: 'contain'
-                          }}
-                          preview={false}
-                        />
-                        <Text type="secondary" style={{ marginTop: '5mm' }}>
-                          Scan to verify badge authenticity
-                        </Text>
-                      </div>
-                    ) : (
-                      <div style={{ 
-                        width: '50mm',
-                        height: '50mm',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        color: '#999',
-                        border: '1px dashed #d9d9d9',
-                        borderRadius: '4px'
-                      }}>
-                        <QrcodeOutlined style={{ fontSize: '24px' }} />
-                        <div style={{ marginTop: '8px' }}>Click Preview to Generate QR Code</div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                <div style={{
+                  width: '100%',
+                  height: '220px',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  border: '1px solid #e5e7eb',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  backgroundColor: '#fafafa',
+                  marginBottom: '10mm'
+                }}>
+                  {selectedTemplate.badge?.cloudinaryUrl && (
+                    <div style={{
+                      width: '100%',
+                      height: '220px',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      padding: '2mm'
+                    }}>
+                      <Image
+                        src={selectedTemplate.badge.cloudinaryUrl}
+                        alt="Badge"
+                        style={{
+                          width: '100%',
+                          height: '220px',
+                          objectFit: 'contain'
+                        }}
+                        preview={false}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '8mm',
+                  padding: '5mm',
+                  textAlign: 'center',
+                  marginBottom: '10mm',
+                  minHeight: '120px'
+                }}>
+                  <Typography.Title 
+                    level={3} 
+                    style={{ 
+                      margin: 0, 
+                      fontSize: '20pt',
+                      color: '#000000',
+                      lineHeight: '1.2'
+                    }}
+                  >
+                    {selectedTemplate.title?.text}
+                  </Typography.Title>
+                  <Typography.Text 
+                    strong 
+                    style={{ 
+                      fontSize: '16pt',
+                      color: '#000000',
+                      lineHeight: '1.2'
+                    }}
+                  >
+                    {selectedTemplate.subtitle?.text}
+                  </Typography.Text>
+                  <Typography.Text 
+                    style={{ 
+                      fontSize: '12pt',
+                      color: '#000000',
+                      lineHeight: '1.2'
+                    }}
+                  >
+                    {selectedTemplate.additionalInfo?.text}
+                  </Typography.Text>
+                </div>
+
+                <div style={{
+                  height: '350px',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  padding: '5mm',
+                  border: selectedTemplate.isPreview ? 'none' : '1px dashed #e5e7eb',
+                  borderRadius: '4px',
+                  backgroundColor: selectedTemplate.isPreview ? 'transparent' : '#fafafa',
+                  marginBottom: '20mm'
+                }}>
+                  {selectedTemplate.isPreview && selectedTemplate.showQRCode && (
+                    <QRCodeSVG
+                      value={generateVerificationURL(selectedTemplate._id || '')}
+                      size={200}
+                      level="H"
+                      includeMargin={true}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div style={{
+                width: '100%',
+                padding: '5mm 0',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginTop: 'auto',
+                backgroundColor: 'white'
+              }}>
+                <Typography.Title
+                  level={1}
+                  style={{
+                    margin: 0,
+                    textAlign: 'center',
+                    fontWeight: 'bold',
+                    textTransform: 'uppercase',
+                    letterSpacing: '3px',
+                    color: '#3730A3',
+                    fontSize: '48px'
+                  }}
+                >
+                  VISITRACK
+                </Typography.Title>
               </div>
             </div>
           )}
