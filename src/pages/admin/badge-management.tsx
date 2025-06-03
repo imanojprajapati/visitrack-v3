@@ -532,97 +532,63 @@ const BadgeManagement: React.FC = () => {
 
       const badgeElement = badgeRef.current.cloneNode(true) as HTMLElement;
       
-      // Set container styles with proper width constraints
+      // Set container styles
       badgeElement.style.cssText = `
         position: absolute;
         left: -9999px;
         top: 0;
-        width: 190mm; /* Reduced from 210mm to account for padding */
-        height: 297mm;
+        width: 210mm;
+        min-height: 297mm;
         background: white;
         padding: 10mm;
         display: flex;
         flex-direction: column;
         position: relative;
         box-sizing: border-box;
-        min-height: 297mm;
-        overflow: hidden;
       `;
 
-      // Ensure content container maintains structure with proper width
-      const contentContainer = badgeElement.querySelector('div[style*="flex: 1"]');
-      if (contentContainer instanceof HTMLElement) {
-        contentContainer.style.cssText = `
+      // Ensure content wrapper maintains structure
+      const contentWrapper = badgeElement.querySelector('div[style*="flex: 1"]');
+      if (contentWrapper instanceof HTMLElement) {
+        contentWrapper.style.cssText = `
+          flex: 1;
           display: flex;
           flex-direction: column;
-          flex: 1;
-          position: relative;
-          min-height: 277mm;
+          gap: 10mm;
+          height: calc(297mm - 20mm - 60px);
+          padding-bottom: 60px;
           width: 100%;
-          max-width: 190mm;
-          margin: 0 auto;
         `;
       }
 
-      // Fix width of all rows
+      // Ensure all rows maintain their width
       const rows = badgeElement.querySelectorAll('div[style*="display: flex"]');
       rows.forEach((row) => {
-        if (row instanceof HTMLElement) {
-          row.style.width = '100%';
-          row.style.maxWidth = '190mm';
-          row.style.margin = '0 auto';
+        if (row instanceof HTMLElement && !(row as HTMLElement).style.position) { // Skip VISITRACK container
+          (row as HTMLElement).style.width = '100%';
         }
       });
 
-      // Ensure third row (QR code space) is properly sized
-      const qrCodeContainer = badgeElement.querySelector('div[style*="height: 350px"]');
-      if (qrCodeContainer instanceof HTMLElement) {
-        qrCodeContainer.style.cssText = `
-          height: 350px;
-          width: 100%;
-          max-width: 190mm;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          padding: 5mm;
-          border: 1px dashed #e5e7eb;
-          border-radius: 4px;
-          background-color: #fafafa;
-          margin: 0 auto 20mm auto;
-        `;
-      }
-
-      // Ensure VISITRACK text container is properly positioned and sized
+      // Ensure VISITRACK text container is properly positioned
       const visitrackContainer = badgeElement.querySelector('div[style*="position: absolute"]');
       if (visitrackContainer instanceof HTMLElement) {
         visitrackContainer.style.cssText = `
           width: 100%;
-          max-width: 190mm;
-          padding: 5mm 0;
+          height: 60px;
           display: flex;
           justify-content: center;
           align-items: center;
           position: absolute;
           bottom: 10mm;
-          left: 50%;
-          transform: translateX(-50%);
+          left: 0;
           background-color: white;
-          z-index: 10;
+          border-top: 1px solid #f0f0f0;
         `;
       }
 
       // Remove any QR code elements
       const qrCodeElements = badgeElement.querySelectorAll('svg');
       qrCodeElements.forEach(element => element.remove());
-
-      // Ensure all images are properly contained
-      const images = badgeElement.querySelectorAll('img');
-      images.forEach((img) => {
-        if (img instanceof HTMLElement) {
-          img.style.maxWidth = '100%';
-          img.style.height = 'auto';
-        }
-      });
 
       document.body.appendChild(badgeElement);
 
@@ -950,10 +916,9 @@ const BadgeManagement: React.FC = () => {
           {selectedTemplate && (
             <div 
               ref={badgeRef}
-              className="badge-preview"
               style={{
-                width: '210mm',
-                height: '297mm',
+                width: '100%',
+                minHeight: '297mm',
                 margin: '0 auto',
                 background: 'white',
                 padding: '10mm',
@@ -961,17 +926,19 @@ const BadgeManagement: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 position: 'relative',
-                boxSizing: 'border-box',
-                minHeight: '297mm'
+                boxSizing: 'border-box'
               }}
             >
+              {/* Content wrapper with fixed height to prevent overlap */}
               <div style={{
+                flex: 1,
                 display: 'flex',
                 flexDirection: 'column',
-                flex: 1,
-                position: 'relative',
-                minHeight: '277mm'
+                gap: '10mm',
+                height: 'calc(297mm - 20mm - 60px)', // Full height minus padding and VISITRACK space
+                paddingBottom: '60px' // Space for VISITRACK text
               }}>
+                {/* First Row: Badge Image */}
                 <div style={{
                   width: '100%',
                   height: '220px',
@@ -981,8 +948,7 @@ const BadgeManagement: React.FC = () => {
                   border: '1px solid #e5e7eb',
                   borderRadius: '4px',
                   overflow: 'hidden',
-                  backgroundColor: '#fafafa',
-                  marginBottom: '10mm'
+                  backgroundColor: '#fafafa'
                 }}>
                   {selectedTemplate.badge?.cloudinaryUrl && (
                     <div style={{
@@ -1007,7 +973,9 @@ const BadgeManagement: React.FC = () => {
                   )}
                 </div>
 
+                {/* Second Row: Event Details */}
                 <div style={{
+                  width: '100%',
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'center',
@@ -1015,7 +983,6 @@ const BadgeManagement: React.FC = () => {
                   gap: '8mm',
                   padding: '5mm',
                   textAlign: 'center',
-                  marginBottom: '10mm',
                   minHeight: '120px'
                 }}>
                   <Typography.Title 
@@ -1050,7 +1017,9 @@ const BadgeManagement: React.FC = () => {
                   </Typography.Text>
                 </div>
 
+                {/* Third Row: QR Code or Empty Space */}
                 <div style={{
+                  width: '100%',
                   height: '350px',
                   display: 'flex',
                   justifyContent: 'center',
@@ -1058,8 +1027,7 @@ const BadgeManagement: React.FC = () => {
                   padding: '5mm',
                   border: selectedTemplate.isPreview ? 'none' : '1px dashed #e5e7eb',
                   borderRadius: '4px',
-                  backgroundColor: selectedTemplate.isPreview ? 'transparent' : '#fafafa',
-                  marginBottom: '20mm'
+                  backgroundColor: selectedTemplate.isPreview ? 'transparent' : '#fafafa'
                 }}>
                   {selectedTemplate.isPreview && selectedTemplate.showQRCode && (
                     <QRCodeSVG
@@ -1072,14 +1040,18 @@ const BadgeManagement: React.FC = () => {
                 </div>
               </div>
 
+              {/* Fourth Row: VISITRACK Text */}
               <div style={{
                 width: '100%',
-                padding: '5mm 0',
+                height: '60px',
                 display: 'flex',
                 justifyContent: 'center',
                 alignItems: 'center',
-                marginTop: 'auto',
-                backgroundColor: 'white'
+                position: 'absolute',
+                bottom: '10mm',
+                left: 0,
+                backgroundColor: 'white',
+                borderTop: '1px solid #f0f0f0'
               }}>
                 <Typography.Title
                   level={1}
