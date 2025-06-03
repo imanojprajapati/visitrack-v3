@@ -97,7 +97,7 @@ export default async function handler(
         eventStartDate: event?.startDate || '',
         eventEndDate: event?.endDate || '',
         status: visitor.status,
-        submittedAt: visitor.createdAt,
+        createdAt: visitor.createdAt,
         additionalData: visitor.additionalData,
       };
     });

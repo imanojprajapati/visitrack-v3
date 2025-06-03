@@ -62,34 +62,13 @@ export default function EventRegistration() {
   const handleSendOTP = async (values: { email: string }) => {
     setLoading(true);
     try {
-      // First check if user is already registered
-      const checkResponse = await fetch('/api/visitors/check-registration', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: values.email, eventId }),
-      });
-
-      if (!checkResponse.ok) throw new Error('Failed to check registration status');
-      
-      const { isRegistered, visitor: existingVisitor } = await checkResponse.json();
-      
-      if (isRegistered) {
-        setVisitor(existingVisitor);
-        setIsAlreadyRegistered(true);
-        setCurrentStep(3); // Skip to QR code step
-        message.info('You are already registered for this event');
-        return;
-      }
-
-      // If not registered, proceed with OTP
+      // Only send OTP, do not check registration yet
       const response = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: values.email }),
       });
-
       if (!response.ok) throw new Error('Failed to send OTP');
-      
       setCurrentStep(1);
       message.success('OTP sent to your email');
     } catch (error) {
@@ -104,9 +83,6 @@ export default function EventRegistration() {
     setLoading(true);
     try {
       const email = form.getFieldValue('email');
-      console.log('Verifying OTP for email:', email);
-      console.log('OTP value:', values.otp);
-
       const response = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,21 +91,31 @@ export default function EventRegistration() {
           otp: values.otp,
         }),
       });
-
       const data = await response.json();
-      
       if (!response.ok) {
         console.error('OTP verification failed:', data);
         throw new Error(data.message || 'Failed to verify OTP');
       }
-      
+      // After OTP is verified, check registration
+      const checkResponse = await fetch('/api/visitors/check-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, eventId }),
+      });
+      if (!checkResponse.ok) throw new Error('Failed to check registration status');
+      const { isRegistered, visitor: existingVisitor } = await checkResponse.json();
+      if (isRegistered) {
+        setVisitor(existingVisitor);
+        setIsAlreadyRegistered(true);
+        setCurrentStep(3); // Skip to QR code step
+        message.info('You are already registered for this event');
+        return;
+      }
       if (!event?.form) {
         console.error('No form data available for event:', event);
         message.error('This event has no registration form');
         return;
       }
-      
-      console.log('OTP verified successfully, proceeding to registration form');
       setCurrentStep(2);
       message.success('OTP verified successfully');
     } catch (error) {

@@ -27,12 +27,20 @@ export default function RegistrationReportPage() {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<Event[]>([]);
+  const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState({
     name: '',
     email: '',
     phone: '',
     company: '',
     eventId: '',
+    city: '',
+    state: '',
+    country: '',
+    pincode: '',
+    source: '',
+    location: '',
+    status: '',
     dateRange: null as [string, string] | null,
   });
 
@@ -103,75 +111,31 @@ export default function RegistrationReportPage() {
       phone: '',
       company: '',
       eventId: '',
+      city: '',
+      state: '',
+      country: '',
+      pincode: '',
+      source: '',
+      location: '',
+      status: '',
       dateRange: null,
     });
+    setTimeout(fetchVisitors, 0); // Ensure fetch after state update
   };
 
-  const handleExport = () => {
-    // Convert visitors data to CSV
-    const headers = ['Name', 'Email', 'Phone', 'Company', 'Event', 'Location', 'Date', 'Status', 'Registration Date'];
-    const csvData = visitors.map(visitor => [
-      visitor.name,
-      visitor.email,
-      visitor.phone,
-      visitor.company || visitor.additionalData?.company?.value || '',
-      visitor.eventName,
-      visitor.eventLocation,
-      new Date(visitor.eventStartDate).toLocaleDateString(),
-      visitor.status,
-      new Date(visitor.createdAt).toLocaleString()
-    ]);
+  // Find all unique additionalData keys from visitors
+  const allAdditionalKeys = Array.from(new Set(visitors.flatMap(v => Object.keys(v.additionalData || {}))));
 
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.join(','))
-    ].join('\n');
-
-    // Create and download CSV file
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `visitor-report-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  // Generate dynamic columns for additionalData
+  const additionalDataColumns = allAdditionalKeys.map(key => ({
+    title: visitors[0]?.additionalData?.[key]?.label || key,
+    dataIndex: ['additionalData', key, 'value'],
+    key,
+    render: (_: any, record: Visitor) => record.additionalData?.[key]?.value || '-',
+  }));
 
   const columns = [
-    {
-      title: 'Name',
-      dataIndex: 'name',
-      key: 'name',
-      sorter: (a: Visitor, b: Visitor) => a.name.localeCompare(b.name),
-      render: (name: string, record: Visitor) => name || record.additionalData?.name?.value || '-'
-    },
-    {
-      title: 'Email',
-      dataIndex: 'email',
-      key: 'email',
-      render: (email: string, record: Visitor) => email || record.additionalData?.email?.value || '-'
-    },
-    {
-      title: 'Phone',
-      dataIndex: 'phone',
-      key: 'phone',
-      render: (phone: string, record: Visitor) => phone || record.additionalData?.phone?.value || '-'
-    },
-    {
-      title: 'Company',
-      dataIndex: 'company',
-      key: 'company',
-      render: (company: string, record: Visitor) => 
-        company || record.additionalData?.company?.value || '-'
-    },
-    {
-      title: 'Country',
-      dataIndex: 'country',
-      key: 'country',
-      render: (_: any, record: Visitor) => 
-        record.additionalData?.country?.value || '-'
-    },
+    ...additionalDataColumns,
     {
       title: 'Event',
       dataIndex: 'eventName',
@@ -241,108 +205,206 @@ export default function RegistrationReportPage() {
     },
   ];
 
+  const handleExport = () => {
+    const headers = [
+      ...allAdditionalKeys.map(key => visitors[0]?.additionalData?.[key]?.label || key),
+      'Event', 'Location', 'Date', 'Status', 'Registration Date'
+    ];
+    const csvData = visitors.map(visitor => [
+      ...allAdditionalKeys.map(key => visitor.additionalData?.[key]?.value || ''),
+      visitor.eventName,
+      visitor.eventLocation,
+      new Date(visitor.eventStartDate).toLocaleDateString(),
+      visitor.status,
+      new Date(visitor.createdAt).toLocaleString()
+    ]);
+    const csvContent = [
+      headers.join(','),
+      ...csvData.map(row => row.join(','))
+    ].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `visitor-report-${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="w-full">
-      {/* Filter Section */}
-      <Card 
-        bordered={false} 
-        className="bg-white shadow-sm mb-6"
-        bodyStyle={{ padding: '24px' }}
-      >
-        <div className="mb-6">
-          <Space direction="vertical" size="small" style={{ width: '100%' }}>
-            <div className="flex items-center justify-between">
-              <div>
-                <Title level={4} className="m-0">Filter Visitors</Title>
-                <Text type="secondary">Search and filter visitor registration data</Text>
+      {/* Filter Section (toggleable) */}
+      {showFilters && (
+        <Card 
+          bordered={false} 
+          className="bg-white shadow-sm mb-6"
+          bodyStyle={{ padding: '24px' }}
+        >
+          <div className="mb-6">
+            <Space direction="vertical" size="small" style={{ width: '100%' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <Title level={4} className="m-0">Filter Visitors</Title>
+                  <Text type="secondary">Search and filter visitor registration data</Text>
+                </div>
+                <Space>
+                  <Button
+                    icon={<ReloadOutlined />}
+                    onClick={handleReset}
+                  >
+                    Reset Filters
+                  </Button>
+                  <Button
+                    type="primary"
+                    onClick={fetchVisitors}
+                    icon={<SearchOutlined />}
+                  >
+                    Apply Filters
+                  </Button>
+                </Space>
               </div>
-              <Space>
-                <Button
-                  icon={<ReloadOutlined />}
-                  onClick={handleReset}
-                >
-                  Reset Filters
-                </Button>
-                <Button
-                  type="primary"
-                  onClick={fetchVisitors}
-                  icon={<SearchOutlined />}
-                >
-                  Apply Filters
-                </Button>
-              </Space>
-            </div>
-          </Space>
-        </div>
+            </Space>
+          </div>
 
-        <Row gutter={[16, 16]}>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Input
-              placeholder="Search by name"
-              value={filters.name}
-              onChange={(e) => handleFilterChange('name', e.target.value)}
-              prefix={<SearchOutlined className="text-gray-400" />}
-              allowClear
-              className="hover:border-blue-400 focus:border-blue-400"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Input
-              placeholder="Search by email"
-              value={filters.email}
-              onChange={(e) => handleFilterChange('email', e.target.value)}
-              prefix={<SearchOutlined className="text-gray-400" />}
-              allowClear
-              className="hover:border-blue-400 focus:border-blue-400"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Input
-              placeholder="Search by phone"
-              value={filters.phone}
-              onChange={(e) => handleFilterChange('phone', e.target.value)}
-              prefix={<SearchOutlined className="text-gray-400" />}
-              allowClear
-              className="hover:border-blue-400 focus:border-blue-400"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Input
-              placeholder="Search by company"
-              value={filters.company}
-              onChange={(e) => handleFilterChange('company', e.target.value)}
-              prefix={<SearchOutlined className="text-gray-400" />}
-              allowClear
-              className="hover:border-blue-400 focus:border-blue-400"
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Select
-              placeholder="Filter by event"
-              value={filters.eventId || undefined}
-              onChange={(value) => handleFilterChange('eventId', value)}
-              allowClear
-              style={{ width: '100%' }}
-              suffixIcon={<FilterOutlined className="text-gray-400" />}
-              className="hover:border-blue-400 focus:border-blue-400"
-            >
-              {events.map(event => (
-                <Select.Option key={event._id} value={event._id}>
-                  {event.title}
-                </Select.Option>
-              ))}
-            </Select>
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <RangePicker
-              onChange={handleDateRangeChange}
-              style={{ width: '100%' }}
-              placeholder={['Start Date', 'End Date']}
-              className="hover:border-blue-400 focus:border-blue-400"
-            />
-          </Col>
-        </Row>
-      </Card>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by name"
+                value={filters.name}
+                onChange={(e) => handleFilterChange('name', e.target.value)}
+                prefix={<SearchOutlined className="text-gray-400" />}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by email"
+                value={filters.email}
+                onChange={(e) => handleFilterChange('email', e.target.value)}
+                prefix={<SearchOutlined className="text-gray-400" />}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by phone"
+                value={filters.phone}
+                onChange={(e) => handleFilterChange('phone', e.target.value)}
+                prefix={<SearchOutlined className="text-gray-400" />}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by company"
+                value={filters.company}
+                onChange={(e) => handleFilterChange('company', e.target.value)}
+                prefix={<SearchOutlined className="text-gray-400" />}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by city"
+                value={filters.city}
+                onChange={(e) => handleFilterChange('city', e.target.value)}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by state"
+                value={filters.state}
+                onChange={(e) => handleFilterChange('state', e.target.value)}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by country"
+                value={filters.country}
+                onChange={(e) => handleFilterChange('country', e.target.value)}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by pincode"
+                value={filters.pincode}
+                onChange={(e) => handleFilterChange('pincode', e.target.value)}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by source"
+                value={filters.source}
+                onChange={(e) => handleFilterChange('source', e.target.value)}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Input
+                placeholder="Search by location"
+                value={filters.location}
+                onChange={(e) => handleFilterChange('location', e.target.value)}
+                allowClear
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Select
+                placeholder="Filter by status"
+                value={filters.status || undefined}
+                onChange={(value) => handleFilterChange('status', value)}
+                allowClear
+                style={{ width: '100%' }}
+                className="hover:border-blue-400 focus:border-blue-400"
+              >
+                <Select.Option value="registered">Registered</Select.Option>
+                <Select.Option value="checked_in">Checked In</Select.Option>
+                <Select.Option value="checked_out">Checked Out</Select.Option>
+                <Select.Option value="cancelled">Cancelled</Select.Option>
+              </Select>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <Select
+                placeholder="Filter by event"
+                value={filters.eventId || undefined}
+                onChange={(value) => handleFilterChange('eventId', value)}
+                allowClear
+                style={{ width: '100%' }}
+                suffixIcon={<FilterOutlined className="text-gray-400" />}
+                className="hover:border-blue-400 focus:border-blue-400"
+              >
+                {events.map(event => (
+                  <Select.Option key={event._id} value={event._id}>
+                    {event.title}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Col>
+            <Col xs={24} sm={12} md={8} lg={6}>
+              <RangePicker
+                onChange={handleDateRangeChange}
+                style={{ width: '100%' }}
+                placeholder={['Start Date', 'End Date']}
+                className="hover:border-blue-400 focus:border-blue-400"
+              />
+            </Col>
+          </Row>
+        </Card>
+      )}
 
       {/* Data Table Section */}
       <Card 
@@ -355,13 +417,22 @@ export default function RegistrationReportPage() {
             <Title level={4} className="m-0">Visitor Registrations</Title>
             <Text type="secondary">Showing all visitor registration records</Text>
           </div>
-          <Button
-            icon={<DownloadOutlined />}
-            onClick={handleExport}
-            type="default"
-          >
-            Export CSV
-          </Button>
+          <Space>
+            <Button
+              icon={<FilterOutlined />}
+              onClick={() => setShowFilters(f => !f)}
+              type={showFilters ? 'primary' : 'default'}
+            >
+              Filter
+            </Button>
+            <Button
+              icon={<DownloadOutlined />}
+              onClick={handleExport}
+              type="default"
+            >
+              Export CSV
+            </Button>
+          </Space>
         </div>
 
         <Table
