@@ -86,7 +86,7 @@ export default async function handler(
         name: visitor.name,
         email: visitor.email,
         phone: visitor.phone,
-        company: additionalData.company || '',
+        company: additionalData.company?.value || '',
         city: additionalData.city || '',
         state: additionalData.state || '',
         country: additionalData.country || '',
