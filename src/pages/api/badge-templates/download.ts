@@ -115,6 +115,7 @@ export default async function handler(
     if (visitorData) {
       doc.font('Helvetica-Bold').fontSize(scaled(22)).fillColor('#222');
       const details = [
+        visitorData._id && `Visitor ID: ${visitorData._id}`,
         visitorData.name && `Name: ${visitorData.name}`,
         visitorData.email && `Email: ${visitorData.email}`,
         visitorData.phone && `Phone: ${visitorData.phone}`,

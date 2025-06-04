@@ -395,6 +395,7 @@ export default function EventRegistration() {
                     <Title level={4}>Registration Details</Title>
                     <Divider />
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                      <Text><strong>Visitor ID:</strong> {visitor._id}</Text>
                       <Text><strong>Name:</strong> {visitor.name}</Text>
                       <Text><strong>Email:</strong> {visitor.email}</Text>
                       <Text><strong>Phone:</strong> {visitor.phone}</Text>
@@ -539,6 +540,7 @@ export default function EventRegistration() {
                 <Title level={4}>Registration Details</Title>
                 <Divider />
                 <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  <Text><strong>Visitor ID:</strong> {visitor._id}</Text>
                   <Text><strong>Name:</strong> {visitor.name}</Text>
                   <Text><strong>Email:</strong> {visitor.email}</Text>
                   <Text><strong>Phone:</strong> {visitor.phone}</Text>
