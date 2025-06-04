@@ -7,7 +7,7 @@ export interface IVisitor extends Document {
   name: string;                            // Visitor's name
   email: string;                           // Visitor's email
   phone: string;                           // Visitor's phone
-  company?: string;                        // Visitor's company
+  company: string;                         // Visitor's company
   age?: number;                            // Visitor's age
   qrCode: string;                          // QR code for visitor check-in
   eventName: string;                       // Event name (denormalized for easy querying)
@@ -16,7 +16,8 @@ export interface IVisitor extends Document {
   eventEndDate: string;                    // Event end date in DD-MM-YY format
   eventStartTime: string;                  // Event start time in HH:mm format
   eventEndTime: string;                    // Event end time in HH:mm format
-  status: 'registered' | 'checked_in' | 'checked_out' | 'cancelled';
+  status: 'registered' | 'checked_in' | 'checked_out' | 'Visited';
+  scanTime?: Date;
   checkInTime?: string;                    // When visitor checked in (DD-MM-YY HH:mm)
   checkOutTime?: string;                   // When visitor checked out (DD-MM-YY HH:mm)
   additionalData: Record<string, any>;     // Any additional form fields
@@ -60,7 +61,7 @@ const dateStringSchemaType = {
   }
 };
 
-const visitorSchema = new mongoose.Schema({
+const visitorSchema = new mongoose.Schema<IVisitor>({
   registrationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Registration',
@@ -94,6 +95,7 @@ const visitorSchema = new mongoose.Schema({
   },
   company: {
     type: String,
+    required: true,
     trim: true,
   },
   age: {
@@ -155,8 +157,11 @@ const visitorSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['registered', 'checked_in', 'checked_out', 'cancelled'],
+    enum: ['registered', 'checked_in', 'checked_out', 'Visited'],
     default: 'registered',
+  },
+  scanTime: {
+    type: Date,
   },
   checkInTime: {
     ...dateStringSchemaType,
@@ -180,6 +185,7 @@ const visitorSchema = new mongoose.Schema({
   },
   additionalData: {
     type: mongoose.Schema.Types.Mixed,
+    default: {}
   },
   createdAt: {
     ...dateStringSchemaType,
@@ -209,7 +215,7 @@ const visitorSchema = new mongoose.Schema({
 
 // Create indexes for common queries
 visitorSchema.index({ eventId: 1, status: 1 });
-visitorSchema.index({ email: 1 });
+visitorSchema.index({ email: 1, eventId: 1 });
 visitorSchema.index({ phone: 1 });
 visitorSchema.index({ createdAt: -1 });
 

@@ -21,6 +21,9 @@ import {
 } from '@ant-design/icons';
 import { QRCodeComponent, parseCompactQRData, type QRCodeData } from '../../lib/qrcode';
 import AdminLayout from './layout';
+import { useAppContext } from '../../context/AppContext';
+import dayjs from 'dayjs';
+import { Html5QrcodeScanner, Html5QrcodeScannerState } from 'html5-qrcode';
 
 const { Text } = Typography;
 
@@ -32,138 +35,113 @@ interface VisitorData extends QRCodeData {
   endDate: string;
 }
 
-interface ScannedVisitor extends VisitorData {
-  key: string;
+interface VisitorEntry {
+  _id: string;
+  name: string;
+  company: string;
+  eventName: string;
+  status: string;
   scanTime: string;
+  entryType: 'scan' | 'manual';
 }
 
 const QRScanner = () => {
-  const [form] = Form.useForm<VisitorData>();
+  const [form] = Form.useForm();
   const [scanResult, setScanResult] = useState<VisitorData | null>(null);
   const [showScanner, setShowScanner] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [scannedVisitors, setScannedVisitors] = useState<ScannedVisitor[]>([]);
+  const [scannedVisitors, setScannedVisitors] = useState<VisitorEntry[]>([]);
   const [visitorStatus, setVisitorStatus] = useState<boolean | null>(null);
   const [cameraError, setCameraError] = useState(false);
+  const [loading, setLoading] = useState(false);
   const badgeRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-
-  const startCamera = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: "environment",
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        }
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-      }
-    } catch (err) {
-      console.error('Error accessing camera:', err);
-      setCameraError(true);
-      message.error('Error accessing camera. Please check your camera permissions or try manual entry.');
-    }
-  }, []);
-
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    if (videoRef.current) {
-      videoRef.current.srcObject = null;
-    }
-  }, []);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const { messageApi } = useAppContext();
 
   useEffect(() => {
     if (showScanner) {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-    return () => stopCamera();
-  }, [showScanner, startCamera, stopCamera]);
+      // Initialize QR scanner
+      scannerRef.current = new Html5QrcodeScanner(
+        "qr-reader",
+        { fps: 10, qrbox: 250 },
+        false
+      );
 
-  const handleError = (err: string | DOMException) => {
-    console.error(err);
-    setCameraError(true);
-    message.error('Error accessing camera. Please check your camera permissions or try manual entry.');
-  };
+      scannerRef.current.render(
+        async (decodedText: string) => {
+          try {
+            const qrData = JSON.parse(decodedText) as QRCodeData;
+            await handleQrCodeScan(qrData);
+            if (scannerRef.current) {
+              scannerRef.current.clear();
+            }
+            setShowScanner(false);
+          } catch (error) {
+            console.error('Error processing QR code:', error);
+            messageApi?.error('Invalid QR code format');
+          }
+        },
+        (error: string | Error) => {
+          console.error('QR Scan error:', error);
+          setCameraError(true);
+        }
+      );
+    } else {
+      // Clean up scanner
+      if (scannerRef.current) {
+        scannerRef.current.clear();
+      }
+    }
+
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear();
+      }
+    };
+  }, [showScanner, messageApi]);
 
   const checkVisitorStatus = (visitorId: string): boolean => {
-    return scannedVisitors.some(v => v.visitorId === visitorId);
+    return scannedVisitors.some(v => v._id === visitorId);
   };
 
-  const processVisitorData = (data: string) => {
+  const handleManualEntry = async (values: { visitorId: string; eventId: string }) => {
+    setLoading(true);
     try {
-      // Try parsing as compact format first
-      const qrData = parseCompactQRData(data);
-      
-      if (!qrData) {
-        throw new Error('Invalid QR code format');
+      const response = await fetch('/api/visitors/manual-entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to process manual entry');
       }
 
-      // Create visitor data with default values for optional fields
-      const visitorData: VisitorData = {
-        ...qrData,
-        name: qrData.name || 'Unknown',
-        company: qrData.company || 'Unknown',
-        designation: 'Visitor',
-        eventName: qrData.eventName || 'Unknown Event',
-        endDate: new Date().toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: '2-digit'
-        }).replace(/\//g, '-')
-      };
+      const data = await response.json();
+      setScannedVisitors(prev => [
+        {
+          _id: data.visitor._id,
+          name: data.visitor.name,
+          company: data.visitor.company,
+          eventName: data.visitor.eventName,
+          status: data.visitor.status,
+          scanTime: data.visitor.scanTime,
+          entryType: 'manual'
+        },
+        ...prev
+      ]);
 
-      const hasVisited = checkVisitorStatus(visitorData.visitorId);
-      setVisitorStatus(hasVisited);
-      setScanResult(visitorData);
-      setShowScanner(false);
-      
-      if (!hasVisited) {
-        setShowPreview(true);
-        // Add to scanned visitors list
-        setScannedVisitors([...scannedVisitors, {
-          key: Date.now().toString(),
-          ...visitorData,
-          scanTime: new Date().toLocaleString(),
-        }]);
-        message.success('New visitor registered successfully!');
-      } else {
-        message.warning('Visitor has already been registered!');
-      }
+      form.resetFields();
+      setShowManualEntry(false);
+      messageApi?.success('Visitor entry processed successfully');
     } catch (error) {
-      message.error('Invalid QR Code format');
+      console.error('Error processing manual entry:', error);
+      messageApi?.error(error instanceof Error ? error.message : 'Failed to process manual entry');
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const capture = useCallback(() => {
-    if (videoRef.current) {
-      // TODO: Implement QR code scanning using jsQR library
-      message.info('QR code scanning simulation - implement actual scanning logic');
-    }
-  }, []);
-
-  const handleManualEntry = (values: VisitorData) => {
-    // Convert form values to QR code data format
-    const qrData: QRCodeData = {
-      visitorId: values.visitorId,
-      eventId: values.eventId,
-      name: values.name,
-      company: values.company,
-      eventName: values.eventName
-    };
-    processVisitorData(JSON.stringify(qrData));
-    setShowManualEntry(false);
-    form.resetFields();
   };
 
   const handlePrint = async (visitor: VisitorData) => {
@@ -185,29 +163,43 @@ const QRScanner = () => {
       key: 'company',
     },
     {
-      title: 'Designation',
-      dataIndex: 'designation',
-      key: 'designation',
-    },
-    {
-      title: 'Scan Time',
-      dataIndex: 'scanTime',
-      key: 'scanTime',
+      title: 'Event',
+      dataIndex: 'eventName',
+      key: 'eventName',
     },
     {
       title: 'Status',
+      dataIndex: 'status',
       key: 'status',
-      render: () => <Tag color="green">Registered</Tag>,
+      render: (status: string) => (
+        <Tag color={status === 'Visited' ? 'green' : 'blue'}>{status}</Tag>
+      ),
+    },
+    {
+      title: 'Entry Time',
+      dataIndex: 'scanTime',
+      key: 'scanTime',
+      render: (text: string) => dayjs(text).format('DD/MM/YYYY HH:mm:ss'),
+    },
+    {
+      title: 'Entry Type',
+      dataIndex: 'entryType',
+      key: 'entryType',
+      render: (text: string) => (
+        <Tag color={text === 'manual' ? 'orange' : 'purple'}>
+          {text.charAt(0).toUpperCase() + text.slice(1)}
+        </Tag>
+      ),
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: any) => (
+      render: (_: any, record: VisitorEntry) => (
         <Space size="middle">
           <Button
             type="primary"
             icon={<PrinterOutlined />}
-            onClick={() => handlePrint(record)}
+            onClick={() => handlePrint(record as unknown as VisitorData)}
           >
             Print Badge
           </Button>
@@ -215,6 +207,41 @@ const QRScanner = () => {
       ),
     },
   ];
+
+  const handleQrCodeScan = async (qrData: QRCodeData) => {
+    try {
+      const response = await fetch('/api/visitors/scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(qrData),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to process QR code');
+      }
+
+      const data = await response.json();
+      setScannedVisitors(prev => [
+        {
+          _id: data.visitor._id,
+          name: data.visitor.name,
+          company: data.visitor.company,
+          eventName: data.visitor.eventName,
+          status: data.visitor.status,
+          scanTime: data.visitor.scanTime,
+          entryType: 'scan'
+        },
+        ...prev
+      ]);
+
+      messageApi?.success('QR code scanned successfully');
+      setShowScanner(false);
+    } catch (error) {
+      console.error('Error scanning QR code:', error);
+      messageApi?.error(error instanceof Error ? error.message : 'Failed to process QR code');
+    }
+  };
 
   return (
     <AdminLayout>
@@ -241,10 +268,11 @@ const QRScanner = () => {
           <Table
             columns={columns}
             dataSource={scannedVisitors}
+            rowKey="_id"
             pagination={{ pageSize: 10 }}
           />
         </Card>
-        
+
         {/* QR Scanner Modal */}
         <Modal
           title="Scan QR Code"
@@ -252,13 +280,11 @@ const QRScanner = () => {
           onCancel={() => {
             setShowScanner(false);
             setCameraError(false);
-            stopCamera();
+            if (scannerRef.current) {
+              scannerRef.current.clear();
+            }
           }}
-          footer={[
-            <Button key="scan" type="primary" onClick={capture} disabled={cameraError}>
-              Scan QR Code
-            </Button>
-          ]}
+          footer={null}
           width={800}
         >
           <div className="w-full flex justify-center">
@@ -270,16 +296,7 @@ const QRScanner = () => {
                 </Text>
               </div>
             ) : (
-              <div className="relative w-full max-w-2xl">
-                <video
-                  ref={videoRef}
-                  autoPlay
-                  playsInline
-                  className="w-full"
-                  style={{ transform: 'scaleX(-1)' }}
-                />
-                <div className="absolute inset-0 border-2 border-dashed border-blue-500 pointer-events-none" />
-              </div>
+              <div id="qr-reader" className="w-full max-w-2xl" />
             )}
           </div>
         </Modal>
@@ -302,40 +319,27 @@ const QRScanner = () => {
             <Form.Item
               name="visitorId"
               label="Visitor ID"
-              rules={[{ required: true, message: 'Please input visitor ID!' }]}
+              rules={[
+                { required: true, message: 'Please enter the visitor ID' },
+                { pattern: /^[0-9a-fA-F]{24}$/, message: 'Please enter a valid visitor ID' }
+              ]}
             >
-              <Input />
+              <Input placeholder="Enter visitor ID" />
             </Form.Item>
+
             <Form.Item
               name="eventId"
               label="Event ID"
-              rules={[{ required: true, message: 'Please input event ID!' }]}
+              rules={[
+                { required: true, message: 'Please enter the event ID' },
+                { pattern: /^[0-9a-fA-F]{24}$/, message: 'Please enter a valid event ID' }
+              ]}
             >
-              <Input />
+              <Input placeholder="Enter event ID" />
             </Form.Item>
-            <Form.Item
-              name="name"
-              label="Name"
-              rules={[{ required: true, message: 'Please input name!' }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="company"
-              label="Company"
-              rules={[{ required: true, message: 'Please input company!' }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="eventName"
-              label="Event Name"
-              rules={[{ required: true, message: 'Please input event name!' }]}
-            >
-              <Input />
-            </Form.Item>
+
             <Form.Item>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" htmlType="submit" loading={loading}>
                 Submit
               </Button>
             </Form.Item>

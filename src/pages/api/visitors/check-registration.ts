@@ -38,6 +38,8 @@ export default async function handler(
         isRegistered: true,
         visitor: {
           _id: visitor._id,
+          eventId: visitor.eventId,
+          registrationId: visitor.registrationId,
           name: visitor.name,
           email: visitor.email,
           phone: visitor.phone,
@@ -53,7 +55,8 @@ export default async function handler(
     }
 
     res.status(200).json({ isRegistered: false });
-  } catch (error) {
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error('Unknown error occurred');
     console.error('Error checking registration:', error);
     res.status(500).json({ 
       message: 'Failed to check registration status',
