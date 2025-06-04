@@ -59,6 +59,37 @@ const QRScanner = () => {
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const { messageApi } = useAppContext();
 
+  // Add function to fetch QR scan data
+  const fetchQRScans = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/qr-scans');
+      if (!response.ok) {
+        throw new Error('Failed to fetch QR scans');
+      }
+      const data = await response.json();
+      setScannedVisitors(data.scans.map((scan: any) => ({
+        _id: scan._id,
+        name: scan.name,
+        company: scan.company,
+        eventName: scan.eventName,
+        status: scan.status,
+        scanTime: scan.scanTime,
+        entryType: scan.entryType
+      })));
+    } catch (error) {
+      console.error('Error fetching QR scans:', error);
+      messageApi?.error('Failed to load QR scan data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load QR scan data when component mounts
+  useEffect(() => {
+    fetchQRScans();
+  }, []);
+
   useEffect(() => {
     if (showScanner) {
       // Initialize QR scanner
@@ -119,19 +150,7 @@ const QRScanner = () => {
         throw new Error(error.message || 'Failed to process manual entry');
       }
 
-      const data = await response.json();
-      setScannedVisitors(prev => [
-        {
-          _id: data.visitor._id,
-          name: data.visitor.name,
-          company: data.visitor.company,
-          eventName: data.visitor.eventName,
-          status: data.visitor.status,
-          scanTime: data.visitor.scanTime,
-          entryType: 'manual'
-        },
-        ...prev
-      ]);
+      await fetchQRScans();
 
       form.resetFields();
       setShowManualEntry(false);
@@ -179,7 +198,15 @@ const QRScanner = () => {
       title: 'Entry Time',
       dataIndex: 'scanTime',
       key: 'scanTime',
-      render: (text: string) => dayjs(text).format('DD/MM/YYYY HH:mm:ss'),
+      render: (scanTime: string) => {
+        try {
+          if (!scanTime) return '-';
+          return dayjs(scanTime).format('DD/MM/YYYY HH:mm:ss');
+        } catch (error) {
+          console.error('Error formatting date:', error);
+          return '-';
+        }
+      },
     },
     {
       title: 'Entry Type',
@@ -222,18 +249,7 @@ const QRScanner = () => {
       }
 
       const data = await response.json();
-      setScannedVisitors(prev => [
-        {
-          _id: data.visitor._id,
-          name: data.visitor.name,
-          company: data.visitor.company,
-          eventName: data.visitor.eventName,
-          status: data.visitor.status,
-          scanTime: data.visitor.scanTime,
-          entryType: 'scan'
-        },
-        ...prev
-      ]);
+      await fetchQRScans();
 
       messageApi?.success('QR code scanned successfully');
       setShowScanner(false);
@@ -270,6 +286,7 @@ const QRScanner = () => {
             dataSource={scannedVisitors}
             rowKey="_id"
             pagination={{ pageSize: 10 }}
+            loading={loading}
           />
         </Card>
 

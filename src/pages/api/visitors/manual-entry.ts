@@ -101,7 +101,7 @@ export default async function handler(
         company: updatedVisitor.company,
         eventName: updatedVisitor.eventName,
         status: updatedVisitor.status,
-        scanTime: updatedVisitor.scanTime,
+        scanTime: now.toISOString(),
         eventId: updatedVisitor.eventId
       }
     });
