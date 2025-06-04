@@ -4,68 +4,12 @@ import React from 'react';
 
 // Common interface for QR code data
 export interface QRCodeData {
-  visitorId: string;
-  eventId: string;
-  registrationId?: string;
-  name?: string;
-  company?: string;
-  eventName?: string;
-}
-
-// Props interface for QRCodeComponent
-interface QRCodeComponentProps {
-  data: QRCodeData;
-  size?: number;
-}
-
-// Helper function to create a compact string from the data
-export function createCompactData(data: QRCodeData): string {
-  // Create an ultra-compact format: i{visitorId}e{eventId}r{registrationId}
-  // Only include essential fields to minimize data size
-  return `i${data.visitorId}e${data.eventId}${data.registrationId ? `r${data.registrationId}` : ''}`;
-}
-
-// Helper function to parse compact QR data
-export function parseCompactQRData(data: string): QRCodeData | null {
-  try {
-    const result: any = {};
-    let currentKey = '';
-    let currentValue = '';
-    
-    // Parse the compact format
-    for (let i = 0; i < data.length; i++) {
-      const char = data[i];
-      if (char === 'i' || char === 'e' || char === 'r') {
-        if (currentKey) {
-          result[currentKey] = currentValue;
-        }
-        currentKey = char;
-        currentValue = '';
-      } else {
-        currentValue += char;
-      }
-    }
-    
-    // Add the last key-value pair
-    if (currentKey) {
-      result[currentKey] = currentValue;
-    }
-
-    // Map the keys to their full names
-    return {
-      visitorId: result['i'] || '',
-      eventId: result['e'] || '',
-      registrationId: result['r'],
-    };
-  } catch (error) {
-    console.error('Error parsing QR data:', error);
-    return null;
-  }
+  visitorId: string;  // Only visitor ID is required now
 }
 
 // Common QR code options for consistent generation
 const QR_OPTIONS = {
-  errorCorrectionLevel: 'L' as const,
+  errorCorrectionLevel: 'H' as const,
   margin: 1,
   width: 180,
   color: {
@@ -73,6 +17,41 @@ const QR_OPTIONS = {
     light: '#ffffff'
   }
 };
+
+// Helper function to create a compact string from the data
+export function createCompactData(data: QRCodeData): string {
+  // Just return the visitor ID as is - no JSON wrapping needed
+  return data.visitorId;
+}
+
+// Helper function to parse compact QR data
+export function parseCompactQRData(data: string): QRCodeData | null {
+  try {
+    // First try to parse as JSON (for backward compatibility)
+    try {
+      const parsed = JSON.parse(data);
+      if (parsed && typeof parsed === 'object') {
+        const visitorId = parsed.visitor_id || parsed.visitorId;
+        if (visitorId && /^[0-9a-fA-F]{24}$/.test(visitorId)) {
+          return { visitorId };
+        }
+      }
+    } catch (e) {
+      // Not JSON, continue to direct ID check
+    }
+
+    // Check if the string itself is a valid MongoDB ID
+    if (/^[0-9a-fA-F]{24}$/.test(data)) {
+      return { visitorId: data };
+    }
+
+    // If no valid ID found, return null
+    return null;
+  } catch (error) {
+    console.error('Error parsing QR data:', error);
+    return null;
+  }
+}
 
 // Generate QR code as data URL (for server-side)
 export async function generateQRCode(data: QRCodeData): Promise<string> {
@@ -92,7 +71,10 @@ export async function generateQRCode(data: QRCodeData): Promise<string> {
 }
 
 // React component for QR code generation (for client-side)
-export const QRCodeComponent: React.FC<QRCodeComponentProps> = ({ data, size = QR_OPTIONS.width }) => {
+export const QRCodeComponent: React.FC<{
+  data: QRCodeData;
+  size?: number;
+}> = ({ data, size = QR_OPTIONS.width }) => {
   const qrData = createCompactData(data);
   return React.createElement(QRCodeSVG, {
     value: qrData,

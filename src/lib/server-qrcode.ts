@@ -3,9 +3,8 @@ import { QRCodeData } from './qrcode';
 
 // Helper function to create a compact string from the data
 function createCompactData(data: QRCodeData): string {
-  // Create an ultra-compact format: i{visitorId}e{eventId}r{registrationId}
-  // Only include essential fields to minimize data size
-  return `i${data.visitorId}e${data.eventId}${data.registrationId ? `r${data.registrationId}` : ''}`;
+  // Just return the visitor ID as is
+  return data.visitorId;
 }
 
 // Common QR code options for consistent generation

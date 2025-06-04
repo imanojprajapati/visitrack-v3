@@ -204,10 +204,9 @@ export default async function handler(
 
       // Generate QR code
       const visitorId = new mongoose.Types.ObjectId();
-      const qrCodeData: QRCodeData = {
+      const qrCodeData = {
         visitorId: visitorId.toString(),
-        eventId: event._id.toString(),
-        registrationId: registration[0]._id.toString()
+        eventId: event._id.toString()
       };
 
       let qrCode: string;

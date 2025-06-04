@@ -7,7 +7,6 @@ import mongoose from 'mongoose';
 interface QRCodeData {
   visitorId: string;
   eventId: string;
-  registrationId: string;
 }
 
 export default async function handler(
@@ -26,35 +25,36 @@ export default async function handler(
   session.startTransaction();
 
   try {
-    const { visitorId, eventId, registrationId } = req.body as QRCodeData;
+    const { visitorId, eventId } = req.body as QRCodeData;
 
-    if (!visitorId || !eventId || !registrationId) {
+    if (!visitorId) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ message: 'Missing required fields in QR code data' });
+      return res.status(400).json({ message: 'Missing visitor ID in QR code data' });
     }
 
     // Validate MongoDB ObjectIds
-    if (!mongoose.Types.ObjectId.isValid(visitorId) || 
-        !mongoose.Types.ObjectId.isValid(eventId) ||
-        !mongoose.Types.ObjectId.isValid(registrationId)) {
+    if (!mongoose.Types.ObjectId.isValid(visitorId)) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ message: 'Invalid ID format in QR code' });
+      return res.status(400).json({ message: 'Invalid visitor ID format' });
     }
 
-    // Find visitor and verify registration
+    // Find visitor
+    const query: any = { _id: visitorId };
+    if (eventId && mongoose.Types.ObjectId.isValid(eventId)) {
+      query.eventId = eventId;
+    }
+
     const visitor = await Visitor.findOne({
-      _id: visitorId,
-      eventId: eventId,
-      registrationId: registrationId,
+      ...query,
       status: { $in: ['registered', 'checked_in'] }
     }).session(session);
 
     if (!visitor) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({ message: 'Visitor not found or not registered for this event' });
+      return res.status(404).json({ message: 'Visitor not found or not registered' });
     }
 
     // Update visitor status to 'Visited' and add scan time

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { Card, Input, Button, message, Steps, Form, Typography, Space, Divider, Result } from 'antd';
-import { MailOutlined, SafetyOutlined, UserOutlined, QrcodeOutlined, PrinterOutlined, DownloadOutlined } from '@ant-design/icons';
-import { QRCodeComponent } from '../../../lib/qrcode';
+import { MailOutlined, SafetyOutlined, UserOutlined, QrcodeOutlined, DownloadOutlined } from '@ant-design/icons';
+import { QRCodeSVG } from 'qrcode.react';
 import { jsPDF } from 'jspdf';
 import DynamicForm from '../../../components/DynamicForm';
 import { Event } from '../../../types/event';
@@ -22,6 +22,7 @@ export default function EventRegistration() {
   const [visitor, setVisitor] = useState<Visitor | null>(null);
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
   const [form] = Form.useForm();
+  const [messageApi, contextHolder] = message.useMessage();
 
   useEffect(() => {
     if (eventId) {
@@ -203,17 +204,128 @@ export default function EventRegistration() {
     }
   };
 
+  // Helper function to validate MongoDB ObjectId format
+  const isValidObjectId = (id: string): boolean => {
+    return /^[0-9a-fA-F]{24}$/.test(id);
+  };
+
+  // QR Code component with error boundary
+  const QRCode: React.FC<{ value: string }> = ({ value }) => {
+    const [hasError, setHasError] = useState(false);
+
+    if (hasError) {
+      return (
+        <Result
+          status="error"
+          title="QR Code Generation Failed"
+          subTitle="Unable to generate QR code. Please try again later."
+        />
+      );
+    }
+
+    try {
+      return (
+        <div style={{ background: '#fff', padding: '20px', textAlign: 'center' }}>
+          <QRCodeSVG
+            value={value}
+            size={200}
+            level="L"
+            includeMargin={true}
+            style={{ display: 'block', margin: '0 auto' }}
+            onError={(error) => {
+              console.error('QR Code generation error:', error);
+              setHasError(true);
+            }}
+          />
+          <div style={{ marginTop: '10px', fontSize: '12px', wordBreak: 'break-all' }}>
+            {value}
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error('QR Code render error:', error);
+      setHasError(true);
+      return null;
+    }
+  };
+
+  // Helper function to generate QR code data
+  const generateQRCodeData = (visitor: Visitor): string => {
+    try {
+      if (!visitor?._id) {
+        throw new Error('Invalid visitor ID');
+      }
+      // Ensure the ID is a string and trim any whitespace
+      const visitorId = visitor._id.toString().trim();
+      if (!visitorId) {
+        throw new Error('Empty visitor ID');
+      }
+      return visitorId;
+    } catch (error) {
+      console.error('Error generating QR code data:', error);
+      throw error;
+    }
+  };
+
+  // Registration details component
+  const RegistrationDetails: React.FC<{ visitor: Visitor }> = ({ visitor }) => {
+    const [qrError, setQrError] = useState<string | null>(null);
+    
+    let qrCodeData: string;
+    try {
+      qrCodeData = generateQRCodeData(visitor);
+    } catch (error) {
+      setQrError(error instanceof Error ? error.message : 'Failed to generate QR code');
+      qrCodeData = '';
+    }
+
+    return (
+      <div className="mb-8 text-left">
+        <Title level={4}>Registration Details</Title>
+        <Divider />
+        {qrError ? (
+          <Result
+            status="error"
+            title="Error Generating QR Code"
+            subTitle={qrError}
+          />
+        ) : (
+          <div className="mb-8">
+            <QRCode value={qrCodeData} />
+          </div>
+        )}
+        <Space direction="vertical" size="small" style={{ width: '100%' }}>
+          <Text><strong>Visitor ID:</strong> {visitor._id}</Text>
+          <Text><strong>Event ID:</strong> {visitor.eventId}</Text>
+          <Text><strong>Name:</strong> {visitor.name}</Text>
+          <Text><strong>Email:</strong> {visitor.email}</Text>
+          <Text><strong>Phone:</strong> {visitor.phone}</Text>
+          <Text><strong>Event:</strong> {visitor.eventName}</Text>
+          <Text><strong>Location:</strong> {visitor.eventLocation}</Text>
+          <Text><strong>Event Date:</strong> {formatDate(visitor.eventStartDate)}</Text>
+          <Text><strong>Registration Date:</strong> {formatDateTime(visitor.createdAt)}</Text>
+        </Space>
+      </div>
+    );
+  };
+
   const handleDownloadQR = async () => {
     if (!visitor) return;
 
     try {
+      const qrCodeData = generateQRCodeData(visitor);
+      if (!qrCodeData) {
+        throw new Error('Failed to generate QR code data');
+      }
+
       // Create a temporary div to render QR code
       const tempDiv = document.createElement('div');
-      tempDiv.style.width = '200px';
-      tempDiv.style.height = '200px';
+      tempDiv.style.width = '240px';
+      tempDiv.style.height = '280px';
       tempDiv.style.position = 'absolute';
       tempDiv.style.left = '-9999px';
       tempDiv.style.background = '#ffffff';
+      tempDiv.style.padding = '20px';
       document.body.appendChild(tempDiv);
 
       // Create QR code container
@@ -223,78 +335,58 @@ export default function EventRegistration() {
 
       // Create a promise that resolves when the QR code is rendered
       const qrCodePromise = new Promise<HTMLCanvasElement>((resolve, reject) => {
-        // Render QR code using ReactDOM
-        const root = ReactDOM.createRoot(qrContainer);
-        root.render(
-          <QRCodeComponent
-            data={{
-              visitorId: visitor._id,
-              eventId: visitor.eventId,
-              registrationId: visitor.registrationId,
-              name: visitor.name,
-              company: visitor.company,
-              eventName: visitor.eventName
-            }}
-            size={200}
-          />
-        );
+        try {
+          // Render QR code using ReactDOM
+          const root = ReactDOM.createRoot(qrContainer);
+          root.render(
+            <QRCode value={qrCodeData} />
+          );
 
-        // Function to convert SVG to canvas
-        const convertSVGToCanvas = (svgElement: SVGElement): Promise<HTMLCanvasElement> => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          if (!ctx) throw new Error('Failed to get canvas context');
+          // Wait for QR code to render
+          setTimeout(() => {
+            const svg = qrContainer.querySelector('svg');
+            if (!svg) {
+              reject(new Error('QR code SVG not found'));
+              return;
+            }
 
-          // Set canvas size
-          canvas.width = 200;
-          canvas.height = 200;
+            // Convert SVG to canvas
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = 240;
+            canvas.height = 280;
 
-          // Create an image from the SVG
-          const img = new Image();
-          const svgData = new XMLSerializer().serializeToString(svgElement);
-          const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-          const url = URL.createObjectURL(svgBlob);
+            // Create a blob URL for the SVG
+            const svgData = new XMLSerializer().serializeToString(svg);
+            const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+            const svgUrl = URL.createObjectURL(svgBlob);
 
-          return new Promise((resolveCanvas, rejectCanvas) => {
+            // Create an image from the SVG
+            const img = new Image();
             img.onload = () => {
-              // Draw the image on canvas
-              ctx.fillStyle = '#ffffff';
-              ctx.fillRect(0, 0, canvas.width, canvas.height);
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              URL.revokeObjectURL(url);
-              resolveCanvas(canvas);
+              if (ctx) {
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 20, 20, 200, 200);
+                
+                // Add the QR code text
+                ctx.fillStyle = '#000000';
+                ctx.font = '12px Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText(qrCodeData, canvas.width / 2, 250);
+              }
+              URL.revokeObjectURL(svgUrl);
+              resolve(canvas);
             };
             img.onerror = () => {
-              URL.revokeObjectURL(url);
-              rejectCanvas(new Error('Failed to load SVG image'));
+              URL.revokeObjectURL(svgUrl);
+              reject(new Error('Failed to load QR code image'));
             };
-            img.src = url;
-          });
-        };
-
-        // Function to check for SVG and convert it
-        const checkAndConvertSVG = async () => {
-          const svgElement = qrContainer.querySelector('svg');
-          if (svgElement) {
-            try {
-              const canvas = await convertSVGToCanvas(svgElement);
-              resolve(canvas);
-            } catch (error) {
-              reject(error);
-            }
-          } else {
-            // Try again after a short delay
-            setTimeout(checkAndConvertSVG, 50);
-          }
-        };
-
-        // Start checking for SVG
-        checkAndConvertSVG();
-
-        // Set a timeout to reject if SVG doesn't appear
-        setTimeout(() => {
-          reject(new Error('QR code generation timed out'));
-        }, 5000); // 5 second timeout
+            img.src = svgUrl;
+          }, 100);
+        } catch (error) {
+          reject(error);
+        }
       });
 
       // Wait for QR code to be rendered and converted to canvas
@@ -307,14 +399,11 @@ export default function EventRegistration() {
       link.click();
 
       // Cleanup
-      const root = (tempDiv as any)._reactRootContainer;
-      if (root) {
-        root.unmount();
-      }
       document.body.removeChild(tempDiv);
+      message.success('QR code downloaded successfully');
     } catch (error) {
       console.error('Error downloading QR code:', error);
-      message.error(error instanceof Error ? error.message : 'Failed to download QR code');
+      message.error('Failed to download QR code');
     }
   };
 
@@ -329,12 +418,22 @@ export default function EventRegistration() {
         return;
       }
       const templateId = templates[0]._id;
+
+      // Prepare visitor data with IDs
+      const visitorData = {
+        ...visitor,
+        visitorId: visitor._id,
+        eventId: event._id,
+        eventDate: formatDate(visitor.eventStartDate),
+        registrationDate: formatDateTime(visitor.createdAt)
+      };
+
       const response = await fetch('/api/badge-templates/download', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId,
-          visitorData: visitor
+          visitorData
         })
       });
       if (!response.ok) {
@@ -355,6 +454,51 @@ export default function EventRegistration() {
     }
   };
 
+  const handlePrint = () => {
+    // Implementation for printing the badge
+    console.log('Printing badge');
+  };
+
+  // Helper function to format dates
+  const formatDate = (dateString: string | Date | undefined): string => {
+    try {
+      if (!dateString) return 'Not specified';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Not specified';
+      }
+      return date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Not specified';
+    }
+  };
+
+  // Helper function to format date time
+  const formatDateTime = (dateString: string | Date | undefined): string => {
+    try {
+      if (!dateString) return 'Not specified';
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Not specified';
+      }
+      return date.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).replace(',', '');
+    } catch (error) {
+      console.error('Error formatting date time:', error);
+      return 'Not specified';
+    }
+  };
+
   if (!event) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -363,11 +507,12 @@ export default function EventRegistration() {
     );
   }
 
-  if (isAlreadyRegistered && visitor) {
+  if (isAlreadyRegistered && visitor && event) {
+    const eventTitle = event?.title || 'Event';
     return (
       <div className="min-h-screen bg-gray-50 py-12">
         <Head>
-          <title>Already Registered - {event.title}</title>
+          <title>Already Registered - {eventTitle}</title>
         </Head>
 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -375,47 +520,53 @@ export default function EventRegistration() {
             <Result
               status="info"
               title="Already Registered"
-              subTitle={`You have already registered for ${event.title}`}
+              subTitle={`You have already registered for ${eventTitle}`}
               extra={[
                 <div key="qr" className="text-center">
-                  <div className="mb-8 qr-code">
-                    <QRCodeComponent
-                      data={{
-                        visitorId: visitor._id,
-                        eventId: visitor.eventId,
-                        registrationId: visitor.registrationId,
-                        name: visitor.name,
-                        company: visitor.company,
-                        eventName: visitor.eventName
-                      }}
-                      size={200}
-                    />
-                  </div>
-                  <div className="mb-8 text-left">
-                    <Title level={4}>Registration Details</Title>
-                    <Divider />
-                    <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                      <Text><strong>Visitor ID:</strong> {visitor._id}</Text>
-                      <Text><strong>Event ID:</strong> {visitor.eventId}</Text>
-                      <Text><strong>Name:</strong> {visitor.name}</Text>
-                      <Text><strong>Email:</strong> {visitor.email}</Text>
-                      <Text><strong>Phone:</strong> {visitor.phone}</Text>
-                      <Text><strong>Event:</strong> {visitor.eventName}</Text>
-                      <Text><strong>Location:</strong> {visitor.eventLocation}</Text>
-                      <Text><strong>Date:</strong> {new Date(visitor.eventStartDate).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                      })}</Text>
-                      <Text><strong>Registration Date:</strong> {new Date(visitor.createdAt).toLocaleDateString('en-GB', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }).replace(',', '')}</Text>
-                    </Space>
-                  </div>
+                  <RegistrationDetails visitor={visitor} />
+                  <Space>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={handleDownloadQR}
+                      size="large"
+                    >
+                      Download QR Code
+                    </Button>
+                    <Button
+                      icon={<DownloadOutlined />}
+                      onClick={handleDownloadPDF}
+                      type="primary"
+                      size="large"
+                    >
+                      Download PDF
+                    </Button>
+                  </Space>
+                </div>
+              ]}
+            />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (currentStep === 3 && visitor && event) {
+    const eventTitle = event?.title || 'Event';
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <Head>
+          <title>Registration Successful - {eventTitle}</title>
+        </Head>
+
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="shadow-lg">
+            <Result
+              status="success"
+              title="Registration Successful"
+              subTitle={`You have successfully registered for ${eventTitle}`}
+              extra={[
+                <div key="qr" className="text-center">
+                  <RegistrationDetails visitor={visitor} />
                   <Space>
                     <Button
                       icon={<DownloadOutlined />}
@@ -535,24 +686,12 @@ export default function EventRegistration() {
           {currentStep === 3 && visitor && (
             <div className="text-center">
               <div className="mb-8 qr-code">
-                <QRCodeComponent
-                  data={{
-                    visitorId: visitor._id,
-                    eventId: visitor.eventId,
-                    registrationId: visitor.registrationId,
-                    name: visitor.name,
-                    company: visitor.company,
-                    eventName: visitor.eventName
-                  }}
-                  size={200}
-                />
+                <QRCode value={visitor._id} />
               </div>
               <div className="mb-8 text-left">
                 <Title level={4}>Registration Details</Title>
                 <Divider />
                 <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                  <Text><strong>Visitor ID:</strong> {visitor._id}</Text>
-                  <Text><strong>Event ID:</strong> {visitor.eventId}</Text>
                   <Text><strong>Name:</strong> {visitor.name}</Text>
                   <Text><strong>Email:</strong> {visitor.email}</Text>
                   <Text><strong>Phone:</strong> {visitor.phone}</Text>
@@ -572,7 +711,7 @@ export default function EventRegistration() {
                   }).replace(',', '')}</Text>
                 </Space>
               </div>
-              <Space size="middle">
+              <Space>
                 <Button
                   icon={<DownloadOutlined />}
                   onClick={handleDownloadQR}

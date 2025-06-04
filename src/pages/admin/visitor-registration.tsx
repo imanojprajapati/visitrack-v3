@@ -79,11 +79,7 @@ const VisitorRegistration: React.FC = () => {
             <QRCodeComponent
               data={{
                 visitorId: registeredVisitor._id,
-                eventId: registeredVisitor.eventId,
-                registrationId: registeredVisitor.registrationId,
-                name: registeredVisitor.name,
-                company: registeredVisitor.company,
-                eventName: registeredVisitor.eventName
+                eventId: registeredVisitor.eventId
               }}
               size={200}
             />

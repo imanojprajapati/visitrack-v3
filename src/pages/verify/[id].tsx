@@ -16,19 +16,12 @@ const VerifyVisitor: React.FC = () => {
       let visitorData: QRCodeData | null = null;
       try {
         visitorData = parseCompactQRData(data);
-      } catch (error) {
-        try {
-          const parsedData = JSON.parse(data);
-          if (parsedData && typeof parsedData === 'object') {
-            visitorData = parsedData as QRCodeData;
-          }
-        } catch (e) {
+        if (!visitorData) {
           throw new Error('Invalid QR code format');
         }
-      }
-
-      if (!visitorData || !visitorData.visitorId) {
-        throw new Error('Invalid visitor data');
+      } catch (error) {
+        console.error('Error parsing QR code:', error);
+        throw new Error('Invalid QR code format');
       }
 
       const response = await fetch(`/api/visitors/verify/${visitorData.visitorId}`, {
@@ -37,8 +30,7 @@ const VerifyVisitor: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          eventId: visitorData.eventId,
-          registrationId: visitorData.registrationId
+          eventId: visitorData.eventId
         }),
       });
 

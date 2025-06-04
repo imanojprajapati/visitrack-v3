@@ -1,23 +1,13 @@
-import { MongoClient } from 'mongodb';
+import { MongoClient, Db } from 'mongodb';
 
 if (!process.env.MONGODB_URI) {
-  throw new Error('Please define the MONGODB_URI environment variable inside .env');
+  throw new Error('Please add your Mongo URI to .env.local');
 }
 
 const uri = process.env.MONGODB_URI;
-const options = {
-  retryWrites: true,
-  w: 'majority',
-  maxPoolSize: 10,
-  ignoreUndefined: true,
-  serverApi: {
-    version: "1",
-    strict: true,
-    deprecationErrors: true
-  }
-} as const;
+const options = {};
 
-let client;
+let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
 if (process.env.NODE_ENV === 'development') {
@@ -36,6 +26,12 @@ if (process.env.NODE_ENV === 'development') {
   // In production mode, it's best to not use a global variable.
   client = new MongoClient(uri, options);
   clientPromise = client.connect();
+}
+
+export async function connectToDatabase() {
+  const client = await clientPromise;
+  const db: Db = client.db();
+  return { db, client };
 }
 
 export default clientPromise; 

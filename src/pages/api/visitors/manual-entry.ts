@@ -22,30 +22,50 @@ export default async function handler(
   try {
     const { visitorId, eventId } = req.body;
 
-    if (!visitorId || !eventId) {
+    if (!visitorId) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(400).json({ message: 'Visitor ID and Event ID are required' });
+      return res.status(400).json({ message: 'Visitor ID is required' });
     }
 
     // Validate MongoDB ObjectIds
-    if (!mongoose.Types.ObjectId.isValid(visitorId) || !mongoose.Types.ObjectId.isValid(eventId)) {
+    if (!mongoose.Types.ObjectId.isValid(visitorId)) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ message: 'Invalid ID format' });
     }
 
-    // Find visitor and verify registration
-    const visitor = await Visitor.findOne({
-      _id: visitorId,
-      eventId: eventId,
-      status: { $in: ['registered', 'checked_in'] }
-    }).session(session);
+    // Find visitor
+    const query: any = { _id: visitorId };
+    if (eventId && mongoose.Types.ObjectId.isValid(eventId)) {
+      query.eventId = eventId;
+    }
+
+    // Find visitor with less restrictive status check
+    const visitor = await Visitor.findOne(query).session(session);
 
     if (!visitor) {
       await session.abortTransaction();
       session.endSession();
-      return res.status(404).json({ message: 'Visitor not found or not registered for this event' });
+      return res.status(404).json({ message: 'Visitor not found' });
+    }
+
+    // Check if visitor has already been marked as visited
+    if (visitor.status === 'Visited') {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(400).json({ 
+        message: 'Visitor has already been marked as visited',
+        visitor: {
+          _id: visitor._id,
+          name: visitor.name,
+          company: visitor.company,
+          eventName: visitor.eventName,
+          status: visitor.status,
+          scanTime: visitor.scanTime,
+          eventId: visitor.eventId
+        }
+      });
     }
 
     // Update visitor status to 'Visited' and add scan time

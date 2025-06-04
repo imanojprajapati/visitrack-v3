@@ -523,8 +523,7 @@ const BadgeManagement: React.FC = () => {
           <QRCodeComponent
             data={{
               visitorId: 'template',
-              eventId: eventId,
-              registrationId: templateId
+              eventId: eventId
             }}
             size={1000}
           />

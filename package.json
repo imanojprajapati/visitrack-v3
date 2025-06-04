@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:https": "node scripts/dev-https.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -33,6 +34,7 @@
     "googleapis": "^148.0.0",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
+    "ip": "^2.0.1",
     "jspdf": "^2.5.1",
     "jsqr": "^1.4.0",
     "moment": "^2.30.1",
