@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { Form, Input, InputNumber, DatePicker, Select } from 'antd';
 import type { Rule } from 'antd/es/form';
 import { FormField, FormFieldOption } from '../types/form';
@@ -9,6 +9,15 @@ interface DynamicFormProps {
 }
 
 export default function DynamicForm({ fields, form }: DynamicFormProps) {
+  useEffect(() => {
+    // Set default values for fields, especially for source field
+    fields.forEach(field => {
+      if (field.id === 'source' || ((field.readOnly && field.placeholder) || field.defaultValue !== undefined)) {
+        form.setFieldValue(field.id, field.defaultValue || field.placeholder);
+      }
+    });
+  }, [fields, form]);
+
   const renderField = (field: FormField) => {
     const rules: Rule[] = [
       { required: field.required, message: `Please enter ${field.label.toLowerCase()}` }
@@ -45,7 +54,7 @@ export default function DynamicForm({ fields, form }: DynamicFormProps) {
       label: field.label,
       rules: rules,
       disabled: field.readOnly,
-      initialValue: field.defaultValue
+      initialValue: field.defaultValue || (field.readOnly ? field.placeholder : undefined)
     };
 
     switch (field.type) {
@@ -55,6 +64,8 @@ export default function DynamicForm({ fields, form }: DynamicFormProps) {
             <Input 
               placeholder={field.placeholder} 
               defaultValue={field.defaultValue || (field.readOnly ? field.placeholder : undefined)}
+              readOnly={field.readOnly}
+              style={field.readOnly ? { backgroundColor: '#f5f5f5' } : undefined}
             />
           </Form.Item>
         );

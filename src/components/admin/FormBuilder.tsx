@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Input, Select, Button, Space, Card, Switch, InputNumber, message } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, ArrowLeftOutlined } from '@ant-design/icons';
 import { FormField, FormFieldType, EventForm } from '../../types/form';
 import { Event } from '../../types/event';
 import { useAppContext } from '../../context/AppContext';
+import { useRouter } from 'next/router';
 
 const { Option } = Select;
 
@@ -82,6 +83,7 @@ interface FormBuilderProps {
 }
 
 export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
+  const router = useRouter();
   const [form] = Form.useForm();
   const [events, setEvents] = useState<Event[]>([]);
   const [fields, setFields] = useState<FormField[]>([]);
@@ -165,9 +167,24 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
     }
   };
 
+  const handleBack = () => {
+    router.push('/admin/forms');
+  };
+
   return (
     <div className="max-w-4xl mx-auto p-6">
-      <Card title="Create Event Registration Form" className="mb-6">
+      <div className="flex items-center mb-4">
+        <Button 
+          type="link" 
+          icon={<ArrowLeftOutlined />} 
+          onClick={handleBack}
+          className="mr-4"
+        >
+          Back
+        </Button>
+        <h2 className="text-2xl font-semibold m-0">Create Event Registration Form</h2>
+      </div>
+      <Card className="mb-6">
         <Form
           form={form}
           layout="vertical"

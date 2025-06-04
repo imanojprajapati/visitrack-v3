@@ -24,6 +24,7 @@ interface FormData {
 
 interface EventWithForm extends EventDocument {
   formId: {
+    _id: string;
     fields: FormField[];
   };
 }
@@ -119,8 +120,17 @@ export default async function handler(
       }
 
       // Extract additional data from formData and add source
-      const additionalData = Object.entries(formData).reduce((acc, [key, value]) => {
+      const additionalData = Object.entries(formData).reduce((acc: FormData, [key, value]: [string, any]) => {
         if (typeof value === 'object' && value !== null && 'label' in value && 'value' in value) {
+          // For source field, always set to "Website"
+          if (key === 'source') {
+            acc[key] = {
+              label: 'Source',
+              value: 'Website'
+            };
+            return acc;
+          }
+
           // Validate number fields
           const field = event.formId.fields.find((f: FormField) => f.id === key);
           
@@ -148,15 +158,7 @@ export default async function handler(
               value: String(numValue) // Convert back to string for consistent storage
             };
           } else {
-            // For source field, ensure it has the default value
-            if (key === 'source' && (!value.value || value.value.trim() === '')) {
-              acc[key] = {
-                label: 'Source',
-                value: 'Website'
-              };
-            } else {
-              acc[key] = value;
-            }
+            acc[key] = value;
           }
         }
         return acc;

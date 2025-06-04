@@ -146,13 +146,29 @@ export default function EventRegistration() {
         // Find the field definition to get the label
         const field = event?.form?.fields.find(f => f.id === key);
         if (field) {
-          acc[key] = {
-            label: field.label,
-            value: value
-          };
+          // For source field, always set to "Website"
+          if (key === 'source') {
+            acc[key] = {
+              label: 'Source',
+              value: 'Website'
+            };
+          } else {
+            acc[key] = {
+              label: field.label,
+              value: value
+            };
+          }
         }
         return acc;
       }, {} as Record<string, { label: string; value: any }>);
+
+      // Ensure source field exists
+      if (!formData.source) {
+        formData.source = {
+          label: 'Source',
+          value: 'Website'
+        };
+      }
 
       // Extract name and phone from form data
       const name = formData.name?.value || '';
