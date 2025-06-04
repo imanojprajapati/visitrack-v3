@@ -147,7 +147,7 @@ export default function RegistrationReportPage() {
       key: 'eventLocation',
     },
     {
-      title: 'Date',
+      title: 'Event Date',
       dataIndex: 'eventStartDate',
       key: 'eventStartDate',
       render: (date: string) => {
@@ -190,13 +190,13 @@ export default function RegistrationReportPage() {
           if (!date) return '-';
           const dateObj = new Date(date);
           if (isNaN(dateObj.getTime())) return '-';
-          return dateObj.toLocaleString('en-US', {
+          return dateObj.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
             year: 'numeric',
-            month: 'short',
-            day: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
-          });
+          }).replace(',', '');
         } catch (error) {
           console.error('Error formatting date:', error);
           return '-';

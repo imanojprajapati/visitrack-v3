@@ -183,7 +183,11 @@ export default function VisitorDetailsPage() {
                   <div>
                     <Text type="secondary" className="block text-sm">Event Date</Text>
                     <Text strong>
-                      {new Date(visitor.eventStartDate).toLocaleDateString()}
+                      {new Date(visitor.eventStartDate).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}
                     </Text>
                   </div>
                 </div>
@@ -201,7 +205,13 @@ export default function VisitorDetailsPage() {
                   <div>
                     <Text type="secondary" className="block text-sm">Registration Date</Text>
                     <Text strong>
-                      {new Date(visitor.createdAt).toLocaleDateString()}
+                      {new Date(visitor.createdAt).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }).replace(',', '')}
                     </Text>
                   </div>
                 </div>

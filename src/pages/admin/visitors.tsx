@@ -196,13 +196,13 @@ export default function VisitorsPage() {
           if (!date) return '-';
           const dateObj = new Date(date);
           if (isNaN(dateObj.getTime())) return '-';
-          return dateObj.toLocaleString('en-US', {
+          return dateObj.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
             year: 'numeric',
-            month: 'short',
-            day: 'numeric',
             hour: '2-digit',
             minute: '2-digit'
-          });
+          }).replace(',', '');
         } catch (error) {
           console.error('Error formatting date:', error);
           return '-';
@@ -353,37 +353,37 @@ export default function VisitorsPage() {
             <div className="mb-2">
               <strong>Registration Date:</strong>{' '}
               {selectedVisitor.createdAt
-                ? new Date(selectedVisitor.createdAt).toLocaleString('en-US', {
+                ? new Date(selectedVisitor.createdAt).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
                     year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit'
-                  })
+                  }).replace(',', '')
                 : '-'}
             </div>
             {selectedVisitor.checkInTime && (
               <div className="mb-2">
                 <strong>Check-in Time:</strong>{' '}
-                {new Date(selectedVisitor.checkInTime).toLocaleString('en-US', {
+                {new Date(selectedVisitor.checkInTime).toLocaleDateString('en-GB', {
+                  day: '2-digit',
+                  month: '2-digit',
                   year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
                   hour: '2-digit',
                   minute: '2-digit'
-                })}
+                }).replace(',', '')}
               </div>
             )}
             {selectedVisitor.checkOutTime && (
               <div className="mb-2">
                 <strong>Check-out Time:</strong>{' '}
-                {new Date(selectedVisitor.checkOutTime).toLocaleString('en-US', {
+                {new Date(selectedVisitor.checkOutTime).toLocaleDateString('en-GB', {
+                  day: '2-digit',
+                  month: '2-digit',
                   year: 'numeric',
-                  month: 'short',
-                  day: 'numeric',
                   hour: '2-digit',
                   minute: '2-digit'
-                })}
+                }).replace(',', '')}
               </div>
             )}
           </Card>

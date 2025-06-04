@@ -402,8 +402,18 @@ export default function EventRegistration() {
                       <Text><strong>Phone:</strong> {visitor.phone}</Text>
                       <Text><strong>Event:</strong> {visitor.eventName}</Text>
                       <Text><strong>Location:</strong> {visitor.eventLocation}</Text>
-                      <Text><strong>Date:</strong> {new Date(visitor.eventStartDate).toLocaleDateString()}</Text>
-                      <Text><strong>Registration Date:</strong> {new Date(visitor.createdAt).toLocaleString()}</Text>
+                      <Text><strong>Date:</strong> {new Date(visitor.eventStartDate).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                      })}</Text>
+                      <Text><strong>Registration Date:</strong> {new Date(visitor.createdAt).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }).replace(',', '')}</Text>
                     </Space>
                   </div>
                   <Space>
@@ -548,8 +558,18 @@ export default function EventRegistration() {
                   <Text><strong>Phone:</strong> {visitor.phone}</Text>
                   <Text><strong>Event:</strong> {visitor.eventName}</Text>
                   <Text><strong>Location:</strong> {visitor.eventLocation}</Text>
-                  <Text><strong>Date:</strong> {new Date(visitor.eventStartDate).toLocaleDateString()}</Text>
-                  <Text><strong>Registration Date:</strong> {new Date(visitor.createdAt).toLocaleString()}</Text>
+                  <Text><strong>Date:</strong> {new Date(visitor.eventStartDate).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                  })}</Text>
+                  <Text><strong>Registration Date:</strong> {new Date(visitor.createdAt).toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }).replace(',', '')}</Text>
                 </Space>
               </div>
               <Space size="middle">

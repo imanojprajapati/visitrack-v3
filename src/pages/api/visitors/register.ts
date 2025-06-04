@@ -11,6 +11,19 @@ import { FormField } from '../../../types/form';
 
 interface EventDocument extends mongoose.Document, IEvent {
   _id: mongoose.Types.ObjectId;
+  formId: mongoose.Types.ObjectId;
+}
+
+interface FormWithFields {
+  _id: mongoose.Types.ObjectId;
+  fields: FormField[];
+}
+
+interface EventWithForm extends Omit<EventDocument, 'formId'> {
+  formId: {
+    _id: mongoose.Types.ObjectId;
+    fields: FormField[];
+  };
 }
 
 interface FormDataValue {
@@ -20,13 +33,6 @@ interface FormDataValue {
 
 interface FormData {
   [key: string]: FormDataValue;
-}
-
-interface EventWithForm extends EventDocument {
-  formId: {
-    _id: string;
-    fields: FormField[];
-  };
 }
 
 // Helper function to format date to DD-MM-YY
@@ -47,27 +53,38 @@ const formatDate = (date: Date | string): string => {
 
 // Helper function to convert 12-hour time to 24-hour format
 const convertTo24HourFormat = (time: string): string => {
-  // If already in 24-hour format (HH:mm), return as is
+  // If already in 24-hour format (HH:mm), return properly formatted
   if (/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(time)) {
-    return time;
+    // Ensure hours are padded to 2 digits
+    const [hours, minutes] = time.split(':');
+    return `${hours.padStart(2, '0')}:${minutes}`;
   }
 
   // Parse 12-hour format (h:mm AM/PM)
-  const match = time.match(/^(\d{1,2}):(\d{2})\s?(AM|PM)$/i);
+  const match = time.toLowerCase().match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/i);
   if (!match) {
-    throw new Error('Invalid time format');
+    // If no match, try to extract hours and minutes
+    const timeMatch = time.match(/^(\d{1,2}):(\d{2})$/);
+    if (timeMatch) {
+      const [_, hours, minutes] = timeMatch;
+      const paddedHours = String(parseInt(hours, 10)).padStart(2, '0');
+      return `${paddedHours}:${minutes}`;
+    }
+    throw new Error('Invalid time format. Expected HH:mm or h:mm AM/PM');
   }
 
   let [_, hours, minutes, period] = match;
-  hours = parseInt(hours, 10);
+  let hour = parseInt(hours, 10);
   
-  if (period.toUpperCase() === 'PM' && hours !== 12) {
-    hours += 12;
-  } else if (period.toUpperCase() === 'AM' && hours === 12) {
-    hours = 0;
+  // Convert to 24-hour format
+  if (period === 'pm' && hour !== 12) {
+    hour += 12;
+  } else if (period === 'am' && hour === 12) {
+    hour = 0;
   }
 
-  return `${String(hours).padStart(2, '0')}:${minutes}`;
+  // Ensure both hours and minutes are padded to 2 digits
+  return `${String(hour).padStart(2, '0')}:${minutes}`;
 };
 
 export default async function handler(
