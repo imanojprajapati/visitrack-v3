@@ -264,6 +264,8 @@ export default async function handler(
         message: 'Visitor registered successfully',
         visitor: {
           _id: visitor[0]._id,
+          eventId: visitor[0].eventId,
+          registrationId: visitor[0].registrationId,
           name: visitor[0].name,
           email: visitor[0].email,
           phone: visitor[0].phone,

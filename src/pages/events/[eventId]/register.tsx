@@ -396,6 +396,7 @@ export default function EventRegistration() {
                     <Divider />
                     <Space direction="vertical" size="small" style={{ width: '100%' }}>
                       <Text><strong>Visitor ID:</strong> {visitor._id}</Text>
+                      <Text><strong>Event ID:</strong> {visitor.eventId}</Text>
                       <Text><strong>Name:</strong> {visitor.name}</Text>
                       <Text><strong>Email:</strong> {visitor.email}</Text>
                       <Text><strong>Phone:</strong> {visitor.phone}</Text>
@@ -541,6 +542,7 @@ export default function EventRegistration() {
                 <Divider />
                 <Space direction="vertical" size="small" style={{ width: '100%' }}>
                   <Text><strong>Visitor ID:</strong> {visitor._id}</Text>
+                  <Text><strong>Event ID:</strong> {visitor.eventId}</Text>
                   <Text><strong>Name:</strong> {visitor.name}</Text>
                   <Text><strong>Email:</strong> {visitor.email}</Text>
                   <Text><strong>Phone:</strong> {visitor.phone}</Text>
