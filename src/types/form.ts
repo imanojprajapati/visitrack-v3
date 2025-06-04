@@ -13,6 +13,7 @@ export interface FormField {
   description?: string;
   placeholder?: string;
   readOnly?: boolean;
+  defaultValue?: string | number;
   options?: FormFieldOption[];
   validation?: {
     min?: number;
@@ -23,6 +24,7 @@ export interface FormField {
 
 export interface EventForm {
   id: string;
+  eventId?: string;
   title: string;
   fields: FormField[];
 }

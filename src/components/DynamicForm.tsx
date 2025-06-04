@@ -34,9 +34,9 @@ export default function DynamicForm({ fields, form }: DynamicFormProps) {
       }
     }
 
-    // Set default value for read-only fields
-    if (field.readOnly && field.placeholder) {
-      form.setFieldValue(field.id, field.placeholder);
+    // Set default value for read-only fields or fields with defaultValue
+    if ((field.readOnly && field.placeholder) || field.defaultValue !== undefined) {
+      form.setFieldValue(field.id, field.defaultValue || field.placeholder);
     }
 
     const commonProps = {
@@ -45,6 +45,7 @@ export default function DynamicForm({ fields, form }: DynamicFormProps) {
       label: field.label,
       rules: rules,
       disabled: field.readOnly,
+      initialValue: field.defaultValue
     };
 
     switch (field.type) {
@@ -53,7 +54,7 @@ export default function DynamicForm({ fields, form }: DynamicFormProps) {
           <Form.Item {...commonProps}>
             <Input 
               placeholder={field.placeholder} 
-              defaultValue={field.readOnly ? field.placeholder : undefined}
+              defaultValue={field.defaultValue || (field.readOnly ? field.placeholder : undefined)}
             />
           </Form.Item>
         );
@@ -64,7 +65,7 @@ export default function DynamicForm({ fields, form }: DynamicFormProps) {
             <Input 
               type="email" 
               placeholder={field.placeholder}
-              defaultValue={field.readOnly ? field.placeholder : undefined}
+              defaultValue={field.defaultValue || (field.readOnly ? field.placeholder : undefined)}
             />
           </Form.Item>
         );
@@ -77,7 +78,19 @@ export default function DynamicForm({ fields, form }: DynamicFormProps) {
               placeholder={field.placeholder}
               min={field.validation?.min}
               max={field.validation?.max}
-              defaultValue={field.readOnly && field.placeholder ? Number(field.placeholder) : undefined}
+              defaultValue={field.defaultValue || (field.readOnly && field.placeholder ? Number(field.placeholder) : undefined)}
+              formatter={value => `${value}`}
+              parser={value => {
+                const num = value ? Number(value) : 0;
+                if (isNaN(num)) return 0;
+                if (field.validation?.min !== undefined && num < field.validation.min) {
+                  return field.validation.min;
+                }
+                if (field.validation?.max !== undefined && num > field.validation.max) {
+                  return field.validation.max;
+                }
+                return num;
+              }}
             />
           </Form.Item>
         );
@@ -88,7 +101,7 @@ export default function DynamicForm({ fields, form }: DynamicFormProps) {
             <Input 
               type="tel" 
               placeholder={field.placeholder}
-              defaultValue={field.readOnly ? field.placeholder : undefined}
+              defaultValue={field.defaultValue || (field.readOnly ? field.placeholder : undefined)}
             />
           </Form.Item>
         );
@@ -109,7 +122,7 @@ export default function DynamicForm({ fields, form }: DynamicFormProps) {
             <Select 
               placeholder={field.placeholder}
               disabled={field.readOnly}
-              defaultValue={field.readOnly ? field.placeholder : undefined}
+              defaultValue={field.defaultValue || (field.readOnly ? field.placeholder : undefined)}
             >
               {field.options?.map((option: FormFieldOption) => (
                 <Select.Option key={option.value} value={option.value}>

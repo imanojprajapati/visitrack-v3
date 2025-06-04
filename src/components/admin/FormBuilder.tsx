@@ -70,8 +70,9 @@ const DEFAULT_FIELDS: FormField[] = [
     type: 'text',
     label: 'Source',
     required: true,
+    readOnly: true,
     placeholder: 'Website',
-    readOnly: true
+    defaultValue: 'Website'
   }
 ];
 
@@ -207,7 +208,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       <Select
                         value={field.type}
                         onChange={(value) => updateField(field.id, { type: value })}
-                        disabled={field.readOnly}
+                        disabled={field.id === 'source' || field.readOnly}
                       >
                         <Option value="text">Text</Option>
                         <Option value="email">Email</Option>
@@ -226,7 +227,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       <Switch
                         checked={field.required}
                         onChange={(checked) => updateField(field.id, { required: checked })}
-                        disabled={field.readOnly}
+                        disabled={field.id === 'source' || field.readOnly}
                       />
                     </Form.Item>
 
@@ -235,7 +236,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       danger
                       icon={<DeleteOutlined />}
                       onClick={() => removeField(field.id)}
-                      disabled={field.readOnly}
+                      disabled={field.id === 'source' || field.readOnly}
                     />
                   </div>
 
@@ -244,7 +245,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       value={field.label}
                       onChange={(e) => updateField(field.id, { label: e.target.value })}
                       placeholder="Field label"
-                      disabled={field.readOnly}
+                      disabled={field.id === 'source' || field.readOnly}
                     />
                   </Form.Item>
 
@@ -253,11 +254,24 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                       value={field.placeholder}
                       onChange={(e) => updateField(field.id, { placeholder: e.target.value })}
                       placeholder="Placeholder text"
-                      disabled={field.readOnly}
+                      disabled={field.id === 'source' || field.readOnly}
                     />
                   </Form.Item>
 
-                  {field.type === 'select' && (
+                  {field.id === 'source' && (
+                    <Form.Item label="Default Value">
+                      <Input
+                        value="Website"
+                        disabled
+                        style={{ backgroundColor: '#f5f5f5' }}
+                      />
+                      <div className="mt-1 text-sm text-gray-500">
+                        This field is read-only and will always have "Website" as its value
+                      </div>
+                    </Form.Item>
+                  )}
+
+                  {field.type === 'select' && field.id !== 'source' && (
                     <Form.Item label="Options">
                       <Select
                         mode="tags"
@@ -270,7 +284,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
                     </Form.Item>
                   )}
 
-                  {field.type === 'number' && (
+                  {field.type === 'number' && field.id !== 'source' && (
                     <div className="flex gap-4">
                       <Form.Item label="Min Value" style={{ flex: 1 }}>
                         <InputNumber

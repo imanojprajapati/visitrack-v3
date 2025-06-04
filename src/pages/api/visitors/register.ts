@@ -7,6 +7,7 @@ import Form from '../../../models/Form';
 import { generateQRCode } from '../../../lib/server-qrcode';
 import { QRCodeData } from '../../../lib/qrcode';
 import mongoose from 'mongoose';
+import { FormField } from '../../../types/form';
 
 interface EventDocument extends mongoose.Document, IEvent {
   _id: mongoose.Types.ObjectId;
@@ -14,10 +15,18 @@ interface EventDocument extends mongoose.Document, IEvent {
 
 interface FormDataValue {
   label: string;
-  value: any;
+  value: string;
 }
 
-type FormData = Record<string, FormDataValue>;
+interface FormData {
+  [key: string]: FormDataValue;
+}
+
+interface EventWithForm extends EventDocument {
+  formId: {
+    fields: FormField[];
+  };
+}
 
 // Helper function to format date to DD-MM-YY
 const formatDate = (date: Date | string): string => {
@@ -92,14 +101,10 @@ export default async function handler(
       // Get event with form details
       const event = await Event.findById(eventId)
         .populate('formId')
-        .exec() as EventDocument | null;
+        .exec() as EventWithForm;
 
-      if (!event) {
-        throw new Error('Event not found');
-      }
-
-      if (!event.formId) {
-        throw new Error('Event has no registration form');
+      if (!event || !event.formId) {
+        throw new Error('Event not found or has no form');
       }
 
       // Validate required event fields
@@ -116,16 +121,54 @@ export default async function handler(
       // Extract additional data from formData and add source
       const additionalData = Object.entries(formData).reduce((acc, [key, value]) => {
         if (typeof value === 'object' && value !== null && 'label' in value && 'value' in value) {
-          acc[key] = value as FormDataValue;
+          // Validate number fields
+          const field = event.formId.fields.find((f: FormField) => f.id === key);
+          
+          if (field && field.type === 'number' && field.validation) {
+            const numValue = Number(value.value);
+            
+            if (isNaN(numValue)) {
+              throw new Error(`${field.label} must be a valid number`);
+            }
+            
+            const min = field.validation.min;
+            const max = field.validation.max;
+            
+            if (min !== undefined && numValue < min) {
+              throw new Error(`${field.label} must be at least ${min}`);
+            }
+            
+            if (max !== undefined && numValue > max) {
+              throw new Error(`${field.label} must be at most ${max}`);
+            }
+
+            // Store the validated number value
+            acc[key] = {
+              label: value.label,
+              value: String(numValue) // Convert back to string for consistent storage
+            };
+          } else {
+            // For source field, ensure it has the default value
+            if (key === 'source' && (!value.value || value.value.trim() === '')) {
+              acc[key] = {
+                label: 'Source',
+                value: 'Website'
+              };
+            } else {
+              acc[key] = value;
+            }
+          }
         }
         return acc;
       }, {} as FormData);
 
-      // Add source field with default value "Website"
-      additionalData.source = {
-        label: 'Source',
-        value: 'Website'
-      };
+      // Ensure source field exists with default value
+      if (!additionalData.source) {
+        additionalData.source = {
+          label: 'Source',
+          value: 'Website'
+        };
+      }
 
       // Create registration record first
       const registration = await Registration.create([{
