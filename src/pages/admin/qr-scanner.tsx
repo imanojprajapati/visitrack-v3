@@ -671,14 +671,6 @@ const QRScanner: React.FC = () => {
             >
               Camera Scanner
             </Button>
-            <Upload {...uploadProps}>
-              <Button 
-                icon={<UploadOutlined />}
-                loading={imageScanning}
-              >
-                {imageScanning ? 'Scanning...' : 'Scan from Image'}
-              </Button>
-            </Upload>
             <Button
               icon={<UserAddOutlined />}
               onClick={() => setShowManualEntry(true)}
@@ -689,18 +681,6 @@ const QRScanner: React.FC = () => {
 
           {/* Hidden div for image scanning */}
           <div id="qr-reader-image" style={{ display: 'none' }}></div>
-
-          {/* Image scanning tips */}
-          <div className="mb-4 p-4 bg-gray-50 rounded-lg">
-            <Text className="block font-medium mb-2">Tips for Image Scanning:</Text>
-            <ul className="list-disc list-inside text-sm text-gray-600">
-              <li>Use a clear, well-lit image of the QR code</li>
-              <li>Ensure the QR code is not blurry or damaged</li>
-              <li>The QR code should be clearly visible and not cut off</li>
-              <li>Image size should be less than 2MB</li>
-              <li>Supported formats: JPEG, PNG, GIF, WebP</li>
-            </ul>
-          </div>
 
           <Table
             columns={columns}
