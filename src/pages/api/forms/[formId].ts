@@ -1,12 +1,12 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import connectDB from '../../../lib/db';
+import { connectToDatabase } from '../../../lib/mongodb';
 import Form from '../../../models/Form';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  await connectDB();
+  await connectToDatabase();
   const { formId } = req.query;
 
   if (!formId || typeof formId !== 'string') {

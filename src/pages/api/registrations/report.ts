@@ -1,7 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import connectDB from '../../../lib/db';
+import { connectToDatabase } from '../../../lib/mongodb';
 import Registration from '../../../models/Registration';
 import Event from '../../../models/Event';
+import { Types } from 'mongoose';
 
 interface FormField {
   label: string;
@@ -20,7 +21,7 @@ export default async function handler(
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  await connectDB();
+  await connectToDatabase();
 
   try {
     const {

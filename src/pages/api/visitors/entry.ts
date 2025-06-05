@@ -1,6 +1,8 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { connectToDatabase } from '../../../utils/mongodb';
-import { ObjectId } from 'mongodb';
+import { connectToDatabase } from '../../../lib/mongodb';
+import Visitor from '../../../models/Visitor';
+import Entry from '../../../models/Entry';
+import mongoose from 'mongoose';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -15,24 +17,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Connect to MongoDB
-    const { db } = await connectToDatabase();
+    await connectToDatabase();
 
     // Find the visitor
-    const visitor = await db.collection('visitors').findOne({
-      _id: new ObjectId(visitorId)
-    });
+    const visitor = await Visitor.findById(visitorId).lean();
 
     if (!visitor) {
       return res.status(404).json({ message: 'Visitor not found' });
     }
 
     // Check if visitor has already entered
-    const existingEntry = await db.collection('entries').findOne({
-      visitorId: new ObjectId(visitorId),
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const existingEntry = await Entry.findOne({
+      visitorId: new mongoose.Types.ObjectId(visitorId),
       entryTime: {
-        $gte: new Date(new Date().setHours(0, 0, 0, 0)) // Start of today
+        $gte: startOfToday
       }
-    });
+    }).lean();
 
     if (existingEntry) {
       return res.status(400).json({
@@ -46,14 +49,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Record the entry
     const entryTime = new Date();
-    const entry = {
-      visitorId: new ObjectId(visitorId),
+    const entry = await Entry.create({
+      visitorId: new mongoose.Types.ObjectId(visitorId),
       eventId: visitor.eventId,
       entryTime,
       createdAt: entryTime
-    };
-
-    await db.collection('entries').insertOne(entry);
+    });
 
     // Return visitor details with entry time
     return res.status(200).json({

@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import connectDB from '../../../lib/db';
+import { connectToDatabase } from '../../../lib/mongodb';
 import Form from '../../../models/Form';
 import Event from '../../../models/Event';
 import mongoose from 'mongoose';
@@ -8,7 +8,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  await connectDB();
+  await connectToDatabase();
 
   if (req.method === 'GET') {
     try {
