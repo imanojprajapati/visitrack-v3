@@ -63,18 +63,43 @@ export default function EventRegistration() {
   const handleSendOTP = async (values: { email: string }) => {
     setLoading(true);
     try {
-      // Only send OTP, do not check registration yet
+      // First check if user is already registered
+      const checkResponse = await fetch('/api/visitors/check-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: values.email, eventId }),
+      });
+      
+      if (!checkResponse.ok) {
+        throw new Error('Failed to check registration status');
+      }
+      
+      const { isRegistered, visitor: existingVisitor } = await checkResponse.json();
+      
+      if (isRegistered && existingVisitor) {
+        setVisitor(existingVisitor);
+        setIsAlreadyRegistered(true);
+        setCurrentStep(3); // Move to the final step
+        message.info('You are already registered for this event');
+        return;
+      }
+
+      // If not registered, proceed with OTP
       const response = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: values.email }),
       });
-      if (!response.ok) throw new Error('Failed to send OTP');
+      
+      if (!response.ok) {
+        throw new Error('Failed to send OTP');
+      }
+      
       setCurrentStep(1);
       message.success('OTP sent to your email');
     } catch (error) {
       console.error('Error:', error);
-      message.error('Failed to send OTP');
+      message.error(error instanceof Error ? error.message : 'Failed to process request');
     } finally {
       setLoading(false);
     }
@@ -97,21 +122,7 @@ export default function EventRegistration() {
         console.error('OTP verification failed:', data);
         throw new Error(data.message || 'Failed to verify OTP');
       }
-      // After OTP is verified, check registration
-      const checkResponse = await fetch('/api/visitors/check-registration', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, eventId }),
-      });
-      if (!checkResponse.ok) throw new Error('Failed to check registration status');
-      const { isRegistered, visitor: existingVisitor } = await checkResponse.json();
-      if (isRegistered) {
-        setVisitor(existingVisitor);
-        setIsAlreadyRegistered(true);
-        setCurrentStep(3); // Skip to QR code step
-        message.info('You are already registered for this event');
-        return;
-      }
+
       if (!event?.form) {
         console.error('No form data available for event:', event);
         message.error('This event has no registration form');
@@ -195,6 +206,10 @@ export default function EventRegistration() {
       const data = await response.json();
       setVisitor(data.visitor);
       setCurrentStep(3);
+      
+      // Refresh event data to get updated visitor count
+      await fetchEventDetails();
+      
       message.success('Registration successful!');
     } catch (error) {
       console.error('Error:', error);
@@ -210,7 +225,7 @@ export default function EventRegistration() {
   };
 
   // QR Code component with error boundary
-  const QRCode: React.FC<{ value: string }> = ({ value }) => {
+  const QRCode: React.FC<{ value: string; size?: number }> = ({ value, size = 200 }) => {
     const [hasError, setHasError] = useState(false);
 
     if (hasError) {
@@ -228,7 +243,7 @@ export default function EventRegistration() {
         <div style={{ background: '#fff', padding: '20px', textAlign: 'center' }}>
           <QRCodeSVG
             value={value}
-            size={200}
+            size={size}
             level="L"
             includeMargin={true}
             style={{ display: 'block', margin: '0 auto' }}
@@ -521,11 +536,70 @@ export default function EventRegistration() {
               status="info"
               title="Already Registered"
               subTitle={`You have already registered for ${eventTitle}`}
+              icon={<SafetyOutlined style={{ color: '#1890ff' }} />}
               extra={[
-                <div key="qr" className="text-center">
-                  <RegistrationDetails visitor={visitor} />
-                  <Space>
+                <div key="details" className="text-center">
+                  <div className="mb-8">
+                    <Title level={4}>Your QR Code</Title>
+                    <div className="my-6 p-4 bg-white rounded-lg shadow-sm inline-block">
+                      <QRCode value={visitor._id} size={200} />
+                    </div>
+                  </div>
+                  
+                  <div className="mb-8 text-left">
+                    <Title level={4}>Registration Details</Title>
+                    <Divider />
+                    <Space direction="vertical" size="middle" style={{ width: '100%' }} className="p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <Text type="secondary">Name</Text>
+                        <div><Text strong>{visitor.name}</Text></div>
+                      </div>
+                      <div>
+                        <Text type="secondary">Email</Text>
+                        <div><Text strong>{visitor.email}</Text></div>
+                      </div>
+                      <div>
+                        <Text type="secondary">Phone</Text>
+                        <div><Text strong>{visitor.phone}</Text></div>
+                      </div>
+                      <div>
+                        <Text type="secondary">Event</Text>
+                        <div><Text strong>{visitor.eventName}</Text></div>
+                      </div>
+                      <div>
+                        <Text type="secondary">Location</Text>
+                        <div><Text strong>{visitor.eventLocation}</Text></div>
+                      </div>
+                      <div>
+                        <Text type="secondary">Event Date</Text>
+                        <div><Text strong>{new Date(visitor.eventStartDate).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}</Text></div>
+                      </div>
+                      <div>
+                        <Text type="secondary">Registration Date</Text>
+                        <div><Text strong>{new Date(visitor.createdAt).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }).replace(',', '')}</Text></div>
+                      </div>
+                      {visitor.company && (
+                        <div>
+                          <Text type="secondary">Company</Text>
+                          <div><Text strong>{visitor.company}</Text></div>
+                        </div>
+                      )}
+                    </Space>
+                  </div>
+                  
+                  <Space size="middle">
                     <Button
+                      type="primary"
                       icon={<DownloadOutlined />}
                       onClick={handleDownloadQR}
                       size="large"
@@ -533,12 +607,12 @@ export default function EventRegistration() {
                       Download QR Code
                     </Button>
                     <Button
+                      type="default"
                       icon={<DownloadOutlined />}
                       onClick={handleDownloadPDF}
-                      type="primary"
                       size="large"
                     >
-                      Download PDF
+                      Download Badge
                     </Button>
                   </Space>
                 </div>

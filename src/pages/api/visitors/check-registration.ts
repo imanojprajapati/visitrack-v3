@@ -26,11 +26,11 @@ export default async function handler(
     // Connect to database
     await connectToDatabase();
 
-    // Find visitor using Mongoose model
+    // Find visitor using Mongoose model with case-insensitive email match
     const visitor = await Visitor.findOne({
-      email,
-      eventId,
-      status: { $in: ['registered', 'checked_in'] }
+      email: { $regex: new RegExp('^' + email.toLowerCase() + '$', 'i') },
+      eventId: new mongoose.Types.ObjectId(eventId),
+      status: { $in: ['registered', 'checked_in', 'Visited'] }
     }).lean();
 
     if (visitor) {
@@ -43,19 +43,21 @@ export default async function handler(
           name: visitor.name,
           email: visitor.email,
           phone: visitor.phone,
+          company: visitor.company || '',
           eventName: visitor.eventName,
           eventLocation: visitor.eventLocation,
           eventStartDate: visitor.eventStartDate,
           eventEndDate: visitor.eventEndDate,
           status: visitor.status,
           qrCode: visitor.qrCode,
-          createdAt: visitor.createdAt
+          createdAt: visitor.createdAt,
+          additionalData: visitor.additionalData
         },
       });
     }
 
     res.status(200).json({ isRegistered: false });
-  } catch (err: unknown) {
+  } catch (err) {
     const error = err instanceof Error ? err : new Error('Unknown error occurred');
     console.error('Error checking registration:', error);
     res.status(500).json({ 
