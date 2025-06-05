@@ -81,6 +81,7 @@ export default async function handler(
 
     // Validate MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      console.error('Invalid event ID format:', eventId);
       return res.status(400).json({ message: 'Invalid event ID format' });
     }
 
@@ -90,6 +91,7 @@ export default async function handler(
         const event = await Event.findById(eventId).lean() as unknown as MongoEvent;
 
         if (!event) {
+          console.error('Event not found for ID:', eventId);
           return res.status(404).json({ message: 'Event not found' });
         }
 
@@ -108,6 +110,7 @@ export default async function handler(
         // If event has a formId, fetch the form details
         if (event.formId) {
           try {
+            console.log('Fetching form for ID:', event.formId.toString());
             const form = await Form.findById(event.formId).lean() as unknown as IFormDocument;
             if (form) {
               // Convert form fields to match the expected type
@@ -126,6 +129,9 @@ export default async function handler(
                 title: form.title,
                 fields: convertedFields
               };
+              console.log('Form data loaded successfully');
+            } else {
+              console.error('Form not found for ID:', event.formId.toString());
             }
           } catch (formError) {
             console.error('Error fetching form:', formError);

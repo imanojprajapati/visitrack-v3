@@ -38,25 +38,43 @@ export default function EventRegistration() {
         throw new Error('Event ID is required');
       }
 
-      const response = await fetch(`/api/events/${eventId}`);
+      // Add console log for debugging
+      console.log('Fetching event details for ID:', eventId);
+
+      const response = await fetch(`/api/events/${eventId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      });
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Failed to load event details');
+        console.error('API Error Response:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorData
+        });
+        throw new Error(errorData.message || `Failed to load event details (${response.status})`);
       }
       
       const eventData = await response.json();
+      console.log('Event data received:', eventData);
+
       if (!eventData) {
         throw new Error('Event not found');
       }
 
       // Validate event data
       if (!eventData.title || !eventData.startDate || !eventData.endDate) {
-        throw new Error('Invalid event data');
+        console.error('Invalid event data:', eventData);
+        throw new Error('Invalid event data: Missing required fields');
       }
 
       // Validate form data if present
       if (eventData.form) {
         if (!Array.isArray(eventData.form.fields)) {
+          console.error('Invalid form structure:', eventData.form);
           throw new Error('Invalid form structure');
         }
       }
@@ -65,6 +83,7 @@ export default function EventRegistration() {
     } catch (error) {
       console.error('Error fetching event:', error);
       setError(error instanceof Error ? error.message : 'Failed to load event details');
+      messageApi.error(error instanceof Error ? error.message : 'Failed to load event details');
     } finally {
       setLoading(false);
     }
