@@ -25,55 +25,87 @@ export const getWebSocketUrl = () => {
     : 'ws://localhost:3000';
 };
 
+interface FetchOptions extends RequestInit {
+  retries?: number;
+  retryDelay?: number;
+}
+
 /**
- * Common fetch wrapper with error handling
+ * Common fetch wrapper with error handling and retry logic
  * @param endpoint - API endpoint
- * @param options - Fetch options
+ * @param options - Fetch options including retry configuration
  * @returns Response data
  */
-export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
+export const fetchApi = async (endpoint: string, options: FetchOptions = {}) => {
+  const { retries = 3, retryDelay = 1000, ...fetchOptions } = options;
   const url = buildApiUrl(endpoint);
   
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
-    });
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...fetchOptions,
+        headers: {
+          'Content-Type': 'application/json',
+          ...fetchOptions.headers,
+        },
+        credentials: 'include', // Include cookies for cross-origin requests
+      });
 
-    if (!response.ok) {
-      // Try to parse error as JSON, but handle non-JSON responses too
-      try {
-        const error = await response.json();
-        throw new Error(error.message || 'API request failed');
-      } catch {
-        throw new Error(`API request failed with status ${response.status}`);
+      if (!response.ok) {
+        // Try to parse error as JSON
+        let errorMessage = `HTTP error! status: ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          // If parsing fails, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
-    }
 
-    // Check if response is JSON or binary
-    const contentType = response.headers.get('content-type');
-    if (contentType && contentType.includes('application/json')) {
-      return await response.json();
-    } else {
-      return await response.blob();
+      // Check if response is JSON or binary
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        return await response.json();
+      } else {
+        return await response.blob();
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
+      
+      // If this was the last attempt, throw the error
+      if (attempt === retries) {
+        console.error('API request failed after retries:', {
+          url,
+          attempts: attempt + 1,
+          error: lastError
+        });
+        throw lastError;
+      }
+      
+      // Wait before retrying
+      await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
     }
-  } catch (error) {
-    console.error('API request error:', error);
-    throw error;
   }
 };
 
 /**
- * Upload file to server
+ * Upload file to server with retry logic
  * @param endpoint - API endpoint
  * @param file - File to upload
  * @param additionalData - Additional form data
  * @returns Upload response
  */
-export const uploadFile = async (endpoint: string, file: File, additionalData?: Record<string, any>) => {
+export const uploadFile = async (
+  endpoint: string,
+  file: File,
+  additionalData?: Record<string, any>,
+  options: FetchOptions = {}
+) => {
+  const { retries = 3, retryDelay = 1000 } = options;
   const url = buildApiUrl(endpoint);
   const formData = new FormData();
   formData.append('file', file);
@@ -84,50 +116,88 @@ export const uploadFile = async (endpoint: string, file: File, additionalData?: 
     });
   }
 
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      body: formData,
-    });
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Upload failed');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Upload failed');
+      }
+
+      return await response.json();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
+      
+      if (attempt === retries) {
+        console.error('Upload failed after retries:', {
+          url,
+          attempts: attempt + 1,
+          error: lastError
+        });
+        throw lastError;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
     }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Upload error:', error);
-    throw error;
   }
 };
 
 /**
- * Download file from server
+ * Download file from server with retry logic
  * @param endpoint - API endpoint
  * @param filename - Desired filename
  * @returns void
  */
-export const downloadFile = async (endpoint: string, filename: string) => {
+export const downloadFile = async (
+  endpoint: string,
+  filename: string,
+  options: FetchOptions = {}
+) => {
+  const { retries = 3, retryDelay = 1000 } = options;
   const url = buildApiUrl(endpoint);
   
-  try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error('Download failed');
-    }
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Download failed');
+      }
 
-    const blob = await response.blob();
-    const downloadUrl = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(downloadUrl);
-  } catch (error) {
-    console.error('Download error:', error);
-    throw error;
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+      return;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
+      
+      if (attempt === retries) {
+        console.error('Download failed after retries:', {
+          url,
+          attempts: attempt + 1,
+          error: lastError
+        });
+        throw lastError;
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
+    }
   }
 }; 
