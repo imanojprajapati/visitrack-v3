@@ -2,6 +2,12 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  env: {
+    NEXT_PUBLIC_API_URL: process.env.NODE_ENV === 'production' 
+      ? 'https://www.visitrack.in/api'
+      : 'http://localhost:3000/api',
+    NEXT_PUBLIC_ENV: process.env.NODE_ENV
+  },
   images: {
     remotePatterns: [
       {
@@ -18,7 +24,7 @@ const nextConfig = {
         pathname: '/dghizdjio/**',
       },
     ],
-    domains: ['res.cloudinary.com'],
+    domains: ['res.cloudinary.com', 'www.visitrack.in', 'localhost'],
     unoptimized: true,
   },
   transpilePackages: [
@@ -99,7 +105,17 @@ const nextConfig = {
         ],
       },
     ];
-  }
+  },
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: process.env.NODE_ENV === 'production'
+          ? 'https://www.visitrack.in/api/:path*'
+          : 'http://localhost:3000/api/:path*',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig; 

@@ -9,6 +9,7 @@ import DynamicForm from '../../../components/DynamicForm';
 import { Event } from '../../../types/event';
 import { Visitor } from '../../../types/visitor';
 import ReactDOM from 'react-dom/client';
+import { fetchApi } from '../../../utils/api';
 
 const { Title, Text } = Typography;
 const { Step } = Steps;
@@ -44,9 +45,7 @@ export default function EventRegistration() {
 
   const fetchEventDetails = async () => {
     try {
-      const response = await fetch(`/api/events/${eventId}`);
-      if (!response.ok) throw new Error('Failed to fetch event details');
-      const data = await response.json();
+      const data = await fetchApi(`events/${eventId}`);
       console.log('Event data received:', data);
       if (!data.form) {
         console.error('No form data in event response');
@@ -64,20 +63,13 @@ export default function EventRegistration() {
     setLoading(true);
     try {
       // First check if user is already registered
-      const checkResponse = await fetch('/api/visitors/check-registration', {
+      const checkResponse = await fetchApi('visitors/check-registration', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: values.email, eventId }),
       });
       
-      if (!checkResponse.ok) {
-        throw new Error('Failed to check registration status');
-      }
-      
-      const { isRegistered, visitor: existingVisitor } = await checkResponse.json();
-      
-      if (isRegistered && existingVisitor) {
-        setVisitor(existingVisitor);
+      if (checkResponse.isRegistered && checkResponse.visitor) {
+        setVisitor(checkResponse.visitor);
         setIsAlreadyRegistered(true);
         setCurrentStep(3); // Move to the final step
         message.info('You are already registered for this event');
@@ -85,15 +77,10 @@ export default function EventRegistration() {
       }
 
       // If not registered, proceed with OTP
-      const response = await fetch('/api/auth/send-otp', {
+      await fetchApi('auth/send-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: values.email }),
       });
-      
-      if (!response.ok) {
-        throw new Error('Failed to send OTP');
-      }
       
       setCurrentStep(1);
       message.success('OTP sent to your email');
@@ -109,19 +96,13 @@ export default function EventRegistration() {
     setLoading(true);
     try {
       const email = form.getFieldValue('email');
-      const response = await fetch('/api/auth/verify-otp', {
+      const response = await fetchApi('auth/verify-otp', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           otp: values.otp,
         }),
       });
-      const data = await response.json();
-      if (!response.ok) {
-        console.error('OTP verification failed:', data);
-        throw new Error(data.message || 'Failed to verify OTP');
-      }
 
       if (!event?.form) {
         console.error('No form data available for event:', event);
@@ -186,9 +167,8 @@ export default function EventRegistration() {
       const name = formData.name?.value || '';
       const phone = formData.phone?.value || '';
 
-      const response = await fetch('/api/visitors/register', {
+      const data = await fetchApi('visitors/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           eventId,
           name,
@@ -197,13 +177,7 @@ export default function EventRegistration() {
           formData
         }),
       });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to register');
-      }
       
-      const data = await response.json();
       setVisitor(data.visitor);
       setCurrentStep(3);
       
@@ -309,16 +283,35 @@ export default function EventRegistration() {
             <QRCode value={qrCodeData} />
           </div>
         )}
-        <Space direction="vertical" size="small" style={{ width: '100%' }}>
-          <Text><strong>Visitor ID:</strong> {visitor._id}</Text>
-          <Text><strong>Event ID:</strong> {visitor.eventId}</Text>
-          <Text><strong>Name:</strong> {visitor.name}</Text>
-          <Text><strong>Email:</strong> {visitor.email}</Text>
-          <Text><strong>Phone:</strong> {visitor.phone}</Text>
-          <Text><strong>Event:</strong> {visitor.eventName}</Text>
-          <Text><strong>Location:</strong> {visitor.eventLocation}</Text>
-          <Text><strong>Event Date:</strong> {formatDate(visitor.eventStartDate)}</Text>
-          <Text><strong>Registration Date:</strong> {formatDateTime(visitor.createdAt)}</Text>
+        <Space direction="vertical" size="small" style={{ width: '100%' }} className="p-4 bg-gray-50 rounded-lg">
+          <div>
+            <Text type="secondary">Name</Text>
+            <div><Text strong>{visitor.name}</Text></div>
+          </div>
+          <div>
+            <Text type="secondary">Email</Text>
+            <div><Text strong>{visitor.email}</Text></div>
+          </div>
+          <div>
+            <Text type="secondary">Phone</Text>
+            <div><Text strong>{visitor.phone}</Text></div>
+          </div>
+          <div>
+            <Text type="secondary">Event</Text>
+            <div><Text strong>{visitor.eventName}</Text></div>
+          </div>
+          <div>
+            <Text type="secondary">Location</Text>
+            <div><Text strong>{visitor.eventLocation}</Text></div>
+          </div>
+          <div>
+            <Text type="secondary">Event Date</Text>
+            <div><Text strong>{formatDate(visitor.eventStartDate)}</Text></div>
+          </div>
+          <div>
+            <Text type="secondary">Registration Date</Text>
+            <div><Text strong>{formatDateTime(visitor.createdAt)}</Text></div>
+          </div>
         </Space>
       </div>
     );
@@ -426,8 +419,7 @@ export default function EventRegistration() {
     if (!visitor || !event) return;
     try {
       // Fetch badge template for this event
-      const templateRes = await fetch(`/api/badge-templates?eventId=${event._id}`);
-      const templates = await templateRes.json();
+      const templates = await fetchApi(`badge-templates?eventId=${event._id}`);
       if (!Array.isArray(templates) || templates.length === 0) {
         message.error('No badge template found for this event.');
         return;
@@ -443,7 +435,7 @@ export default function EventRegistration() {
         registrationDate: formatDateTime(visitor.createdAt)
       };
 
-      const response = await fetch('/api/badge-templates/download', {
+      const response = await fetch(buildApiUrl('badge-templates/download'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
