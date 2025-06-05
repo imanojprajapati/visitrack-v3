@@ -896,4 +896,4 @@ export default function EventRegistration() {
       </div>
     </div>
   );
-} 
+}
