@@ -1,22 +1,30 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { connectToDatabase } from '../../../lib/mongodb';
 import Form from '../../../models/Form';
+import mongoose from 'mongoose';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  await connectToDatabase();
   const { formId } = req.query;
 
   if (!formId || typeof formId !== 'string') {
     return res.status(400).json({ error: 'Invalid form ID' });
   }
 
+  // Connect to database
+  await connectToDatabase();
+
+  // Validate MongoDB ObjectId
+  if (!mongoose.Types.ObjectId.isValid(formId)) {
+    return res.status(400).json({ error: 'Invalid form ID format' });
+  }
+
   switch (req.method) {
     case 'GET':
       try {
-        const form = await Form.findById(formId);
+        const form = await Form.findById(formId).lean();
         if (!form) {
           return res.status(404).json({ error: 'Form not found' });
         }
@@ -31,21 +39,32 @@ export default async function handler(
         const { eventId, title, fields } = req.body;
 
         // Validate required fields
-        if (!eventId || !title || !fields || !Array.isArray(fields)) {
+        if (!eventId || !title || !Array.isArray(fields)) {
           return res.status(400).json({ error: 'Missing required fields' });
         }
 
-        const form = await Form.findByIdAndUpdate(
-          formId,
-          { eventId, title, fields },
-          { new: true, runValidators: true }
-        );
+        // Validate eventId format
+        if (!mongoose.Types.ObjectId.isValid(eventId)) {
+          return res.status(400).json({ error: 'Invalid event ID format' });
+        }
 
-        if (!form) {
+        // Update form
+        const updatedForm = await Form.findByIdAndUpdate(
+          formId,
+          { 
+            eventId: new mongoose.Types.ObjectId(eventId),
+            title,
+            fields,
+            updatedAt: new Date()
+          },
+          { new: true, runValidators: true }
+        ).lean();
+
+        if (!updatedForm) {
           return res.status(404).json({ error: 'Form not found' });
         }
 
-        return res.status(200).json(form);
+        return res.status(200).json(updatedForm);
       } catch (error) {
         console.error('Error updating form:', error);
         return res.status(500).json({ error: 'Failed to update form' });
