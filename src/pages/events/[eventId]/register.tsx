@@ -20,13 +20,39 @@ const { Step } = Steps;
 export default function EventRegistration() {
   const router = useRouter();
   const { eventId } = router.query;
-  const [currentStep, setCurrentStep] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [event, setEvent] = useState<Event | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
   const [visitor, setVisitor] = useState<Visitor | null>(null);
   const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchEventDetails = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await fetch(`/api/events/${eventId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to load event details');
+      }
+      
+      const eventData = await response.json();
+      if (!eventData) {
+        throw new Error('Event not found');
+      }
+      
+      setEvent(eventData);
+    } catch (error) {
+      console.error('Error fetching event:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load event details');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (eventId) {
@@ -45,40 +71,6 @@ export default function EventRegistration() {
       }
     }
   }, [currentStep, event]);
-
-  const fetchEventDetails = async () => {
-    try {
-      const response = await fetch(`/api/events/${eventId}`);
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Failed to load event details' }));
-        throw new Error(errorData.message || 'Failed to load event details');
-      }
-      
-      const data = await response.json();
-      console.log('Event data received:', data);
-      
-      if (!data || typeof data !== 'object') {
-        throw new Error('Invalid event data received');
-      }
-
-      if (!data.form) {
-        console.error('No form data in event response');
-        message.error('This event has no registration form');
-        return;
-      }
-
-      // Validate form data structure
-      if (!Array.isArray(data.form.fields)) {
-        console.error('Invalid form fields data:', data.form);
-        throw new Error('Invalid form structure');
-      }
-
-      setEvent(data);
-    } catch (error) {
-      console.error('Error fetching event:', error);
-      message.error(error instanceof Error ? error.message : 'Failed to load event details');
-    }
-  };
 
   const handleSendOTP = async (values: { email: string }) => {
     setLoading(true);
@@ -561,6 +553,32 @@ export default function EventRegistration() {
       return 'Not specified';
     }
   };
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="shadow-lg">
+            <Result
+              status="error"
+              title="Failed to load event"
+              subTitle={error}
+              extra={[
+                <Button key="retry" type="primary" onClick={() => {
+                  setError(null);
+                  if (eventId) {
+                    fetchEventDetails();
+                  }
+                }}>
+                  Try Again
+                </Button>
+              ]}
+            />
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
   if (!event) {
     return (

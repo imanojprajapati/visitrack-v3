@@ -14,7 +14,8 @@ import {
   Tag,
   Row,
   Col,
-  Popconfirm
+  Popconfirm,
+  Result
 } from 'antd';
 import type { TableProps } from 'antd/es/table';
 import {
@@ -56,14 +57,17 @@ export default function EventManagement() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   
   const refreshEvents = async (showMessage = true) => {
     try {
       setIsRefreshing(true);
+      setError(null);
       const response = await fetch('/api/events');
       if (!response.ok) {
-        throw new Error('Failed to fetch events');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch events');
       }
       const data = await response.json();
       
@@ -78,6 +82,7 @@ export default function EventManagement() {
       }
     } catch (error) {
       console.error('Failed to fetch events:', error);
+      setError(error instanceof Error ? error.message : 'Failed to refresh events list');
       if (showMessage) {
         messageApi?.error('Failed to refresh events list');
       }
@@ -92,8 +97,8 @@ export default function EventManagement() {
     setMounted(true);
     refreshEvents(false);
 
-    // Set up periodic refresh every 30 seconds
-    const intervalId = setInterval(() => refreshEvents(false), 300000000);
+    // Set up periodic refresh every 5 minutes
+    const intervalId = setInterval(() => refreshEvents(false), 300000);
 
     // Cleanup interval on component unmount
     return () => {
@@ -287,62 +292,93 @@ export default function EventManagement() {
   };
 
   if (!mounted) {
-    return null;
+    return (
+      <AdminLayout>
+        <div className="p-6">
+          <Card loading={true}>
+            <div className="h-96" />
+          </Card>
+        </div>
+      </AdminLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <AdminLayout>
+        <div className="p-6">
+          <Card>
+            <Result
+              status="error"
+              title="Failed to load events"
+              subTitle={error}
+              extra={[
+                <Button
+                  key="retry"
+                  type="primary"
+                  icon={<ReloadOutlined />}
+                  loading={isRefreshing}
+                  onClick={() => refreshEvents(true)}
+                >
+                  Try Again
+                </Button>
+              ]}
+            />
+          </Card>
+        </div>
+      </AdminLayout>
+    );
   }
 
   return (
     <AdminLayout>
       <div className="p-6">
         <Card
-          title={<h1 className="text-2xl font-bold">Event Management</h1>}
-          extra={
-            <Space>
-              <Button
-                icon={<ReloadOutlined spin={isRefreshing} />}
-                onClick={() => refreshEvents(true)} // Show message when manually refreshing
-                disabled={isRefreshing}
-                title="Refresh Events List"
-              >
-                Refresh
-              </Button>
-              <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => {
-                  form.resetFields();
-                  setSelectedEvent(null);
-                  setIsViewMode(false);
-                  setModalVisible(true);
-                }}
-              >
-                Create Event
-              </Button>
-            </Space>
+          title={
+            <div className="flex items-center justify-between">
+              <span>Events</span>
+              <Space>
+                <Button
+                  type="default"
+                  icon={<ReloadOutlined />}
+                  loading={isRefreshing}
+                  onClick={() => refreshEvents(true)}
+                >
+                  Refresh
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setSelectedEvent(null);
+                    setIsViewMode(false);
+                    setModalVisible(true);
+                  }}
+                >
+                  Add Event
+                </Button>
+              </Space>
+            </div>
           }
         >
           <Table
             columns={columns}
             dataSource={events}
             rowKey="_id"
+            loading={isLoading}
             pagination={{
-              total: events.length,
-              pageSize: 10,
+              defaultPageSize: 10,
               showSizeChanger: true,
-              showTotal: (total) => `Total ${total} events`,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} events`
             }}
-            loading={isLoading || isRefreshing}
           />
         </Card>
 
         <Modal
-          title={isViewMode ? 'Event Details' : (selectedEvent ? 'Edit Event' : 'Create New Event')}
+          title={isViewMode ? 'View Event' : selectedEvent ? 'Edit Event' : 'Add Event'}
           open={modalVisible}
           onCancel={handleModalClose}
-          footer={isViewMode ? [
-            <Button key="close" onClick={handleModalClose}>
-              Close
-            </Button>
-          ] : null}
+          footer={null}
           width={800}
         >
           {isViewMode && selectedEvent ? (
