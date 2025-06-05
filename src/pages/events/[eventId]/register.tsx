@@ -12,6 +12,7 @@ import ReactDOM from 'react-dom/client';
 import { fetchApi, buildApiUrl } from '../../../utils/api';
 import { FormBuilder, FormField } from '../../../utils/formBuilder';
 import { Rule } from 'antd/es/form';
+import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
 const { Step } = Steps;
@@ -164,19 +165,28 @@ export default function EventRegistration() {
         const value = values[field.id];
         
         // Skip empty optional fields
-        if (!field.required && (value === undefined || value === '')) {
+        if (!field.required && (value === undefined || value === '' || value === null)) {
           return acc;
         }
 
         // Validate required fields
-        if (field.required && (value === undefined || value === '')) {
+        if (field.required && (value === undefined || value === '' || value === null)) {
           throw new Error(`${field.label} is required`);
+        }
+
+        // Format the field value based on type
+        let formattedValue = value;
+        if (field.type === 'date' && value) {
+          formattedValue = dayjs(value).format('YYYY-MM-DD');
+        } else if (field.type === 'number' && value) {
+          formattedValue = Number(value);
         }
 
         // Format the field value
         acc[field.id] = {
           label: field.label,
-          value: value
+          value: formattedValue,
+          type: field.type
         };
 
         return acc;
@@ -185,12 +195,19 @@ export default function EventRegistration() {
       // Ensure source field exists
       formData.source = {
         label: 'Source',
-        value: 'Website'
+        value: 'Website',
+        type: 'text'
       };
 
       // Extract name and phone from form data
       const name = formData.name?.value || '';
       const phone = formData.phone?.value || '';
+      const email = form.getFieldValue('email');
+
+      // Validate email
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error('Please enter a valid email address');
+      }
 
       const response = await fetch('/api/visitors/register', {
         method: 'POST',
@@ -200,7 +217,7 @@ export default function EventRegistration() {
         body: JSON.stringify({
           eventId,
           name,
-          email: form.getFieldValue('email'),
+          email,
           phone,
           formData
         }),
@@ -212,6 +229,10 @@ export default function EventRegistration() {
       }
 
       const data = await response.json();
+      
+      if (!data.visitor) {
+        throw new Error('Invalid response from server');
+      }
       
       setVisitor(data.visitor);
       setCurrentStep(3);
