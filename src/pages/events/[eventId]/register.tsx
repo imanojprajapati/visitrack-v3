@@ -5,11 +5,13 @@ import { Card, Input, Button, message, Steps, Form, Typography, Space, Divider, 
 import { MailOutlined, SafetyOutlined, UserOutlined, QrcodeOutlined, DownloadOutlined } from '@ant-design/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { jsPDF } from 'jspdf';
-import DynamicForm from '../../../components/DynamicForm';
+import { DynamicForm } from '../../../components/DynamicForm';
 import { Event } from '../../../types/event';
 import { Visitor } from '../../../types/visitor';
 import ReactDOM from 'react-dom/client';
-import { fetchApi } from '../../../utils/api';
+import { fetchApi, buildApiUrl } from '../../../utils/api';
+import { FormBuilder, FormField } from '../../../utils/formBuilder';
+import { Rule } from 'antd/es/form';
 
 const { Title, Text } = Typography;
 const { Step } = Steps;
@@ -153,7 +155,7 @@ export default function EventRegistration() {
           }
         }
         return acc;
-      }, {} as Record<string, { label: string; value: any }>);
+      }, {} as Record<string, any>);
 
       // Ensure source field exists
       if (!formData.source) {
@@ -435,19 +437,17 @@ export default function EventRegistration() {
         registrationDate: formatDateTime(visitor.createdAt)
       };
 
-      const response = await fetch(buildApiUrl('badge-templates/download'), {
+      // Use fetchApi to get the PDF blob directly
+      const pdfBlob = await fetchApi('badge-templates/download', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           templateId,
           visitorData
         })
       });
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
-      }
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
+
+      // Create download link for the blob
+      const url = window.URL.createObjectURL(pdfBlob);
       const link = document.createElement('a');
       link.href = url;
       link.download = `visitrack-badge-${visitor.name}.pdf`;
@@ -455,6 +455,8 @@ export default function EventRegistration() {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
+      
+      message.success('Badge downloaded successfully');
     } catch (error) {
       console.error('Error downloading PDF:', error);
       message.error(error instanceof Error ? error.message : 'Failed to download PDF');
@@ -659,143 +661,204 @@ export default function EventRegistration() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 py-12">
-      <Head>
-        <title>Register for {event?.title || 'Event'} - Visitrack</title>
-      </Head>
+  // Registration form
+  if (currentStep === 2 && event?.form) {
+    const template = FormBuilder.createTemplate(
+      'Registration Form',
+      event.form.fields.map(field => {
+        // Convert validation object to antd Rule array
+        const validation: Rule[] = [];
+        if (field.validation) {
+          if (field.validation.min !== undefined) {
+            validation.push({ type: 'number', min: field.validation.min, message: `Minimum value is ${field.validation.min}` });
+          }
+          if (field.validation.max !== undefined) {
+            validation.push({ type: 'number', max: field.validation.max, message: `Maximum value is ${field.validation.max}` });
+          }
+          if (field.validation.pattern) {
+            validation.push({ pattern: new RegExp(field.validation.pattern), message: 'Invalid format' });
+          }
+        }
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Card className="shadow-lg">
-          <div className="text-center mb-8">
-            <Title level={2}>{event.title}</Title>
-            <Text type="secondary">{event.description}</Text>
-            <div className="mt-4">
-              <Text type="secondary">
-                Location: {event.location} | 
-                Date: {new Date(event.startDate).toLocaleDateString()} | 
-                Capacity: {event.visitors}/{event.capacity}
-              </Text>
+        return {
+          id: field.id,
+          label: field.label,
+          type: field.type === 'tel' ? 'phone' : field.type === 'textarea' ? 'text' : field.type as FormField['type'],
+          required: field.required || false,
+          validation: validation.length > 0 ? validation : undefined,
+          placeholder: field.placeholder,
+          options: field.options?.map(opt => ({ label: opt.label, value: opt.value }))
+        };
+      }),
+      'Event registration form'
+    );
+
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <Head>
+          <title>Register for {event?.title || 'Event'} - Visitrack</title>
+        </Head>
+
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="shadow-lg">
+            <div className="text-center mb-8">
+              <Title level={2}>{event.title}</Title>
+              <Text type="secondary">{event.description}</Text>
+              <div className="mt-4">
+                <Text type="secondary">
+                  Location: {event.location} | 
+                  Date: {new Date(event.startDate).toLocaleDateString()} | 
+                  Capacity: {event.visitors}/{event.capacity}
+                </Text>
+              </div>
             </div>
-          </div>
 
-          <Steps current={currentStep} className="mb-8">
-            <Step title="Email" icon={<MailOutlined />} />
-            <Step title="Verify" icon={<SafetyOutlined />} />
-            <Step title="Register" icon={<UserOutlined />} />
-            <Step title="QR Code" icon={<QrcodeOutlined />} />
-          </Steps>
+            <Steps current={currentStep} className="mb-8">
+              <Step title="Email" icon={<MailOutlined />} />
+              <Step title="Verify" icon={<SafetyOutlined />} />
+              <Step title="Register" icon={<UserOutlined />} />
+              <Step title="QR Code" icon={<QrcodeOutlined />} />
+            </Steps>
 
-          {currentStep === 0 && (
+            <DynamicForm
+              template={template}
+              onFinish={handleRegistration}
+              onFinishFailed={(errorInfo) => {
+                console.error('Form validation failed:', errorInfo);
+                message.error('Please fill in all required fields correctly');
+              }}
+            />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Email form
+  if (currentStep === 0) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <Head>
+          <title>Register for {event?.title || 'Event'} - Visitrack</title>
+        </Head>
+
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="shadow-lg">
+            <div className="text-center mb-8">
+              <Title level={2}>{event?.title || 'Event Registration'}</Title>
+              <Text type="secondary">{event?.description}</Text>
+              {event && (
+                <div className="mt-4">
+                  <Text type="secondary">
+                    Location: {event.location} | 
+                    Date: {new Date(event.startDate).toLocaleDateString()} | 
+                    Capacity: {event.visitors}/{event.capacity}
+                  </Text>
+                </div>
+              )}
+            </div>
+
+            <Steps current={currentStep} className="mb-8">
+              <Step title="Email" icon={<MailOutlined />} />
+              <Step title="Verify" icon={<SafetyOutlined />} />
+              <Step title="Register" icon={<UserOutlined />} />
+              <Step title="QR Code" icon={<QrcodeOutlined />} />
+            </Steps>
+
             <Form form={form} onFinish={handleSendOTP} layout="vertical">
               <Form.Item
                 name="email"
                 label="Email"
                 rules={[
                   { required: true, message: 'Please enter your email' },
-                  { type: 'email', message: 'Please enter a valid email' },
+                  { type: 'email', message: 'Please enter a valid email' }
                 ]}
               >
-                <Input prefix={<MailOutlined />} placeholder="Enter your email" size="large" />
+                <Input prefix={<MailOutlined />} placeholder="Enter your email" />
               </Form.Item>
+
               <Form.Item>
-                <Button type="primary" htmlType="submit" loading={loading} block size="large">
+                <Button type="primary" htmlType="submit" loading={loading} block>
                   Send OTP
                 </Button>
               </Form.Item>
             </Form>
-          )}
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
-          {currentStep === 1 && (
+  // OTP verification form
+  if (currentStep === 1) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <Head>
+          <title>Verify OTP - Visitrack</title>
+        </Head>
+
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="shadow-lg">
+            <div className="text-center mb-8">
+              <Title level={2}>Verify OTP</Title>
+              <Text type="secondary">
+                Please enter the OTP sent to your email: {form.getFieldValue('email')}
+              </Text>
+            </div>
+
+            <Steps current={currentStep} className="mb-8">
+              <Step title="Email" icon={<MailOutlined />} />
+              <Step title="Verify" icon={<SafetyOutlined />} />
+              <Step title="Register" icon={<UserOutlined />} />
+              <Step title="QR Code" icon={<QrcodeOutlined />} />
+            </Steps>
+
             <Form form={form} onFinish={handleVerifyOTP} layout="vertical">
               <Form.Item
                 name="otp"
                 label="OTP"
                 rules={[
                   { required: true, message: 'Please enter the OTP' },
-                  { len: 6, message: 'OTP must be 6 digits' },
+                  { pattern: /^\d{6}$/, message: 'OTP must be 6 digits' }
                 ]}
               >
-                <Input prefix={<SafetyOutlined />} placeholder="Enter 6-digit OTP" size="large" />
+                <Input placeholder="Enter 6-digit OTP" maxLength={6} />
               </Form.Item>
+
               <Form.Item>
-                <Button type="primary" htmlType="submit" loading={loading} block size="large">
-                  Verify OTP
-                </Button>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <Button type="primary" htmlType="submit" loading={loading} block>
+                    Verify OTP
+                  </Button>
+                  <Button 
+                    type="link" 
+                    onClick={() => setCurrentStep(0)} 
+                    block
+                  >
+                    Back to Email
+                  </Button>
+                </Space>
               </Form.Item>
             </Form>
-          )}
+          </Card>
+        </div>
+      </div>
+    );
+  }
 
-          {currentStep === 2 && (
-            <>
-              {event?.form ? (
-                <Form form={form} onFinish={handleRegistration} layout="vertical">
-                  <DynamicForm fields={event.form.fields} form={form} />
-                  <Form.Item>
-                    <Button type="primary" htmlType="submit" loading={loading} block size="large">
-                      Complete Registration
-                    </Button>
-                  </Form.Item>
-                </Form>
-              ) : (
-                <div className="text-center py-8">
-                  <Result
-                    status="error"
-                    title="Registration Form Not Available"
-                    subTitle="This event does not have a registration form configured."
-                  />
-                </div>
-              )}
-            </>
-          )}
+  // Loading or error state
+  return (
+    <div className="min-h-screen bg-gray-50 py-12">
+      <Head>
+        <title>Loading - Visitrack</title>
+      </Head>
 
-          {currentStep === 3 && visitor && (
-            <div className="text-center">
-              <div className="mb-8 qr-code">
-                <QRCode value={visitor._id} />
-              </div>
-              <div className="mb-8 text-left">
-                <Title level={4}>Registration Details</Title>
-                <Divider />
-                <Space direction="vertical" size="small" style={{ width: '100%' }}>
-                  <Text><strong>Name:</strong> {visitor.name}</Text>
-                  <Text><strong>Email:</strong> {visitor.email}</Text>
-                  <Text><strong>Phone:</strong> {visitor.phone}</Text>
-                  <Text><strong>Event:</strong> {visitor.eventName}</Text>
-                  <Text><strong>Location:</strong> {visitor.eventLocation}</Text>
-                  <Text><strong>Date:</strong> {new Date(visitor.eventStartDate).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric'
-                  })}</Text>
-                  <Text><strong>Registration Date:</strong> {new Date(visitor.createdAt).toLocaleDateString('en-GB', {
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }).replace(',', '')}</Text>
-                </Space>
-              </div>
-              <Space>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={handleDownloadQR}
-                  size="large"
-                >
-                  Download QR Code
-                </Button>
-                <Button
-                  icon={<DownloadOutlined />}
-                  onClick={handleDownloadPDF}
-                  type="primary"
-                  size="large"
-                >
-                  Download PDF
-                </Button>
-              </Space>
-            </div>
-          )}
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        <Card className="shadow-lg">
+          <div className="text-center">
+            <Title level={2}>Loading...</Title>
+            <Text type="secondary">Please wait while we load the event details.</Text>
+          </div>
         </Card>
       </div>
     </div>

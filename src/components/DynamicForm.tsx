@@ -1,157 +1,156 @@
-import { useEffect } from 'react';
-import { Form, Input, InputNumber, DatePicker, Select } from 'antd';
-import type { Rule } from 'antd/es/form';
-import { FormField, FormFieldOption } from '../types/form';
+import React from 'react';
+import { Form, Input, InputNumber, Select, Checkbox, Radio, DatePicker } from 'antd';
+import type { Rule } from 'antd/lib/form';
+import { FormField, FormTemplate } from '../utils/formBuilder';
 
 interface DynamicFormProps {
-  fields: FormField[];
-  form: any;
+  template: FormTemplate;
+  onFinish?: (values: any) => void;
+  onFinishFailed?: (errorInfo: any) => void;
 }
 
-export default function DynamicForm({ fields, form }: DynamicFormProps) {
-  useEffect(() => {
-    // Set default values for fields, especially for source field
-    fields.forEach(field => {
-      if (field.id === 'source' || ((field.readOnly && field.placeholder) || field.defaultValue !== undefined)) {
-        form.setFieldValue(field.id, field.defaultValue || field.placeholder);
-      }
+const validateEmail = (email: string): boolean => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+};
+
+const validatePhone = (phone: string): boolean => {
+  const phoneRegex = /^\+?[\d\s-]{10,}$/;
+  return phoneRegex.test(phone);
+};
+
+const getFieldRules = (field: FormField): Rule[] => {
+  const rules: Rule[] = [];
+
+  if (field.required) {
+    rules.push({
+      required: true,
+      message: `${field.label} is required`,
     });
-  }, [fields, form]);
+  }
 
-  const renderField = (field: FormField) => {
-    const rules: Rule[] = [
-      { required: field.required, message: `Please enter ${field.label.toLowerCase()}` }
-    ];
+  switch (field.type) {
+    case 'email':
+      rules.push({
+        validator: async (_, value) => {
+          if (value && !validateEmail(value)) {
+            throw new Error('Please enter a valid email address');
+          }
+        },
+      });
+      break;
 
-    // Add validation rules based on field type
-    if (field.type === 'email') {
-      rules.push({ type: 'email', message: 'Please enter a valid email' });
-    } else if (field.type === 'tel') {
-      rules.push({ pattern: /^[0-9]{10}$/, message: 'Please enter a valid 10-digit phone number' });
-    }
+    case 'phone':
+      rules.push({
+        validator: async (_, value) => {
+          if (value && !validatePhone(value)) {
+            throw new Error('Please enter a valid phone number');
+          }
+        },
+      });
+      break;
 
-    // Add custom validation rules if specified
-    if (field.validation) {
-      if (field.validation.min !== undefined) {
-        rules.push({ min: field.validation.min, message: `Minimum value is ${field.validation.min}` });
-      }
-      if (field.validation.max !== undefined) {
-        rules.push({ max: field.validation.max, message: `Maximum value is ${field.validation.max}` });
-      }
-      if (field.validation.pattern) {
-        rules.push({ pattern: new RegExp(field.validation.pattern), message: 'Invalid format' });
-      }
-    }
+    case 'number':
+      rules.push({
+        type: 'number',
+        message: 'Please enter a valid number',
+      });
+      break;
+  }
 
-    // Set default value for read-only fields or fields with defaultValue
-    if ((field.readOnly && field.placeholder) || field.defaultValue !== undefined) {
-      form.setFieldValue(field.id, field.defaultValue || field.placeholder);
-    }
+  if (field.validation) {
+    rules.push(...field.validation);
+  }
 
-    const commonProps = {
-      key: field.id,
-      name: field.id,
-      label: field.label,
-      rules: rules,
-      disabled: field.readOnly,
-      initialValue: field.defaultValue || (field.readOnly ? field.placeholder : undefined)
-    };
+  return rules;
+};
 
-    switch (field.type) {
-      case 'text':
-        return (
-          <Form.Item {...commonProps}>
-            <Input 
-              placeholder={field.placeholder} 
-              defaultValue={field.defaultValue || (field.readOnly ? field.placeholder : undefined)}
-              readOnly={field.readOnly}
-              style={field.readOnly ? { backgroundColor: '#f5f5f5' } : undefined}
-            />
-          </Form.Item>
-        );
+const renderField = (field: FormField): React.ReactNode => {
+  switch (field.type) {
+    case 'text':
+      return <Input placeholder={field.placeholder} />;
 
-      case 'email':
-        return (
-          <Form.Item {...commonProps}>
-            <Input 
-              type="email" 
-              placeholder={field.placeholder}
-              defaultValue={field.defaultValue || (field.readOnly ? field.placeholder : undefined)}
-            />
-          </Form.Item>
-        );
+    case 'number':
+      return <InputNumber style={{ width: '100%' }} placeholder={field.placeholder} />;
 
-      case 'number':
-        return (
-          <Form.Item {...commonProps}>
-            <InputNumber
-              style={{ width: '100%' }}
-              placeholder={field.placeholder}
-              min={field.validation?.min}
-              max={field.validation?.max}
-              defaultValue={field.defaultValue || (field.readOnly && field.placeholder ? Number(field.placeholder) : undefined)}
-              formatter={value => `${value}`}
-              parser={value => {
-                const num = value ? Number(value) : 0;
-                if (isNaN(num)) return 0;
-                if (field.validation?.min !== undefined && num < field.validation.min) {
-                  return field.validation.min;
-                }
-                if (field.validation?.max !== undefined && num > field.validation.max) {
-                  return field.validation.max;
-                }
-                return num;
-              }}
-            />
-          </Form.Item>
-        );
+    case 'email':
+      return <Input type="email" placeholder={field.placeholder || 'Enter email'} />;
 
-      case 'tel':
-        return (
-          <Form.Item {...commonProps}>
-            <Input 
-              type="tel" 
-              placeholder={field.placeholder}
-              defaultValue={field.defaultValue || (field.readOnly ? field.placeholder : undefined)}
-            />
-          </Form.Item>
-        );
+    case 'phone':
+      return <Input placeholder={field.placeholder || 'Enter phone number'} />;
 
-      case 'date':
-        return (
-          <Form.Item {...commonProps}>
-            <DatePicker 
-              style={{ width: '100%' }}
-              disabled={field.readOnly}
-            />
-          </Form.Item>
-        );
+    case 'select':
+      return (
+        <Select placeholder={field.placeholder}>
+          {field.options?.map((option) => (
+            <Select.Option key={option.value} value={option.value}>
+              {option.label}
+            </Select.Option>
+          ))}
+        </Select>
+      );
 
-      case 'select':
-        return (
-          <Form.Item {...commonProps}>
-            <Select 
-              placeholder={field.placeholder}
-              disabled={field.readOnly}
-              defaultValue={field.defaultValue || (field.readOnly ? field.placeholder : undefined)}
-            >
-              {field.options?.map((option: FormFieldOption) => (
-                <Select.Option key={option.value} value={option.value}>
-                  {option.label}
-                </Select.Option>
-              ))}
-            </Select>
-          </Form.Item>
-        );
+    case 'checkbox':
+      return (
+        <Checkbox.Group>
+          {field.options?.map((option) => (
+            <Checkbox key={option.value} value={option.value}>
+              {option.label}
+            </Checkbox>
+          ))}
+        </Checkbox.Group>
+      );
 
-      default:
-        return null;
-    }
-  };
+    case 'radio':
+      return (
+        <Radio.Group>
+          {field.options?.map((option) => (
+            <Radio key={option.value} value={option.value}>
+              {option.label}
+            </Radio>
+          ))}
+        </Radio.Group>
+      );
+
+    case 'date':
+      return <DatePicker style={{ width: '100%' }} />;
+
+    default:
+      return <Input placeholder={field.placeholder} />;
+  }
+};
+
+export const DynamicForm: React.FC<DynamicFormProps> = ({
+  template,
+  onFinish,
+  onFinishFailed,
+}) => {
+  const [form] = Form.useForm();
 
   return (
-    <div className="space-y-4">
-      {fields.map(field => renderField(field))}
-    </div>
+    <Form
+      form={form}
+      layout="vertical"
+      name={template.id}
+      onFinish={onFinish}
+      onFinishFailed={onFinishFailed}
+      initialValues={template.fields.reduce((acc, field) => {
+        if (field.defaultValue !== undefined) {
+          acc[field.id] = field.defaultValue;
+        }
+        return acc;
+      }, {} as Record<string, any>)}
+    >
+      {template.fields.map((field) => (
+        <Form.Item
+          key={field.id}
+          name={field.id}
+          label={field.label}
+          rules={getFieldRules(field)}
+        >
+          {renderField(field)}
+        </Form.Item>
+      ))}
+    </Form>
   );
-} 
+}; 
