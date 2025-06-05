@@ -10,28 +10,26 @@ export default function EditFormPage() {
   const { formId } = router.query;
   const [form, setForm] = useState<EventForm | null>(null);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     if (formId) {
-      console.log('Fetching form with ID:', formId);
       fetchForm();
     }
+    return () => {
+      setMounted(false);
+    };
   }, [formId]);
 
   const fetchForm = async () => {
     try {
-      console.log('Making request to:', `/api/forms/${formId}`);
       const response = await fetch(`/api/forms/${formId}`);
-      console.log('Response status:', response.status);
-      
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Error response:', errorData);
         throw new Error(errorData.error || 'Failed to fetch form');
       }
-      
       const data = await response.json();
-      console.log('Form data received:', data);
       setForm(data);
     } catch (error) {
       console.error('Error fetching form:', error);
@@ -63,6 +61,10 @@ export default function EditFormPage() {
       message.error('Failed to update form');
     }
   };
+
+  if (!mounted) {
+    return null;
+  }
 
   if (loading) {
     return (

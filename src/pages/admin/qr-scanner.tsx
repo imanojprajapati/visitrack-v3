@@ -138,12 +138,27 @@ const QRScanner: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const badgeRef = useRef<HTMLDivElement>(null);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
-  const { messageApi } = useAppContext();
   const [imageScanning, setImageScanning] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadFile[]>([]);
+  const [mounted, setMounted] = useState(false);
+
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const html5QrCode = useRef<Html5Qrcode | null>(null);
+  const { messageApi } = useAppContext();
+
+  useEffect(() => {
+    setMounted(true);
+    fetchQRScans();
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear();
+      }
+      if (html5QrCode.current) {
+        html5QrCode.current.clear();
+      }
+    };
+  }, []);
 
   // Function to fetch QR scans with retry logic
   const fetchQRScans = async () => {
@@ -250,11 +265,6 @@ const QRScanner: React.FC = () => {
       throw new Error('Invalid QR code format');
     }
   };
-
-  // Load QR scan data when component mounts
-  useEffect(() => {
-    fetchQRScans();
-  }, []);
 
   // Add error UI
   if (error && !loading) {
@@ -700,6 +710,10 @@ const QRScanner: React.FC = () => {
       </Form>
     </Modal>
   );
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <AdminLayout>

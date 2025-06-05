@@ -28,6 +28,7 @@ export default function RegistrationReportPage() {
   const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<Event[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const [filters, setFilters] = useState({
     name: '',
     email: '',
@@ -45,8 +46,12 @@ export default function RegistrationReportPage() {
   });
 
   useEffect(() => {
+    setMounted(true);
     fetchEvents();
     fetchVisitors();
+    return () => {
+      setMounted(false);
+    };
   }, []);
 
   const fetchEvents = async () => {
@@ -231,6 +236,10 @@ export default function RegistrationReportPage() {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <div className="w-full">

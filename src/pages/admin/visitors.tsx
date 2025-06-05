@@ -82,11 +82,16 @@ export default function VisitorsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredVisitors, setFilteredVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    setMounted(true);
     fetchVisitors();
     fetchEvents();
+    return () => {
+      setMounted(false);
+    };
   }, []);
 
   const fetchEvents = async () => {
@@ -103,6 +108,7 @@ export default function VisitorsPage() {
 
   const fetchVisitors = async () => {
     try {
+      setLoading(true);
       const response = await fetch('/api/visitors');
       if (!response.ok) throw new Error('Failed to fetch visitors');
       const data = await response.json();
@@ -393,16 +399,11 @@ export default function VisitorsPage() {
   );
 
   const QRCodeModal = () => {
-    const generateVisitorURL = (visitor: Visitor) => {
-      // Use the IP address to generate the URL with visitorId parameter
-      return `http://192.168.29.163:3000/visitor/${visitor._id}`;
-    };
-
     if (!selectedVisitor) {
       return null;
     }
 
-    const visitorUrl = generateVisitorURL(selectedVisitor);
+    const visitorUrl = `${window.location.origin}/visitor/${selectedVisitor._id}`;
 
     return (
       <Modal
@@ -438,6 +439,10 @@ export default function VisitorsPage() {
       </Modal>
     );
   };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <AdminLayout>

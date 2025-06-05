@@ -7,6 +7,9 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NODE_ENV === 'production' 
       ? 'https://www.visitrack.in/api'
       : 'http://localhost:3000/api',
+    NEXT_PUBLIC_BASE_URL: process.env.NODE_ENV === 'production'
+      ? 'https://www.visitrack.in'
+      : 'http://localhost:3000',
     NEXT_PUBLIC_ENV: process.env.NODE_ENV
   },
   images: {
@@ -25,7 +28,7 @@ const nextConfig = {
         protocol: 'http',
         hostname: 'localhost',
         port: '3000',
-        pathname: '/uploads/**',
+        pathname: '/**',
       }
     ],
     unoptimized: true,
@@ -126,7 +129,11 @@ const nextConfig = {
           },
           {
             key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, Authorization'
+            value: 'Content-Type, Authorization, X-Requested-With'
+          },
+          {
+            key: 'Access-Control-Allow-Credentials',
+            value: 'true'
           }
         ],
       },

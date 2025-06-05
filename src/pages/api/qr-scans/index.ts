@@ -15,16 +15,23 @@ export default async function handler(
 
     // Connect to database with retry logic
     let retries = 3;
+    let lastError: Error | null = null;
+
     while (retries > 0) {
       try {
         await connectToDatabase();
         break;
       } catch (error) {
+        lastError = error instanceof Error ? error : new Error('Unknown error occurred');
+        console.error(`Database connection attempt failed (${retries} retries left):`, lastError);
         retries--;
+        
         if (retries === 0) {
-          throw new ApiError(503, 'Database connection failed after multiple attempts');
+          throw new ApiError(503, 'Database connection failed after multiple attempts', lastError);
         }
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, 3 - retries) * 1000));
       }
     }
 
@@ -97,6 +104,6 @@ export default async function handler(
       scans: formattedScans
     });
   } catch (error) {
-    handleApiError(error, res);
+    return handleApiError(error, res);
   }
 }

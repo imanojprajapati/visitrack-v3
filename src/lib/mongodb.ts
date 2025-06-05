@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { registerModels } from './models';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
@@ -35,14 +36,14 @@ export async function connectToDatabase() {
       family: 4,
       retryWrites: true,
       retryReads: true,
-      connectTimeoutMS: 10000,
-      keepAlive: true,
-      keepAliveInitialDelay: 300000
+      connectTimeoutMS: 10000
     };
 
     globalWithMongoose.mongoose.promise = mongoose.connect(MONGODB_URI as string, opts)
       .then((mongoose) => {
         console.log('MongoDB connected successfully');
+        // Register all models after successful connection
+        registerModels();
         return mongoose;
       })
       .catch((error) => {

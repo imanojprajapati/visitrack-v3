@@ -56,6 +56,7 @@ export default function EventManagement() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   
   const refreshEvents = async (showMessage = true) => {
     try {
@@ -88,14 +89,17 @@ export default function EventManagement() {
 
   // Initial load and periodic refresh
   useEffect(() => {
-    // Initial fetch
+    setMounted(true);
     refreshEvents(false);
 
     // Set up periodic refresh every 30 seconds
     const intervalId = setInterval(() => refreshEvents(false), 300000000);
 
     // Cleanup interval on component unmount
-    return () => clearInterval(intervalId);
+    return () => {
+      clearInterval(intervalId);
+      setMounted(false);
+    };
   }, []);
 
   // Add refresh after modal close
@@ -281,6 +285,10 @@ export default function EventManagement() {
       refreshEvents(false); // Refresh events after submission without showing message
     }
   };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <AdminLayout>

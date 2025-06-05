@@ -2,7 +2,8 @@
  * Get the base API URL based on the current environment
  */
 export const getApiUrl = () => {
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api';
+  return baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
 };
 
 /**
@@ -12,17 +13,16 @@ export const getApiUrl = () => {
  */
 export const buildApiUrl = (endpoint: string): string => {
   const baseUrl = getApiUrl();
-  return `${baseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+  return `${baseUrl}/${cleanEndpoint}`;
 };
 
 /**
  * Helper function to build WebSocket URL
  */
 export const getWebSocketUrl = () => {
-  const isProduction = process.env.NODE_ENV === 'production';
-  return isProduction 
-    ? 'wss://www.visitrack.in'
-    : 'ws://localhost:3000';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000/api';
+  return baseUrl.replace(/^http/, 'ws');
 };
 
 interface FetchOptions extends RequestInit {
@@ -44,23 +44,28 @@ export const fetchApi = async (endpoint: string, options: FetchOptions = {}) => 
   
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(url, {
         ...fetchOptions,
         headers: {
           'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
           ...fetchOptions.headers,
         },
-        credentials: 'include', // Include cookies for cross-origin requests
+        credentials: 'include',
+        signal: controller.signal,
       });
 
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        // Try to parse error as JSON
         let errorMessage = `HTTP error! status: ${response.status}`;
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorData.error || errorMessage;
         } catch {
-          // If parsing fails, use status text
           errorMessage = response.statusText || errorMessage;
         }
         throw new Error(errorMessage);
@@ -73,9 +78,21 @@ export const fetchApi = async (endpoint: string, options: FetchOptions = {}) => 
       } else {
         return await response.blob();
       }
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
-      
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        lastError = err;
+        if (err.name === 'AbortError') {
+          console.error('Request timed out:', {
+            url,
+            attempt: attempt + 1,
+            error: lastError
+          });
+          throw new Error('Request timed out');
+        }
+      } else {
+        lastError = new Error('Unknown error occurred');
+      }
+
       // If this was the last attempt, throw the error
       if (attempt === retries) {
         console.error('API request failed after retries:', {
@@ -120,11 +137,20 @@ export const uploadFile = async (
   
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout for uploads
+
       const response = await fetch(url, {
         method: 'POST',
         body: formData,
         credentials: 'include',
+        signal: controller.signal,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        }
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -132,9 +158,16 @@ export const uploadFile = async (
       }
 
       return await response.json();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
-      
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        lastError = err;
+        if (err.name === 'AbortError') {
+          throw new Error('Upload timed out');
+        }
+      } else {
+        lastError = new Error('Unknown error occurred');
+      }
+
       if (attempt === retries) {
         console.error('Upload failed after retries:', {
           url,
@@ -167,9 +200,18 @@ export const downloadFile = async (
   
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+
       const response = await fetch(url, {
         credentials: 'include',
+        signal: controller.signal,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        }
       });
+
+      clearTimeout(timeoutId);
       
       if (!response.ok) {
         throw new Error('Download failed');
@@ -185,9 +227,16 @@ export const downloadFile = async (
       link.remove();
       window.URL.revokeObjectURL(downloadUrl);
       return;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
-      
+    } catch (err: unknown) {
+      if (err instanceof Error) {
+        lastError = err;
+        if (err.name === 'AbortError') {
+          throw new Error('Download timed out');
+        }
+      } else {
+        lastError = new Error('Unknown error occurred');
+      }
+
       if (attempt === retries) {
         console.error('Download failed after retries:', {
           url,

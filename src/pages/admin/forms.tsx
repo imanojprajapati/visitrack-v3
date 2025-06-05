@@ -25,10 +25,15 @@ export default function FormsPage() {
   const [forms, setForms] = useState<FormRecord[]>([]);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
+    setMounted(true);
     fetchForms();
+    return () => {
+      setMounted(false);
+    };
   }, []);
 
   const fetchForms = async () => {
@@ -66,6 +71,22 @@ export default function FormsPage() {
     } catch (error) {
       console.error('Error saving form:', error);
       message.error('Failed to save form');
+    }
+  };
+
+  const handleDeleteForm = async (formId: string) => {
+    try {
+      const response = await fetch(`/api/forms/${formId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to delete form');
+
+      message.success('Form deleted successfully');
+      fetchForms();
+    } catch (error) {
+      console.error('Error deleting form:', error);
+      message.error('Failed to delete form');
     }
   };
 
@@ -113,21 +134,9 @@ export default function FormsPage() {
     },
   ];
 
-  const handleDeleteForm = async (formId: string) => {
-    try {
-      const response = await fetch(`/api/forms/${formId}`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) throw new Error('Failed to delete form');
-
-      message.success('Form deleted successfully');
-      fetchForms();
-    } catch (error) {
-      console.error('Error deleting form:', error);
-      message.error('Failed to delete form');
-    }
-  };
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <AdminLayout>

@@ -137,6 +137,7 @@ const BadgeManagement: React.FC = () => {
   const [selectedTemplate, setSelectedTemplate] = useState<BadgeTemplate | null>(null);
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const badgeRef = useRef<HTMLDivElement>(null);
 
   // Define default template values
@@ -213,8 +214,12 @@ const BadgeManagement: React.FC = () => {
   const [template, setTemplate] = useState<BadgeTemplate>(defaultTemplate);
 
   useEffect(() => {
+    setMounted(true);
     fetchEvents();
     fetchTemplates();
+    return () => {
+      setMounted(false);
+    };
   }, []);
 
   const fetchEvents = async () => {
@@ -849,6 +854,10 @@ const BadgeManagement: React.FC = () => {
       }));
     }
   };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <AdminLayout>
