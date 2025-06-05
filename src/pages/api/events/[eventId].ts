@@ -72,6 +72,7 @@ export default async function handler(
   const { eventId } = req.query;
 
   if (!eventId || typeof eventId !== 'string') {
+    console.error('Invalid event ID provided:', eventId);
     return res.status(400).json({ message: 'Invalid event ID' });
   }
 
@@ -87,63 +88,72 @@ export default async function handler(
 
     switch (req.method) {
       case 'GET':
-        // Get event with form details
-        const event = await Event.findById(eventId).lean() as unknown as MongoEvent;
+        try {
+          // Get event with form details
+          const event = await Event.findById(eventId).lean() as unknown as MongoEvent;
 
-        if (!event) {
-          console.error('Event not found for ID:', eventId);
-          return res.status(404).json({ message: 'Event not found' });
-        }
-
-        // Convert ObjectId to string and format dates
-        const formattedEvent = {
-          ...event,
-          _id: event._id.toString(),
-          startDate: event.startDate.toISOString(),
-          endDate: event.endDate.toISOString(),
-          registrationDeadline: event.registrationDeadline?.toISOString(),
-          createdAt: event.createdAt.toISOString(),
-          updatedAt: event.updatedAt.toISOString(),
-          formId: event.formId?.toString()
-        } as FormattedEvent;
-
-        // If event has a formId, fetch the form details
-        if (event.formId) {
-          try {
-            console.log('Fetching form for ID:', event.formId.toString());
-            const form = await Form.findById(event.formId).lean() as unknown as IFormDocument;
-            if (form) {
-              // Convert form fields to match the expected type
-              const convertedFields: FormField[] = form.fields.map(field => ({
-                id: field.id,
-                type: field.type as FormField['type'],
-                label: field.label,
-                required: field.required,
-                placeholder: field.placeholder,
-                options: field.options?.map(opt => ({ label: opt, value: opt })) || undefined,
-                validation: field.validation
-              }));
-
-              formattedEvent.form = {
-                id: form._id.toString(),
-                title: form.title,
-                fields: convertedFields
-              };
-              console.log('Form data loaded successfully');
-            } else {
-              console.error('Form not found for ID:', event.formId.toString());
-            }
-          } catch (formError) {
-            console.error('Error fetching form:', formError);
-            // Don't fail the entire request if form fetch fails
-            formattedEvent.form = undefined;
+          if (!event) {
+            console.error('Event not found for ID:', eventId);
+            return res.status(404).json({ message: 'Event not found' });
           }
+
+          // Convert ObjectId to string and format dates
+          const formattedEvent = {
+            ...event,
+            _id: event._id.toString(),
+            startDate: event.startDate.toISOString(),
+            endDate: event.endDate.toISOString(),
+            registrationDeadline: event.registrationDeadline?.toISOString(),
+            createdAt: event.createdAt.toISOString(),
+            updatedAt: event.updatedAt.toISOString(),
+            formId: event.formId?.toString()
+          } as FormattedEvent;
+
+          // If event has a formId, fetch the form details
+          if (event.formId) {
+            try {
+              console.log('Fetching form for ID:', event.formId.toString());
+              const form = await Form.findById(event.formId).lean() as unknown as IFormDocument;
+              if (form) {
+                // Convert form fields to match the expected type
+                const convertedFields: FormField[] = form.fields.map(field => ({
+                  id: field.id,
+                  type: field.type as FormField['type'],
+                  label: field.label,
+                  required: field.required,
+                  placeholder: field.placeholder,
+                  options: field.options?.map(opt => ({ label: opt, value: opt })) || undefined,
+                  validation: field.validation
+                }));
+
+                formattedEvent.form = {
+                  id: form._id.toString(),
+                  title: form.title,
+                  fields: convertedFields
+                };
+                console.log('Form data loaded successfully');
+              } else {
+                console.error('Form not found for ID:', event.formId.toString());
+              }
+            } catch (formError) {
+              console.error('Error fetching form:', formError);
+              // Don't fail the entire request if form fetch fails
+              formattedEvent.form = undefined;
+            }
+          }
+
+          // Remove the raw formId from response to prevent circular references
+          const { formId, ...eventData } = formattedEvent;
+
+          // Set appropriate headers
+          res.setHeader('Cache-Control', 'no-store, must-revalidate');
+          res.setHeader('Content-Type', 'application/json');
+
+          return res.status(200).json(eventData);
+        } catch (error) {
+          console.error('Error processing event:', error);
+          return res.status(500).json({ message: 'Internal server error while processing event' });
         }
-
-        // Remove the raw formId from response to prevent circular references
-        const { formId, ...eventData } = formattedEvent;
-
-        return res.status(200).json(eventData);
 
       case 'PUT':
         const updates = req.body;

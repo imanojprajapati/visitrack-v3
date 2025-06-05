@@ -41,24 +41,12 @@ export default function EventRegistration() {
       // Add console log for debugging
       console.log('Fetching event details for ID:', eventId);
 
-      const response = await fetch(`/api/events/${eventId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+      const eventData = await fetchApi(`events/${eventId}`, {
+        method: 'GET',
+        retries: 3,
+        retryDelay: 1000,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('API Error Response:', {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorData
-        });
-        throw new Error(errorData.message || `Failed to load event details (${response.status})`);
-      }
-      
-      const eventData = await response.json();
       console.log('Event data received:', eventData);
 
       if (!eventData) {
