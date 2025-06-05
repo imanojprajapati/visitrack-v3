@@ -438,9 +438,25 @@ const QRScanner: React.FC = () => {
   const handleManualEntry = async (values: ManualEntryFormData) => {
     try {
       setLoading(true);
-      await processQRData(values.visitorId);
+      
+      // Call the manual entry API endpoint
+      const response = await fetch('/api/visitors/manual-entry', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ visitorId: values.visitorId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to process manual entry');
+      }
+
+      // Refresh the scans list
+      await fetchQRScans();
+      
       setShowManualEntry(false);
       form.resetFields();
+      messageApi?.success('Manual entry processed successfully');
     } catch (error) {
       console.error('Error processing manual entry:', error);
       messageApi?.error({
