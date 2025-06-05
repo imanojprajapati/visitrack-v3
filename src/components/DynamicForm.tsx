@@ -1,5 +1,5 @@
 import React from 'react';
-import { Form, Input, InputNumber, Select, Checkbox, Radio, DatePicker } from 'antd';
+import { Form, Input, InputNumber, Select, DatePicker } from 'antd';
 import type { Rule } from 'antd/lib/form';
 import { FormField, FormTemplate } from '../utils/formBuilder';
 
@@ -70,6 +70,9 @@ const renderField = (field: FormField): React.ReactNode => {
     case 'text':
       return <Input placeholder={field.placeholder} />;
 
+    case 'textarea':
+      return <Input.TextArea rows={4} placeholder={field.placeholder} />;
+
     case 'number':
       return <InputNumber style={{ width: '100%' }} placeholder={field.placeholder} />;
 
@@ -88,28 +91,6 @@ const renderField = (field: FormField): React.ReactNode => {
             </Select.Option>
           ))}
         </Select>
-      );
-
-    case 'checkbox':
-      return (
-        <Checkbox.Group>
-          {field.options?.map((option) => (
-            <Checkbox key={option.value} value={option.value}>
-              {option.label}
-            </Checkbox>
-          ))}
-        </Checkbox.Group>
-      );
-
-    case 'radio':
-      return (
-        <Radio.Group>
-          {field.options?.map((option) => (
-            <Radio key={option.value} value={option.value}>
-              {option.label}
-            </Radio>
-          ))}
-        </Radio.Group>
       );
 
     case 'date':

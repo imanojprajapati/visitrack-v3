@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { Card, Input, Button, message, Steps, Form, Typography, Space, Divider, Result } from 'antd';
+import { Card, Input, Button, message, Steps, Form, Typography, Space, Divider, Result, Spin, Alert } from 'antd';
 import { MailOutlined, SafetyOutlined, UserOutlined, QrcodeOutlined, DownloadOutlined } from '@ant-design/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { jsPDF } from 'jspdf';
@@ -10,7 +10,7 @@ import { Event } from '../../../types/event';
 import { Visitor } from '../../../types/visitor';
 import ReactDOM from 'react-dom/client';
 import { fetchApi, buildApiUrl } from '../../../utils/api';
-import { FormBuilder, FormField } from '../../../utils/formBuilder';
+import { FormBuilder, FormField, FormTemplate } from '../../../utils/formBuilder';
 import { Rule } from 'antd/es/form';
 import dayjs from 'dayjs';
 
@@ -34,15 +34,31 @@ export default function EventRegistration() {
       setLoading(true);
       setError(null);
       
+      if (!eventId) {
+        throw new Error('Event ID is required');
+      }
+
       const response = await fetch(`/api/events/${eventId}`);
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({}));
         throw new Error(errorData.message || 'Failed to load event details');
       }
       
       const eventData = await response.json();
       if (!eventData) {
         throw new Error('Event not found');
+      }
+
+      // Validate event data
+      if (!eventData.title || !eventData.startDate || !eventData.endDate) {
+        throw new Error('Invalid event data');
+      }
+
+      // Validate form data if present
+      if (eventData.form) {
+        if (!Array.isArray(eventData.form.fields)) {
+          throw new Error('Invalid form structure');
+        }
       }
       
       setEvent(eventData);
@@ -73,8 +89,15 @@ export default function EventRegistration() {
   }, [currentStep, event]);
 
   const handleSendOTP = async (values: { email: string }) => {
-    setLoading(true);
     try {
+      setLoading(true);
+      setError(null);
+
+      // Validate email
+      if (!values.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) {
+        throw new Error('Please enter a valid email address');
+      }
+
       // First check if user is already registered
       const checkResponse = await fetchApi('visitors/check-registration', {
         method: 'POST',
@@ -99,6 +122,7 @@ export default function EventRegistration() {
       message.success('OTP sent to your email');
     } catch (error) {
       console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to process request');
       message.error(error instanceof Error ? error.message : 'Failed to process request');
     } finally {
       setLoading(false);
@@ -106,10 +130,17 @@ export default function EventRegistration() {
   };
 
   const handleVerifyOTP = async (values: { otp: string }) => {
-    setLoading(true);
     try {
+      setLoading(true);
+      setError(null);
+
+      // Validate OTP
+      if (!values.otp || !/^\d{6}$/.test(values.otp)) {
+        throw new Error('Please enter a valid 6-digit OTP');
+      }
+
       const email = form.getFieldValue('email');
-      const response = await fetchApi('auth/verify-otp', {
+      await fetchApi('auth/verify-otp', {
         method: 'POST',
         body: JSON.stringify({
           email,
@@ -118,25 +149,26 @@ export default function EventRegistration() {
       });
 
       if (!event?.form) {
-        console.error('No form data available for event:', event);
-        message.error('This event has no registration form');
-        return;
+        throw new Error('This event has no registration form');
       }
+
       setCurrentStep(2);
       message.success('OTP verified successfully');
     } catch (error) {
       console.error('Error in OTP verification:', error);
       if (error instanceof Error) {
         if (error.message.includes('No valid OTP found')) {
-          message.error('OTP has expired. Please request a new OTP.');
+          setError('OTP has expired. Please request a new OTP.');
         } else if (error.message.includes('Too many failed attempts')) {
-          message.error('Too many failed attempts. Please request a new OTP.');
+          setError('Too many failed attempts. Please request a new OTP.');
         } else if (error.message.includes('Invalid OTP')) {
-          message.error('Invalid OTP. Please try again.');
+          setError('Invalid OTP. Please try again.');
         } else {
-          message.error(error.message);
+          setError(error.message);
         }
+        message.error(error.message);
       } else {
+        setError('Failed to verify OTP. Please try again.');
         message.error('Failed to verify OTP. Please try again.');
       }
     } finally {
@@ -145,11 +177,18 @@ export default function EventRegistration() {
   };
 
   const handleRegistration = async (values: any) => {
-    setLoading(true);
     try {
+      setLoading(true);
+      setError(null);
+
       // Validate required fields
       if (!event?.form?.fields) {
         throw new Error('Form configuration is missing');
+      }
+
+      const email = form.getFieldValue('email');
+      if (!email) {
+        throw new Error('Email is required');
       }
 
       // Format form data to match the expected structure
@@ -184,57 +223,33 @@ export default function EventRegistration() {
         return acc;
       }, {} as Record<string, any>);
 
-      // Ensure source field exists
+      // Add source field
       formData.source = {
         label: 'Source',
         value: 'Website',
         type: 'text'
       };
 
-      // Extract name and phone from form data
-      const name = formData.name?.value || '';
-      const phone = formData.phone?.value || '';
-      const email = form.getFieldValue('email');
-
-      // Validate email
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        throw new Error('Please enter a valid email address');
-      }
-
-      const response = await fetch('/api/visitors/register', {
+      // Submit registration
+      const response = await fetchApi('visitors/register', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           eventId,
-          name,
           email,
-          phone,
           formData
         }),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ message: 'Registration failed' }));
-        throw new Error(errorData.message || 'Registration failed');
+      if (!response.visitor) {
+        throw new Error('Failed to create visitor registration');
       }
 
-      const data = await response.json();
-      
-      if (!data.visitor) {
-        throw new Error('Invalid response from server');
-      }
-      
-      setVisitor(data.visitor);
+      setVisitor(response.visitor);
       setCurrentStep(3);
-      
-      // Refresh event data to get updated visitor count
-      await fetchEventDetails();
-      
-      message.success('Registration successful!');
+      message.success('Registration successful');
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error in registration:', error);
+      setError(error instanceof Error ? error.message : 'Failed to complete registration');
       message.error(error instanceof Error ? error.message : 'Failed to complete registration');
     } finally {
       setLoading(false);
@@ -554,6 +569,176 @@ export default function EventRegistration() {
     }
   };
 
+  const renderStepContent = () => {
+    if (!event) {
+      return null;
+    }
+
+    switch (currentStep) {
+      case 0:
+        return (
+          <Form
+            form={form}
+            onFinish={handleSendOTP}
+            layout="vertical"
+            className="max-w-sm mx-auto"
+          >
+            <Form.Item
+              name="email"
+              label="Email"
+              rules={[
+                { required: true, message: 'Please enter your email' },
+                { type: 'email', message: 'Please enter a valid email' }
+              ]}
+            >
+              <Input prefix={<MailOutlined />} placeholder="Enter your email" />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" loading={loading} block>
+                Send OTP
+              </Button>
+            </Form.Item>
+          </Form>
+        );
+
+      case 1:
+        return (
+          <Form
+            form={form}
+            onFinish={handleVerifyOTP}
+            layout="vertical"
+            className="max-w-sm mx-auto"
+          >
+            <Form.Item
+              name="otp"
+              label="OTP"
+              rules={[
+                { required: true, message: 'Please enter the OTP' },
+                { pattern: /^\d{6}$/, message: 'Please enter a valid 6-digit OTP' }
+              ]}
+            >
+              <Input prefix={<SafetyOutlined />} placeholder="Enter 6-digit OTP" />
+            </Form.Item>
+            <Form.Item>
+              <Button type="primary" htmlType="submit" loading={loading} block>
+                Verify OTP
+              </Button>
+            </Form.Item>
+          </Form>
+        );
+
+      case 2:
+        if (!event.form) {
+          return (
+            <Result
+              status="error"
+              title="Form not found"
+              subTitle="The registration form for this event is not available."
+            />
+          );
+        }
+
+        // Create form template from event form fields
+        const template: FormTemplate = {
+          id: 'registration-form',
+          name: 'Registration Form',
+          description: 'Please fill in your details',
+          fields: event.form.fields.map(field => {
+            // Map field type to supported DynamicForm field type
+            let fieldType: FormField['type'] = 'text';
+            const fieldTypeStr = field.type as string;
+            if (fieldTypeStr === 'phone' || fieldTypeStr === 'tel') {
+              fieldType = 'phone';
+            } else if (fieldTypeStr === 'textarea') {
+              fieldType = 'textarea';
+            } else if (fieldTypeStr === 'number') {
+              fieldType = 'number';
+            } else if (fieldTypeStr === 'email') {
+              fieldType = 'email';
+            } else if (fieldTypeStr === 'date') {
+              fieldType = 'date';
+            } else if (fieldTypeStr === 'select') {
+              fieldType = 'select';
+            } else {
+              fieldType = 'text';
+            }
+
+            return {
+              id: field.id,
+              label: field.label,
+              type: fieldType,
+              required: field.required,
+              placeholder: field.placeholder,
+              options: field.options,
+              validation: field.validation ? [
+                ...(field.validation.min !== undefined ? [{
+                  type: 'number' as const,
+                  min: field.validation.min,
+                  message: `Minimum value is ${field.validation.min}`
+                }] : []),
+                ...(field.validation.max !== undefined ? [{
+                  type: 'number' as const,
+                  max: field.validation.max,
+                  message: `Maximum value is ${field.validation.max}`
+                }] : []),
+                ...(field.validation.pattern ? [{
+                  pattern: new RegExp(field.validation.pattern),
+                  message: 'Invalid format'
+                }] : [])
+              ] : []
+            };
+          })
+        };
+
+        return (
+          <DynamicForm
+            template={template}
+            onFinish={handleRegistration}
+            onFinishFailed={(errorInfo) => {
+              console.error('Form validation failed:', errorInfo);
+              message.error('Please fill in all required fields correctly');
+            }}
+          />
+        );
+
+      case 3:
+        if (!visitor) {
+          return (
+            <Result
+              status="error"
+              title="Visitor information not found"
+              subTitle="Please try registering again."
+            />
+          );
+        }
+        return (
+          <div className="text-center">
+            <Result
+              status="success"
+              title="Registration Successful!"
+              subTitle={`You have successfully registered for ${event.title}`}
+            />
+            <div className="mt-8">
+              <QRCodeSVG value={generateQRCodeData(visitor)} size={200} />
+            </div>
+            <div className="mt-4">
+              <Space>
+                <Button type="primary" onClick={handleDownloadQR}>
+                  <DownloadOutlined /> Download QR Code
+                </Button>
+                <Button onClick={handleDownloadPDF}>
+                  <DownloadOutlined /> Download PDF
+                </Button>
+              </Space>
+            </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
@@ -564,12 +749,16 @@ export default function EventRegistration() {
               title="Failed to load event"
               subTitle={error}
               extra={[
-                <Button key="retry" type="primary" onClick={() => {
-                  setError(null);
-                  if (eventId) {
-                    fetchEventDetails();
-                  }
-                }}>
+                <Button
+                  key="retry"
+                  type="primary"
+                  onClick={() => {
+                    setError(null);
+                    if (eventId) {
+                      fetchEventDetails();
+                    }
+                  }}
+                >
                   Try Again
                 </Button>
               ]}
@@ -580,10 +769,33 @@ export default function EventRegistration() {
     );
   }
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="shadow-lg">
+            <div className="text-center">
+              <Spin size="large" />
+              <div className="mt-4">Loading...</div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   if (!event) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Card className="shadow-lg">
+            <Result
+              status="404"
+              title="Event not found"
+              subTitle="The event you are looking for does not exist."
+            />
+          </Card>
+        </div>
       </div>
     );
   }
@@ -690,247 +902,35 @@ export default function EventRegistration() {
     );
   }
 
-  if (currentStep === 3 && visitor && event) {
-    const eventTitle = event?.title || 'Event';
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <Head>
-          <title>Registration Successful - {eventTitle}</title>
-        </Head>
-
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Card className="shadow-lg">
-            <Result
-              status="success"
-              title="Registration Successful"
-              subTitle={`You have successfully registered for ${eventTitle}`}
-              extra={[
-                <div key="qr" className="text-center">
-                  <RegistrationDetails visitor={visitor} />
-                  <Space>
-                    <Button
-                      icon={<DownloadOutlined />}
-                      onClick={handleDownloadQR}
-                      size="large"
-                    >
-                      Download QR Code
-                    </Button>
-                    <Button
-                      icon={<DownloadOutlined />}
-                      onClick={handleDownloadPDF}
-                      type="primary"
-                      size="large"
-                    >
-                      Download PDF
-                    </Button>
-                  </Space>
-                </div>
-              ]}
-            />
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Registration form
-  if (currentStep === 2 && event?.form) {
-    const template = FormBuilder.createTemplate(
-      'Registration Form',
-      event.form.fields.map(field => {
-        // Convert validation object to antd Rule array
-        const validation: Rule[] = [];
-        if (field.validation) {
-          if (field.validation.min !== undefined) {
-            validation.push({ type: 'number', min: field.validation.min, message: `Minimum value is ${field.validation.min}` });
-          }
-          if (field.validation.max !== undefined) {
-            validation.push({ type: 'number', max: field.validation.max, message: `Maximum value is ${field.validation.max}` });
-          }
-          if (field.validation.pattern) {
-            validation.push({ pattern: new RegExp(field.validation.pattern), message: 'Invalid format' });
-          }
-        }
-
-        return {
-          id: field.id,
-          label: field.label,
-          type: field.type === 'tel' ? 'phone' : field.type === 'textarea' ? 'text' : field.type as FormField['type'],
-          required: field.required || false,
-          validation: validation.length > 0 ? validation : undefined,
-          placeholder: field.placeholder,
-          options: field.options?.map(opt => ({ label: opt.label, value: opt.value }))
-        };
-      }),
-      'Event registration form'
-    );
-
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <Head>
-          <title>Register for {event?.title || 'Event'} - Visitrack</title>
-        </Head>
-
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Card className="shadow-lg">
-            <div className="text-center mb-8">
-              <Title level={2}>{event.title}</Title>
-              <Text type="secondary">{event.description}</Text>
-              <div className="mt-4">
-                <Text type="secondary">
-                  Location: {event.location} | 
-                  Date: {new Date(event.startDate).toLocaleDateString()} | 
-                  Capacity: {event.visitors}/{event.capacity}
-                </Text>
-              </div>
-            </div>
-
-            <Steps current={currentStep} className="mb-8">
-              <Step title="Email" icon={<MailOutlined />} />
-              <Step title="Verify" icon={<SafetyOutlined />} />
-              <Step title="Register" icon={<UserOutlined />} />
-              <Step title="QR Code" icon={<QrcodeOutlined />} />
-            </Steps>
-
-            <DynamicForm
-              template={template}
-              onFinish={handleRegistration}
-              onFinishFailed={(errorInfo) => {
-                console.error('Form validation failed:', errorInfo);
-                message.error('Please fill in all required fields correctly');
-              }}
-            />
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Email form
-  if (currentStep === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <Head>
-          <title>Register for {event?.title || 'Event'} - Visitrack</title>
-        </Head>
-
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Card className="shadow-lg">
-            <div className="text-center mb-8">
-              <Title level={2}>{event?.title || 'Event Registration'}</Title>
-              <Text type="secondary">{event?.description}</Text>
-              {event && (
-                <div className="mt-4">
-                  <Text type="secondary">
-                    Location: {event.location} | 
-                    Date: {new Date(event.startDate).toLocaleDateString()} | 
-                    Capacity: {event.visitors}/{event.capacity}
-                  </Text>
-                </div>
-              )}
-            </div>
-
-            <Steps current={currentStep} className="mb-8">
-              <Step title="Email" icon={<MailOutlined />} />
-              <Step title="Verify" icon={<SafetyOutlined />} />
-              <Step title="Register" icon={<UserOutlined />} />
-              <Step title="QR Code" icon={<QrcodeOutlined />} />
-            </Steps>
-
-            <Form form={form} onFinish={handleSendOTP} layout="vertical">
-              <Form.Item
-                name="email"
-                label="Email"
-                rules={[
-                  { required: true, message: 'Please enter your email' },
-                  { type: 'email', message: 'Please enter a valid email' }
-                ]}
-              >
-                <Input prefix={<MailOutlined />} placeholder="Enter your email" />
-              </Form.Item>
-
-              <Form.Item>
-                <Button type="primary" htmlType="submit" loading={loading} block>
-                  Send OTP
-                </Button>
-              </Form.Item>
-            </Form>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // OTP verification form
-  if (currentStep === 1) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-12">
-        <Head>
-          <title>Verify OTP - Visitrack</title>
-        </Head>
-
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <Card className="shadow-lg">
-            <div className="text-center mb-8">
-              <Title level={2}>Verify OTP</Title>
-              <Text type="secondary">
-                Please enter the OTP sent to your email: {form.getFieldValue('email')}
-              </Text>
-            </div>
-
-            <Steps current={currentStep} className="mb-8">
-              <Step title="Email" icon={<MailOutlined />} />
-              <Step title="Verify" icon={<SafetyOutlined />} />
-              <Step title="Register" icon={<UserOutlined />} />
-              <Step title="QR Code" icon={<QrcodeOutlined />} />
-            </Steps>
-
-            <Form form={form} onFinish={handleVerifyOTP} layout="vertical">
-              <Form.Item
-                name="otp"
-                label="OTP"
-                rules={[
-                  { required: true, message: 'Please enter the OTP' },
-                  { pattern: /^\d{6}$/, message: 'OTP must be 6 digits' }
-                ]}
-              >
-                <Input placeholder="Enter 6-digit OTP" maxLength={6} />
-              </Form.Item>
-
-              <Form.Item>
-                <Space direction="vertical" style={{ width: '100%' }}>
-                  <Button type="primary" htmlType="submit" loading={loading} block>
-                    Verify OTP
-                  </Button>
-                  <Button 
-                    type="link" 
-                    onClick={() => setCurrentStep(0)} 
-                    block
-                  >
-                    Back to Email
-                  </Button>
-                </Space>
-              </Form.Item>
-            </Form>
-          </Card>
-        </div>
-      </div>
-    );
-  }
-
-  // Loading or error state
   return (
     <div className="min-h-screen bg-gray-50 py-12">
       <Head>
-        <title>Loading - Visitrack</title>
+        <title>Register - {event.title}</title>
       </Head>
-
+      {contextHolder}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <Card className="shadow-lg">
-          <div className="text-center">
-            <Title level={2}>Loading...</Title>
-            <Text type="secondary">Please wait while we load the event details.</Text>
+          <div className="text-center mb-8">
+            <Title level={2}>{event.title}</Title>
+            <Text type="secondary">
+              {formatDate(event.startDate)} - {formatDate(event.endDate)}
+            </Text>
           </div>
+
+          <Steps current={currentStep} className="mb-8">
+            <Step title="Email" icon={<MailOutlined />} />
+            <Step title="Verify" icon={<SafetyOutlined />} />
+            <Step title="Details" icon={<UserOutlined />} />
+            <Step title="Complete" icon={<QrcodeOutlined />} />
+          </Steps>
+
+          {error && (
+            <div className="mb-4">
+              <Alert message={error} type="error" showIcon />
+            </div>
+          )}
+
+          {renderStepContent()}
         </Card>
       </div>
     </div>

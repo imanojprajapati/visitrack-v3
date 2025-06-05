@@ -3,7 +3,7 @@ import { Rule } from 'antd/lib/form';
 export interface FormField {
   id: string;
   label: string;
-  type: 'text' | 'number' | 'email' | 'phone' | 'select' | 'checkbox' | 'radio' | 'date';
+  type: 'text' | 'number' | 'email' | 'phone' | 'date' | 'select' | 'checkbox' | 'radio' | 'textarea';
   required?: boolean;
   options?: { label: string; value: string | number }[];
   validation?: Rule[];

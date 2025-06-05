@@ -3,7 +3,7 @@ export interface FormFieldOption {
   value: string;
 }
 
-export type FormFieldType = 'text' | 'email' | 'number' | 'tel' | 'date' | 'select' | 'textarea';
+export type FormFieldType = 'text' | 'email' | 'number' | 'phone' | 'date' | 'select' | 'textarea';
 
 export interface FormField {
   id: string;

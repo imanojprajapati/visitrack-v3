@@ -3,7 +3,7 @@ import { connectToDatabase } from '../../../lib/mongodb';
 import Event, { IEvent } from '../../../models/Event';
 import Form from '../../../models/Form';
 import { EventForm, FormField } from '../../../types/form';
-import mongoose from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 
 interface IFormField {
   id: string;
@@ -19,7 +19,7 @@ interface IFormField {
   };
 }
 
-interface IFormDocument {
+interface IFormDocument extends Document {
   _id: mongoose.Types.ObjectId;
   eventId: mongoose.Types.ObjectId;
   title: string;
@@ -28,10 +28,42 @@ interface IFormDocument {
   updatedAt: Date;
 }
 
-interface EventWithForm extends Omit<IEvent, 'formId'> {
+type MongoEvent = {
+  _id: mongoose.Types.ObjectId;
+  title: string;
+  description: string;
+  location: string;
+  startDate: Date;
+  endDate: Date;
+  time: string;
+  endTime: string;
+  status: string;
+  capacity: number;
+  visitors: number;
   formId?: mongoose.Types.ObjectId;
+  registrationDeadline?: Date;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type FormattedEvent = {
+  _id: string;
+  title: string;
+  description: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+  time: string;
+  endTime: string;
+  status: string;
+  capacity: number;
+  visitors: number;
+  registrationDeadline?: string;
+  createdAt: string;
+  updatedAt: string;
   form?: EventForm;
-}
+  formId?: string;
+};
 
 export default async function handler(
   req: NextApiRequest,
@@ -43,69 +75,71 @@ export default async function handler(
     return res.status(400).json({ message: 'Invalid event ID' });
   }
 
-  // Connect to database
-  await connectToDatabase();
+  try {
+    // Connect to database
+    await connectToDatabase();
 
-  // Validate MongoDB ObjectId
-  if (!mongoose.Types.ObjectId.isValid(eventId)) {
-    return res.status(400).json({ message: 'Invalid event ID format' });
-  }
+    // Validate MongoDB ObjectId
+    if (!mongoose.Types.ObjectId.isValid(eventId)) {
+      return res.status(400).json({ message: 'Invalid event ID format' });
+    }
 
-  switch (req.method) {
-    case 'GET':
-      try {
+    switch (req.method) {
+      case 'GET':
         // Get event with form details
-        const event = await Event.findById(eventId).lean() as EventWithForm | null;
+        const event = await Event.findById(eventId).lean() as unknown as MongoEvent;
 
         if (!event) {
           return res.status(404).json({ message: 'Event not found' });
         }
 
-        // Convert dates to ISO strings for consistent formatting
+        // Convert ObjectId to string and format dates
         const formattedEvent = {
           ...event,
-          startDate: event.startDate?.toISOString(),
-          endDate: event.endDate?.toISOString(),
+          _id: event._id.toString(),
+          startDate: event.startDate.toISOString(),
+          endDate: event.endDate.toISOString(),
           registrationDeadline: event.registrationDeadline?.toISOString(),
-          createdAt: event.createdAt?.toISOString(),
-          updatedAt: event.updatedAt?.toISOString(),
-        };
+          createdAt: event.createdAt.toISOString(),
+          updatedAt: event.updatedAt.toISOString(),
+          formId: event.formId?.toString()
+        } as FormattedEvent;
 
         // If event has a formId, fetch the form details
-        if (formattedEvent.formId) {
-          const form = await Form.findById(formattedEvent.formId).lean() as IFormDocument | null;
-          if (form) {
-            // Convert form fields to match the expected type
-            const convertedFields: FormField[] = form.fields.map(field => ({
-              id: field.id,
-              type: field.type as FormField['type'],
-              label: field.label,
-              required: field.required,
-              placeholder: field.placeholder,
-              options: field.options?.map(opt => ({ label: opt, value: opt })) || undefined,
-              validation: field.validation
-            }));
+        if (event.formId) {
+          try {
+            const form = await Form.findById(event.formId).lean() as unknown as IFormDocument;
+            if (form) {
+              // Convert form fields to match the expected type
+              const convertedFields: FormField[] = form.fields.map(field => ({
+                id: field.id,
+                type: field.type as FormField['type'],
+                label: field.label,
+                required: field.required,
+                placeholder: field.placeholder,
+                options: field.options?.map(opt => ({ label: opt, value: opt })) || undefined,
+                validation: field.validation
+              }));
 
-            formattedEvent.form = {
-              id: form._id.toString(),
-              title: form.title,
-              fields: convertedFields
-            };
+              formattedEvent.form = {
+                id: form._id.toString(),
+                title: form.title,
+                fields: convertedFields
+              };
+            }
+          } catch (formError) {
+            console.error('Error fetching form:', formError);
+            // Don't fail the entire request if form fetch fails
+            formattedEvent.form = undefined;
           }
         }
 
-        // Remove the raw formId from response
+        // Remove the raw formId from response to prevent circular references
         const { formId, ...eventData } = formattedEvent;
 
-        res.status(200).json(eventData);
-      } catch (error) {
-        console.error('Error fetching event:', error);
-        res.status(500).json({ message: 'Failed to fetch event details' });
-      }
-      break;
+        return res.status(200).json(eventData);
 
-    case 'PUT':
-      try {
+      case 'PUT':
         const updates = req.body;
 
         // Validate request body
@@ -129,14 +163,6 @@ export default async function handler(
           }
         }
 
-        // Validate required fields
-        const requiredFields = ['title', 'startDate', 'status'];
-        for (const field of requiredFields) {
-          if (!updates[field]) {
-            return res.status(400).json({ message: `${field} is required` });
-          }
-        }
-
         // Update event
         const updatedEvent = await Event.findByIdAndUpdate(
           eventId,
@@ -148,37 +174,31 @@ export default async function handler(
             new: true, 
             runValidators: true
           }
-        ) as IEvent | null;
+        ).lean() as unknown as MongoEvent;
 
         if (!updatedEvent) {
           return res.status(404).json({ message: 'Event not found' });
         }
 
-        // Convert to plain object and format dates
-        const eventObj = updatedEvent.toObject();
-        const formattedEvent = {
-          ...eventObj,
-          _id: eventObj._id.toString(),
-          startDate: eventObj.startDate?.toISOString(),
-          endDate: eventObj.endDate?.toISOString(),
-          registrationDeadline: eventObj.registrationDeadline?.toISOString(),
-          createdAt: eventObj.createdAt?.toISOString(),
-          updatedAt: eventObj.updatedAt?.toISOString(),
-          formId: eventObj.formId?.toString()
+        // Format response
+        const formattedUpdatedEvent = {
+          ...updatedEvent,
+          _id: updatedEvent._id.toString(),
+          startDate: updatedEvent.startDate.toISOString(),
+          endDate: updatedEvent.endDate.toISOString(),
+          registrationDeadline: updatedEvent.registrationDeadline?.toISOString(),
+          createdAt: updatedEvent.createdAt.toISOString(),
+          updatedAt: updatedEvent.updatedAt.toISOString(),
+          formId: updatedEvent.formId?.toString()
         };
 
-        res.status(200).json(formattedEvent);
-      } catch (error) {
-        console.error('Error updating event:', error);
-        if (error instanceof Error) {
-          res.status(500).json({ message: error.message });
-        } else {
-          res.status(500).json({ message: 'Failed to update event' });
-        }
-      }
-      break;
+        return res.status(200).json(formattedUpdatedEvent);
 
-    default:
-      res.status(405).json({ message: 'Method not allowed' });
+      default:
+        return res.status(405).json({ message: 'Method not allowed' });
+    }
+  } catch (error) {
+    console.error('Error handling event request:', error);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 } 

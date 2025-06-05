@@ -26,7 +26,7 @@ const DEFAULT_FIELDS: FormField[] = [
   },
   {
     id: 'phone',
-    type: 'tel',
+    type: 'phone',
     label: 'Phone Number',
     required: true,
     placeholder: 'Enter your phone number'
