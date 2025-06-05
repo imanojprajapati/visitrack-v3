@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { connectToDatabase } from '../../../lib/mongodb';
 import BadgeTemplate from '../../../models/BadgeTemplate';
 import { uploadToCloudinary, deleteFromCloudinary } from '../../../lib/cloudinary';
+import { handleApiError, ApiError, validateMongoId } from '../../../utils/api-error';
 import mongoose from 'mongoose';
 
 export default async function handler(
@@ -9,28 +10,39 @@ export default async function handler(
   res: NextApiResponse
 ) {
   try {
-    // Connect to database
     await connectToDatabase();
 
     switch (req.method) {
       case 'GET':
         const { eventId } = req.query;
-        const query = eventId ? { eventId } : {};
         
+        if (eventId) {
+          validateMongoId(eventId as string, 'Event ID');
+        }
+        
+        const query = eventId ? { eventId: new mongoose.Types.ObjectId(eventId as string) } : {};
         const templates = await BadgeTemplate.find(query)
           .sort({ createdAt: -1 })
           .lean();
 
-        res.status(200).json(templates);
-        break;
+        return res.status(200).json(templates);
 
       case 'POST':
+        const templateData = { ...req.body };
+
+        if (!templateData.eventId) {
+          throw new ApiError(400, 'Event ID is required');
+        }
+
+        validateMongoId(templateData.eventId, 'Event ID');
+
         try {
-          const templateData = { ...req.body };
-          
           // Handle logo upload if provided
           if (templateData.logo?.enabled && templateData.logo?.imageData) {
             const logoResult = await uploadToCloudinary(templateData.logo.imageData, 'badge-templates/logos');
+            if (!logoResult?.url) {
+              throw new ApiError(500, 'Failed to upload logo');
+            }
             templateData.logo.cloudinaryUrl = logoResult.url;
             templateData.logo.cloudinaryPublicId = logoResult.publicId;
             delete templateData.logo.imageData;
@@ -39,6 +51,9 @@ export default async function handler(
           // Handle photo upload if provided
           if (templateData.photo?.enabled && templateData.photo?.imageData) {
             const photoResult = await uploadToCloudinary(templateData.photo.imageData, 'badge-templates/photos');
+            if (!photoResult?.url) {
+              throw new ApiError(500, 'Failed to upload photo');
+            }
             templateData.photo.cloudinaryUrl = photoResult.url;
             templateData.photo.cloudinaryPublicId = photoResult.publicId;
             delete templateData.photo.imageData;
@@ -47,6 +62,9 @@ export default async function handler(
           // Handle background upload if provided
           if (templateData.background?.imageData) {
             const bgResult = await uploadToCloudinary(templateData.background.imageData, 'badge-templates/backgrounds');
+            if (!bgResult?.url) {
+              throw new ApiError(500, 'Failed to upload background');
+            }
             templateData.background = {
               cloudinaryUrl: bgResult.url,
               cloudinaryPublicId: bgResult.publicId
@@ -57,26 +75,20 @@ export default async function handler(
           templateData.eventId = new mongoose.Types.ObjectId(templateData.eventId);
 
           const template = await BadgeTemplate.create(templateData);
-          res.status(201).json(template);
-        } catch (createError: any) {
-          console.error('Error creating badge template:', createError);
-          
-          if (createError.name === 'ValidationError') {
-            const validationErrors = Object.keys(createError.errors).map(key => ({
-              field: key,
-              message: createError.errors[key].message,
-              value: createError.errors[key].value
-            }));
-            
-            return res.status(400).json({
-              error: 'Validation Error',
-              details: validationErrors
-            });
+          return res.status(201).json(template);
+        } catch (error) {
+          // Clean up any uploaded images if template creation fails
+          if (templateData.logo?.cloudinaryPublicId) {
+            await deleteFromCloudinary(templateData.logo.cloudinaryPublicId);
           }
-          
-          throw createError;
+          if (templateData.photo?.cloudinaryPublicId) {
+            await deleteFromCloudinary(templateData.photo.cloudinaryPublicId);
+          }
+          if (templateData.background?.cloudinaryPublicId) {
+            await deleteFromCloudinary(templateData.background.cloudinaryPublicId);
+          }
+          throw error;
         }
-        break;
 
       case 'DELETE':
         const { id } = req.query;
@@ -112,16 +124,9 @@ export default async function handler(
 
       default:
         res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
-        res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+        throw new ApiError(405, `Method ${req.method} Not Allowed`);
     }
-  } catch (error: any) {
-    console.error('Error handling badge templates:', error);
-    
-    res.status(500).json({
-      error: 'Internal Server Error',
-      message: error.message,
-      name: error.name,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-    });
+  } catch (error) {
+    handleApiError(error, res);
   }
 } 

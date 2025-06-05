@@ -2,6 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
+  output: 'standalone',
   env: {
     NEXT_PUBLIC_API_URL: process.env.NODE_ENV === 'production' 
       ? 'https://www.visitrack.in/api'
@@ -55,7 +56,10 @@ const nextConfig = {
     'rc-virtual-list'
   ],
   experimental: {
-    esmExternals: true
+    esmExternals: true,
+    serverComponentsExternalPackages: [],
+    optimizeCss: false,
+    scrollRestoration: false
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -72,6 +76,13 @@ const nextConfig = {
       exprContextCritical: false,
     };
 
+    config.cache = {
+      type: 'filesystem',
+      buildDependencies: {
+        config: [__filename]
+      }
+    };
+
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': require('path').resolve(__dirname, './src'),
@@ -82,6 +93,7 @@ const nextConfig = {
       test: /\.svg$/,
       use: ['@svgr/webpack'],
     });
+
     return config;
   },
   async headers() {

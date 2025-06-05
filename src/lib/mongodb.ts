@@ -1,10 +1,10 @@
-import mongoose, { ConnectOptions } from 'mongoose';
-
-if (!process.env.MONGODB_URI) {
-  throw new Error('Please add your Mongo URI to .env.local');
-}
+import mongoose from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI;
+
+if (!MONGODB_URI) {
+  throw new Error('Please define the MONGODB_URI environment variable inside .env.local');
+}
 
 interface MongooseCache {
   conn: typeof mongoose | null;
@@ -15,73 +15,37 @@ declare global {
   var mongoose: MongooseCache | undefined;
 }
 
-/**
- * Global is used here to maintain a cached connection across hot reloads
- * in development. This prevents connections growing exponentially
- * during API Route usage.
- */
-const cached: MongooseCache = global.mongoose || { conn: null, promise: null };
+const globalWithMongoose = global as { mongoose: MongooseCache };
 
-if (!global.mongoose) {
-  global.mongoose = cached;
+if (!globalWithMongoose.mongoose) {
+  globalWithMongoose.mongoose = { conn: null, promise: null };
 }
 
-async function connectToDatabase() {
-  if (cached.conn) {
-    // Test existing connection
-    try {
-      if (mongoose.connection.db) {
-        await mongoose.connection.db.admin().ping();
-        console.log('Using existing database connection');
-        return cached.conn;
-      }
-    } catch (error) {
-      console.log('Existing connection failed, creating new connection');
-      cached.conn = null;
-      cached.promise = null;
-    }
+export async function connectToDatabase() {
+  if (globalWithMongoose.mongoose.conn) {
+    return globalWithMongoose.mongoose.conn;
   }
 
-  if (!cached.promise) {
-    const opts: ConnectOptions = {
-      bufferCommands: false,
+  if (!globalWithMongoose.mongoose.promise) {
+    const opts = {
+      bufferCommands: true,
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 5000,
       socketTimeoutMS: 45000,
-      family: 4,
-      retryWrites: true,
-      writeConcern: {
-        w: 'majority'
-      }
+      family: 4
     };
 
-    mongoose.set('strictQuery', true);
-    cached.promise = mongoose.connect(MONGODB_URI, opts)
-      .then((mongoose) => {
-        console.log('New connection to MongoDB established');
-        return mongoose;
-      })
-      .catch((error) => {
-        console.error('Failed to connect to MongoDB:', error);
-        throw error;
-      });
+    globalWithMongoose.mongoose.promise = mongoose.connect(MONGODB_URI as string, opts).then((mongoose) => {
+      return mongoose;
+    });
   }
 
   try {
-    cached.conn = await cached.promise;
-    
-    // Test the new connection
-    if (mongoose.connection.db) {
-      await mongoose.connection.db.admin().ping();
-      console.log('Database connection is healthy');
-    }
-    
-    return cached.conn;
-  } catch (error) {
-    cached.promise = null;
-    cached.conn = null;
-    console.error('Error connecting to database:', error);
-    throw new Error(`Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    globalWithMongoose.mongoose.conn = await globalWithMongoose.mongoose.promise;
+    return globalWithMongoose.mongoose.conn;
+  } catch (e) {
+    globalWithMongoose.mongoose.promise = null;
+    throw e;
   }
 }
 
@@ -94,15 +58,14 @@ mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error:', err);
 });
 
+// Handle disconnection
 mongoose.connection.on('disconnected', () => {
   console.log('MongoDB disconnected');
-  cached.conn = null;
-  cached.promise = null;
+  globalWithMongoose.mongoose.conn = null;
+  globalWithMongoose.mongoose.promise = null;
 });
 
 process.on('SIGINT', async () => {
   await mongoose.connection.close();
   process.exit(0);
-});
-
-export { connectToDatabase }; 
+}); 

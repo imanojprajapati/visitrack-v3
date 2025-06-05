@@ -1,67 +1,62 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import type { IEvent } from '../../../models/Event';
+import { connectToDatabase } from '../../../lib/mongodb';
 import Event from '../../../models/Event';
 import mongoose from 'mongoose';
-import { connectToDatabase } from '../../../lib/mongodb';
-import { CreateEventInput } from '../../../types/event';
-import clientPromise from '../../../utils/mongodb';
-import { DB_NAME } from '../../../utils/constants';
+import { handleApiError, ApiError } from '../../../utils/api-error';
 
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
   try {
-    // Connect to database using mongoose
-    const conn = await connectToDatabase();
-    if (!conn) {
-      throw new Error('Failed to connect to database');
-    }
+    await connectToDatabase();
 
     switch (req.method) {
       case 'GET':
         try {
-          const events = await Event.find()
-            .sort({ createdAt: -1 })
+          const { status, category } = req.query;
+          const query: any = {};
+
+          // Add filters if provided
+          if (status) query.status = status;
+          if (category) query.category = category;
+
+          const events = await Event.find(query)
+            .sort({ startDate: 1 })
             .lean();
-          
-          res.status(200).json(events);
+
+          return res.status(200).json(events);
         } catch (error) {
-          console.error('Failed to fetch events:', error);
-          res.status(500).json({ error: 'Failed to fetch events' });
+          throw new ApiError(500, 'Failed to fetch events', error);
         }
-        break;
-      
+
       case 'POST':
         try {
           const eventData = req.body;
-          
-          console.log('Received event data:', eventData);
 
           // Validate required fields
-          if (!eventData.title || !eventData.location || !eventData.startDate || 
-              !eventData.endDate || !eventData.time || !eventData.endTime) {
-            console.error('Missing required fields:', {
-              title: !eventData.title,
-              location: !eventData.location,
-              startDate: !eventData.startDate,
-              endDate: !eventData.endDate,
-              time: !eventData.time,
-              endTime: !eventData.endTime
-            });
-            return res.status(400).json({ error: 'Missing required fields' });
+          if (!eventData.title) {
+            throw new ApiError(400, 'Event title is required');
+          }
+          if (!eventData.location) {
+            throw new ApiError(400, 'Event location is required');
+          }
+          if (!eventData.startDate) {
+            throw new ApiError(400, 'Event start date is required');
           }
 
-          // Validate dates
+          // Parse dates
           const startDate = new Date(eventData.startDate);
-          const endDate = new Date(eventData.endDate);
+          const endDate = eventData.endDate ? new Date(eventData.endDate) : startDate;
 
-          if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-            console.error('Invalid date format:', { startDate: eventData.startDate, endDate: eventData.endDate });
-            return res.status(400).json({ error: 'Invalid date format' });
+          if (isNaN(startDate.getTime())) {
+            throw new ApiError(400, 'Invalid start date format');
+          }
+          if (isNaN(endDate.getTime())) {
+            throw new ApiError(400, 'Invalid end date format');
           }
 
-          // Create new event with proper initialization
+          // Create new event
           const newEvent = {
             title: eventData.title,
             description: eventData.description || '',
@@ -78,36 +73,28 @@ export default async function handler(
             banner: eventData.banner || '',
             registrationDeadline: eventData.registrationDeadline ? new Date(eventData.registrationDeadline) : undefined,
             formId: eventData.formId ? new mongoose.Types.ObjectId(eventData.formId) : undefined,
-            visitors: 0 // Initialize visitor count to 0
+            visitors: 0
           };
 
-          // Use the Event model to create the event
           const event = await Event.create(newEvent);
 
-          res.status(201).json({ 
+          return res.status(201).json({
             success: true,
             message: 'Event created successfully',
             event: event
           });
-        } catch (error: any) {
-          console.error('Error creating event:', error);
-          res.status(500).json({ 
-            error: 'Failed to create event',
-            message: error.message,
-            details: error.errors // Include validation errors in response
-          });
+        } catch (error) {
+          if (error instanceof Error && error.name === 'ValidationError') {
+            throw new ApiError(400, 'Invalid event data', error);
+          }
+          throw error;
         }
-        break;
 
       default:
         res.setHeader('Allow', ['GET', 'POST']);
-        res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+        throw new ApiError(405, `Method ${req.method} Not Allowed`);
     }
-  } catch (error: any) {
-    console.error('Error handling events:', error);
-    res.status(500).json({ 
-      error: 'Internal Server Error',
-      message: error.message
-    });
+  } catch (error) {
+    handleApiError(error, res);
   }
 }

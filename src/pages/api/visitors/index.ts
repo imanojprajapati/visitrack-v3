@@ -1,10 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import dbConnect from '../../../lib/dbConnect';
+import { connectToDatabase } from '../../../lib/mongodb';
 import Visitor from '../../../models/Visitor';
-import Event, { IEvent } from '../../../models/Event';
-import Registration from '../../../models/Registration';
+import Event from '../../../models/Event';
+import { handleApiError, ApiError } from '../../../utils/api-error';
 import mongoose from 'mongoose';
-import nodemailer from 'nodemailer';
 
 interface RegistrationData {
   [key: string]: {
@@ -13,65 +12,50 @@ interface RegistrationData {
   };
 }
 
-interface IRegistration extends mongoose.Document {
-  _id: mongoose.Types.ObjectId;
-  eventId: mongoose.Types.ObjectId;
-  formId: mongoose.Types.ObjectId;
-  data: RegistrationData;
-  status: string;
-  submittedAt: Date;
-}
-
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  await dbConnect();
-
   try {
-    const {
-      name,
-      email,
-      phone,
-      company,
-      city,
-      state,
-      country,
-      pincode,
-      source,
-      eventId,
-      startDate,
-      endDate,
-    } = req.query;
+    await connectToDatabase();
 
-    // Build the query
-    const query: any = {};
-
-    // Add filters if they exist
-    if (eventId) query.eventId = eventId;
-    if (startDate && endDate) {
-      query.createdAt = {
-        $gte: new Date(startDate as string),
-        $lte: new Date(endDate as string),
-      };
+    if (req.method !== 'GET') {
+      throw new ApiError(405, `Method ${req.method} Not Allowed`);
     }
 
-    // Add text search filters
-    if (name) query.name = { $regex: name, $options: 'i' };
-    if (email) query.email = { $regex: email, $options: 'i' };
-    if (phone) query.phone = { $regex: phone, $options: 'i' };
-    if (company) query['additionalData.company'] = { $regex: company, $options: 'i' };
-    if (city) query['additionalData.city'] = { $regex: city, $options: 'i' };
-    if (state) query['additionalData.state'] = { $regex: state, $options: 'i' };
-    if (country) query['additionalData.country'] = { $regex: country, $options: 'i' };
-    if (pincode) query['additionalData.pincode'] = { $regex: pincode, $options: 'i' };
-    if (source) query['additionalData.source'] = { $regex: source, $options: 'i' };
+    const { eventId, status, startDate, endDate } = req.query;
+    const query: any = {};
 
-    // Fetch visitors with event details
+    // Add filters
+    if (eventId) {
+      if (!mongoose.Types.ObjectId.isValid(eventId as string)) {
+        throw new ApiError(400, 'Invalid event ID format');
+      }
+      query.eventId = new mongoose.Types.ObjectId(eventId as string);
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    if (startDate) {
+      const start = new Date(startDate as string);
+      if (isNaN(start.getTime())) {
+        throw new ApiError(400, 'Invalid start date format');
+      }
+      query.createdAt = { $gte: start };
+    }
+
+    if (endDate) {
+      const end = new Date(endDate as string);
+      if (isNaN(end.getTime())) {
+        throw new ApiError(400, 'Invalid end date format');
+      }
+      if (!query.createdAt) query.createdAt = {};
+      query.createdAt.$lte = end;
+    }
+
+    // Fetch visitors with populated event data
     const visitors = await Visitor.find(query)
       .populate('eventId', 'title location startDate endDate')
       .sort({ createdAt: -1 })
@@ -88,11 +72,11 @@ export default async function handler(
         email: visitor.email,
         phone: visitor.phone,
         company: additionalData.company?.value || '',
-        city: additionalData.city || '',
-        state: additionalData.state || '',
-        country: additionalData.country || '',
-        pincode: additionalData.pincode || '',
-        source: additionalData.source || 'Website',
+        city: additionalData.city?.value || '',
+        state: additionalData.state?.value || '',
+        country: additionalData.country?.value || '',
+        pincode: additionalData.pincode?.value || '',
+        source: additionalData.source?.value || 'Website',
         eventName: event?.title || 'Unknown Event',
         eventLocation: event?.location || 'Unknown Location',
         eventStartDate: event?.startDate || '',
@@ -103,9 +87,8 @@ export default async function handler(
       };
     });
 
-    res.status(200).json(formattedVisitors);
+    return res.status(200).json(formattedVisitors);
   } catch (error) {
-    console.error('Error fetching visitors:', error);
-    res.status(500).json({ error: 'Failed to fetch visitors' });
+    handleApiError(error, res);
   }
 } 
