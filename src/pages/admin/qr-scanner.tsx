@@ -69,15 +69,6 @@ interface ManualEntryFormData {
   visitorId: string;
 }
 
-// Helper function to extract visitor ID from QR code data
-const extractVisitorId = (qrCodeData: string): string => {
-  const parsedData = parseCompactQRData(qrCodeData);
-  if (!parsedData) {
-    throw new Error('No valid visitor ID found in QR code');
-  }
-  return parsedData.visitorId;
-};
-
 // Function to fetch visitor details
 const fetchVisitorDetails = async (visitorId: string) => {
   try {
@@ -191,8 +182,8 @@ const QRScanner: React.FC = () => {
         throw new Error('Invalid visitor ID format');
       }
 
-      // Register the entry
-      const response = await fetch('/api/visitors/scan', {
+      // Register the entry using the scan endpoint
+      const response = await fetch('/api/visitors/register-entry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ visitorId }),
@@ -209,9 +200,6 @@ const QRScanner: React.FC = () => {
       // Update the scans list
       await fetchQRScans();
 
-      // Set only the visitor ID in the form
-      form.setFieldsValue({ visitorId });
-
       // Show success message
       messageApi?.success('Visitor entry processed successfully');
 
@@ -223,6 +211,21 @@ const QRScanner: React.FC = () => {
         duration: 5
       });
       return false;
+    }
+  };
+
+  // Helper function to extract visitor ID from QR code data
+  const extractVisitorId = (qrCodeData: string): string => {
+    try {
+      // The QR code contains just the visitor ID
+      const visitorId = qrCodeData.trim();
+      if (!/^[a-f0-9]{24}$/i.test(visitorId)) {
+        throw new Error('Invalid visitor ID format in QR code');
+      }
+      return visitorId;
+    } catch (error) {
+      console.error('Error extracting visitor ID:', error);
+      throw new Error('Invalid QR code format');
     }
   };
 
