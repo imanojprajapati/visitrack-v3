@@ -9,10 +9,23 @@ export default async function handler(
   res: NextApiResponse
 ) {
   try {
-    await connectToDatabase();
-
     if (req.method !== 'GET') {
       throw new ApiError(405, `Method ${req.method} Not Allowed`);
+    }
+
+    // Connect to database with retry logic
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        await connectToDatabase();
+        break;
+      } catch (error) {
+        retries--;
+        if (retries === 0) {
+          throw new ApiError(503, 'Database connection failed after multiple attempts');
+        }
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
 
     const { eventId, startDate, endDate } = req.query;
@@ -48,7 +61,15 @@ export default async function handler(
       .populate('visitorId', 'name email phone company')
       .populate('eventId', 'title location startDate endDate')
       .sort({ scanTime: -1 })
-      .lean();
+      .lean()
+      .exec();
+
+    if (!scans || scans.length === 0) {
+      return res.status(200).json({
+        message: 'No QR scans found',
+        scans: []
+      });
+    }
 
     // Format the response
     const formattedScans = scans.map(scan => {
@@ -70,8 +91,12 @@ export default async function handler(
       };
     });
 
-    return res.status(200).json(formattedScans);
+    return res.status(200).json({
+      message: 'QR scans retrieved successfully',
+      count: formattedScans.length,
+      scans: formattedScans
+    });
   } catch (error) {
     handleApiError(error, res);
   }
-} 
+}

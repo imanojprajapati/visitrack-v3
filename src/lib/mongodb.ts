@@ -30,14 +30,26 @@ export async function connectToDatabase() {
     const opts = {
       bufferCommands: true,
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
-      socketTimeoutMS: 45000,
-      family: 4
+      serverSelectionTimeoutMS: parseInt(process.env.MONGODB_CONNECTION_TIMEOUT || '10000'),
+      socketTimeoutMS: parseInt(process.env.MONGODB_SOCKET_TIMEOUT || '45000'),
+      family: 4,
+      retryWrites: true,
+      retryReads: true,
+      connectTimeoutMS: 10000,
+      keepAlive: true,
+      keepAliveInitialDelay: 300000
     };
 
-    globalWithMongoose.mongoose.promise = mongoose.connect(MONGODB_URI as string, opts).then((mongoose) => {
-      return mongoose;
-    });
+    globalWithMongoose.mongoose.promise = mongoose.connect(MONGODB_URI as string, opts)
+      .then((mongoose) => {
+        console.log('MongoDB connected successfully');
+        return mongoose;
+      })
+      .catch((error) => {
+        console.error('MongoDB connection error:', error);
+        globalWithMongoose.mongoose.promise = null;
+        throw error;
+      });
   }
 
   try {
@@ -56,6 +68,8 @@ mongoose.connection.on('connected', () => {
 
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error:', err);
+  globalWithMongoose.mongoose.conn = null;
+  globalWithMongoose.mongoose.promise = null;
 });
 
 // Handle disconnection
@@ -65,7 +79,8 @@ mongoose.connection.on('disconnected', () => {
   globalWithMongoose.mongoose.promise = null;
 });
 
+// Handle process termination
 process.on('SIGINT', async () => {
   await mongoose.connection.close();
   process.exit(0);
-}); 
+});

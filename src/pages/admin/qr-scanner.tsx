@@ -12,7 +12,8 @@ import {
   Tag,
   Divider,
   Spin,
-  Upload
+  Upload,
+  Result
 } from 'antd';
 import type { FormInstance } from 'antd/es/form';
 import {
@@ -95,7 +96,7 @@ const fetchVisitorDetails = async (visitorId: string) => {
     console.log('Visitor details received:', data);
     return data.visitor;
   } catch (error) {
-    console.error('Error in fetchVisitorDetails:', error);
+    console.error('Error fetching visitor details:', error);
     throw error;
   }
 };
@@ -135,6 +136,8 @@ const QRScanner: React.FC = () => {
   const [visitorStatus, setVisitorStatus] = useState<boolean | null>(null);
   const [cameraError, setCameraError] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const badgeRef = useRef<HTMLDivElement>(null);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
   const { messageApi } = useAppContext();
@@ -142,14 +145,18 @@ const QRScanner: React.FC = () => {
   const [uploadedFiles, setUploadedFiles] = useState<UploadFile[]>([]);
   const html5QrCode = useRef<Html5Qrcode | null>(null);
 
-  // Function to fetch QR scans
+  // Function to fetch QR scans with retry logic
   const fetchQRScans = async () => {
     try {
       setLoading(true);
+      setError(null);
+      
       const response = await fetch('/api/qr-scans');
       if (!response.ok) {
-        throw new Error('Failed to fetch QR scans');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to fetch QR scans');
       }
+      
       const data = await response.json();
       setScannedVisitors(data.scans.map((scan: any) => ({
         _id: scan._id,
@@ -160,9 +167,24 @@ const QRScanner: React.FC = () => {
         scanTime: scan.scanTime,
         entryType: scan.entryType
       })));
+      
+      setRetryCount(0); // Reset retry count on success
     } catch (error) {
       console.error('Error fetching QR scans:', error);
-      messageApi?.error('Failed to load QR scan data');
+      setError(error instanceof Error ? error.message : 'Failed to load QR scan data');
+      
+      // Implement retry logic
+      if (retryCount < 3) {
+        setTimeout(() => {
+          setRetryCount(prev => prev + 1);
+          fetchQRScans();
+        }, Math.pow(2, retryCount) * 1000); // Exponential backoff
+      } else {
+        messageApi?.error({
+          content: 'Failed to load QR scan data after multiple attempts. Please try again later.',
+          duration: 5
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -233,6 +255,25 @@ const QRScanner: React.FC = () => {
   useEffect(() => {
     fetchQRScans();
   }, []);
+
+  // Add error UI
+  if (error && !loading) {
+    return (
+      <Result
+        status="error"
+        title="Failed to Load Data"
+        subTitle={error}
+        extra={[
+          <Button key="retry" type="primary" onClick={() => {
+            setRetryCount(0);
+            fetchQRScans();
+          }}>
+            Try Again
+          </Button>
+        ]}
+      />
+    );
+  }
 
   // Function to validate image before scanning
   const validateImage = (file: File): Promise<boolean> => {
