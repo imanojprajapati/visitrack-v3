@@ -4,7 +4,8 @@ import React from 'react';
 
 // Common interface for QR code data
 export interface QRCodeData {
-  visitorId: string;  // Only visitor ID is required now
+  visitorId: string;  // Only visitor ID is required
+  eventId?: string;   // Optional event ID for backward compatibility
 }
 
 // Common QR code options for consistent generation
@@ -32,8 +33,9 @@ export function parseCompactQRData(data: string): QRCodeData | null {
       const parsed = JSON.parse(data);
       if (parsed && typeof parsed === 'object') {
         const visitorId = parsed.visitor_id || parsed.visitorId;
+        const eventId = parsed.event_id || parsed.eventId;
         if (visitorId && /^[0-9a-fA-F]{24}$/.test(visitorId)) {
-          return { visitorId };
+          return { visitorId, eventId };
         }
       }
     } catch (e) {

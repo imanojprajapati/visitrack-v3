@@ -3,6 +3,12 @@ import { Html5Qrcode } from 'html5-qrcode';
 import { Button, message, Alert, Select, Space } from 'antd';
 import { CameraOutlined, LoadingOutlined } from '@ant-design/icons';
 
+// Define the CameraDevice type to match html5-qrcode's return type
+interface CameraDevice {
+  id: string;
+  label: string;
+}
+
 interface QRCodeScannerProps {
   onScanSuccess: (visitorId: string) => void;
   onScanError?: (error: string) => void;
@@ -11,7 +17,7 @@ interface QRCodeScannerProps {
 const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, onScanError }) => {
   const [isScanning, setIsScanning] = useState(false);
   const [html5QrCode, setHtml5QrCode] = useState<Html5Qrcode | null>(null);
-  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -6,8 +6,23 @@ import FormBuilder from '../../components/admin/FormBuilder';
 import { EventForm } from '../../types/form';
 import { useRouter } from 'next/router';
 
+// Define the form record type to match the database structure
+interface FormRecord {
+  _id: string;
+  title: string;
+  description: string;
+  fields: Array<{
+    name: string;
+    type: string;
+    required: boolean;
+    options?: string[];
+  }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function FormsPage() {
-  const [forms, setForms] = useState<EventForm[]>([]);
+  const [forms, setForms] = useState<FormRecord[]>([]);
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -80,7 +95,7 @@ export default function FormsPage() {
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: EventForm) => (
+      render: (_: any, record: FormRecord) => (
         <Space>
           <Button
             type="text"

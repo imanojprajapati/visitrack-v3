@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { v2 as cloudinary } from 'cloudinary';
+import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 import { connectToDatabase } from '../../../lib/mongodb';
 import BadgeTemplate from '../../../models/BadgeTemplate';
 
@@ -46,7 +46,7 @@ export default async function handler(
     const buffer = Buffer.from(base64Data, 'base64');
 
     // Upload to Cloudinary using buffer
-    const result = await new Promise((resolve, reject) => {
+    const result = await new Promise<UploadApiResponse>((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
         {
           folder: 'badge-templates/qr-codes',
@@ -59,7 +59,8 @@ export default async function handler(
         },
         (error, result) => {
           if (error) reject(error);
-          else resolve(result);
+          else if (result) resolve(result);
+          else reject(new Error('Upload failed: No result returned'));
         }
       );
 

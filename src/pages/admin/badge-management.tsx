@@ -118,6 +118,11 @@ interface BadgeTemplate {
   isPreview: boolean;
 }
 
+interface QRCodeData {
+  visitorId: string;
+  eventId?: string; // Make it optional to maintain compatibility
+}
+
 const BadgeManagement: React.FC = () => {
   const [form] = Form.useForm<BadgeTemplate>();
   const [events, setEvents] = useState<Event[]>([]);

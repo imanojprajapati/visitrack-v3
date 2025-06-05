@@ -15,6 +15,12 @@ interface RegistrationData {
   [key: string]: RegistrationField;
 }
 
+interface FormField {
+  label: string;
+  value?: any;
+  [key: string]: any;
+}
+
 type LeanEventDocument = {
   _id: Types.ObjectId;
   title: string;
@@ -72,13 +78,15 @@ export default async function handler(
             if (!formData || typeof formData !== 'object') return 'Unknown';
 
             // Look for name field in various formats
-            const nameField = Object.values(formData).find((field: any) => {
+            const fields = Object.values(formData);
+            const nameField = fields.find((field): field is RegistrationField => {
               if (!field || typeof field !== 'object') return false;
+              if (!('label' in field)) return false;
               const label = String(field.label || '').toLowerCase();
               return label.includes('name') || label.includes('full name') || label.includes('visitor name');
             });
 
-            return nameField ? String(nameField.value || 'Unknown') : 'Unknown';
+            return nameField?.value ? String(nameField.value) : 'Unknown';
           } catch (error) {
             console.error('Error extracting visitor name:', error);
             return 'Unknown';

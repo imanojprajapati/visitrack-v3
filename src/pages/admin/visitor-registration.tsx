@@ -1,10 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { QRCodeComponent } from '../../lib/qrcode';
+import { Button, Modal, Form, message, Typography, Input, DatePicker } from 'antd';
+import { formatDate, formatDateTime } from '../../utils/dateFormat';
+
+const { Title, Text } = Typography;
+const { useForm } = Form;
+
+interface RegisteredVisitor {
+  _id: string;
+  eventId: string;
+  name: string;
+  company: string;
+  designation: string;
+  eventName: string;
+  endDate: string;
+}
 
 const VisitorRegistration: React.FC = () => {
+  const [form] = useForm();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
-  const [registeredVisitor, setRegisteredVisitor] = useState(null);
+  const [registeredVisitor, setRegisteredVisitor] = useState<RegisteredVisitor | null>(null);
 
   const handleSubmit = async (values: any) => {
     try {
@@ -57,6 +74,58 @@ const VisitorRegistration: React.FC = () => {
     }
   };
 
+  const handlePrintQRCode = () => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const content = `
+      <html>
+        <head>
+          <title>Visitor QR Code</title>
+          <style>
+            body { text-align: center; padding: 20px; }
+            .qr-container { margin: 20px 0; }
+            .visitor-info { margin-top: 20px; }
+          </style>
+        </head>
+        <body>
+          <div id="qr-code" class="qr-container"></div>
+          <div class="visitor-info">
+            <p><strong>Name:</strong> ${registeredVisitor?.name}</p>
+            <p><strong>Company:</strong> ${registeredVisitor?.company}</p>
+            <p><strong>Event:</strong> ${registeredVisitor?.eventName}</p>
+            <p><strong>Valid Until:</strong> ${registeredVisitor?.endDate}</p>
+          </div>
+          <script>
+            window.print();
+            window.close();
+          </script>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(content);
+    
+    // Render QR code in the new window
+    if (registeredVisitor) {
+      const qrCodeElement = document.createElement('div');
+      printWindow.document.getElementById('qr-code')?.appendChild(qrCodeElement);
+      
+      // Render QR code component into the element
+      const qrCode = (
+        <QRCodeComponent
+          data={{
+            visitorId: registeredVisitor._id,
+            eventId: registeredVisitor.eventId
+          }}
+          size={200}
+        />
+      );
+      // Use ReactDOM to render the component
+      ReactDOM.render(qrCode, qrCodeElement);
+    }
+  };
+
   const renderQRCodeModal = () => (
     <Modal
       title="Registration Successful"
@@ -96,8 +165,70 @@ const VisitorRegistration: React.FC = () => {
   );
 
   return (
-    <div>
-      {/* Render your form here */}
+    <div className="p-6">
+      <Title level={2}>Visitor Registration</Title>
+      <Form
+        form={form}
+        onFinish={handleSubmit}
+        layout="vertical"
+        className="max-w-2xl"
+      >
+        <Form.Item
+          name="name"
+          label="Name"
+          rules={[{ required: true, message: 'Please enter visitor name' }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="company"
+          label="Company"
+          rules={[{ required: true, message: 'Please enter company name' }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="designation"
+          label="Designation"
+          rules={[{ required: true, message: 'Please enter designation' }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="eventName"
+          label="Event Name"
+          rules={[{ required: true, message: 'Please enter event name' }]}
+        >
+          <Input />
+        </Form.Item>
+
+        <Form.Item
+          name="eventStartDate"
+          label="Event Start Date"
+          rules={[{ required: true, message: 'Please select event start date' }]}
+        >
+          <DatePicker style={{ width: '100%' }} />
+        </Form.Item>
+
+        <Form.Item
+          name="eventEndDate"
+          label="Event End Date"
+          rules={[{ required: true, message: 'Please select event end date' }]}
+        >
+          <DatePicker style={{ width: '100%' }} />
+        </Form.Item>
+
+        <Form.Item>
+          <Button type="primary" htmlType="submit" loading={isSubmitting}>
+            Register Visitor
+          </Button>
+        </Form.Item>
+      </Form>
+
+      {renderQRCodeModal()}
     </div>
   );
 };
