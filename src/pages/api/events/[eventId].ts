@@ -5,11 +5,6 @@ import Form from '../../../models/Form';
 import { EventForm, FormField } from '../../../types/form';
 import mongoose from 'mongoose';
 
-interface EventWithForm extends Omit<IEvent, 'formId'> {
-  formId?: mongoose.Types.ObjectId;
-  form?: EventForm;
-}
-
 interface IFormField {
   id: string;
   type: string;
@@ -31,6 +26,11 @@ interface IFormDocument {
   fields: IFormField[];
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface EventWithForm extends Omit<IEvent, 'formId'> {
+  formId?: mongoose.Types.ObjectId;
+  form?: EventForm;
 }
 
 export default async function handler(
@@ -61,9 +61,19 @@ export default async function handler(
           return res.status(404).json({ message: 'Event not found' });
         }
 
+        // Convert dates to ISO strings for consistent formatting
+        const formattedEvent = {
+          ...event,
+          startDate: event.startDate?.toISOString(),
+          endDate: event.endDate?.toISOString(),
+          registrationDeadline: event.registrationDeadline?.toISOString(),
+          createdAt: event.createdAt?.toISOString(),
+          updatedAt: event.updatedAt?.toISOString(),
+        };
+
         // If event has a formId, fetch the form details
-        if (event.formId) {
-          const form = await Form.findById(event.formId).lean() as IFormDocument | null;
+        if (formattedEvent.formId) {
+          const form = await Form.findById(formattedEvent.formId).lean() as IFormDocument | null;
           if (form) {
             // Convert form fields to match the expected type
             const convertedFields: FormField[] = form.fields.map(field => ({
@@ -76,7 +86,7 @@ export default async function handler(
               validation: field.validation
             }));
 
-            event.form = {
+            formattedEvent.form = {
               id: form._id.toString(),
               title: form.title,
               fields: convertedFields
@@ -85,7 +95,7 @@ export default async function handler(
         }
 
         // Remove the raw formId from response
-        const { formId, ...eventData } = event;
+        const { formId, ...eventData } = formattedEvent;
 
         res.status(200).json(eventData);
       } catch (error) {
@@ -103,26 +113,68 @@ export default async function handler(
           return res.status(400).json({ message: 'Invalid request body' });
         }
 
-        // Convert dates to proper format
-        if (updates.startDate) updates.startDate = new Date(updates.startDate);
-        if (updates.endDate) updates.endDate = new Date(updates.endDate);
-        if (updates.registrationDeadline) updates.registrationDeadline = new Date(updates.registrationDeadline);
+        // Validate and convert dates
+        const dateFields = ['startDate', 'endDate', 'registrationDeadline'];
+        for (const field of dateFields) {
+          if (updates[field]) {
+            try {
+              const date = new Date(updates[field]);
+              if (isNaN(date.getTime())) {
+                return res.status(400).json({ message: `Invalid ${field} format` });
+              }
+              updates[field] = date;
+            } catch (error) {
+              return res.status(400).json({ message: `Invalid ${field} format` });
+            }
+          }
+        }
+
+        // Validate required fields
+        const requiredFields = ['title', 'startDate', 'status'];
+        for (const field of requiredFields) {
+          if (!updates[field]) {
+            return res.status(400).json({ message: `${field} is required` });
+          }
+        }
 
         // Update event
         const updatedEvent = await Event.findByIdAndUpdate(
           eventId,
-          { ...updates, updatedAt: new Date() },
-          { new: true, runValidators: true }
-        ).lean();
+          { 
+            ...updates,
+            updatedAt: new Date()
+          },
+          { 
+            new: true, 
+            runValidators: true
+          }
+        ) as IEvent | null;
 
         if (!updatedEvent) {
           return res.status(404).json({ message: 'Event not found' });
         }
 
-        res.status(200).json(updatedEvent);
+        // Convert to plain object and format dates
+        const eventObj = updatedEvent.toObject();
+        const formattedEvent = {
+          ...eventObj,
+          _id: eventObj._id.toString(),
+          startDate: eventObj.startDate?.toISOString(),
+          endDate: eventObj.endDate?.toISOString(),
+          registrationDeadline: eventObj.registrationDeadline?.toISOString(),
+          createdAt: eventObj.createdAt?.toISOString(),
+          updatedAt: eventObj.updatedAt?.toISOString(),
+          formId: eventObj.formId?.toString()
+        };
+
+        res.status(200).json(formattedEvent);
       } catch (error) {
         console.error('Error updating event:', error);
-        res.status(500).json({ message: 'Failed to update event' });
+        if (error instanceof Error) {
+          res.status(500).json({ message: error.message });
+        } else {
+          res.status(500).json({ message: 'Failed to update event' });
+        }
       }
       break;
 

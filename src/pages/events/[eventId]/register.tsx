@@ -47,17 +47,35 @@ export default function EventRegistration() {
 
   const fetchEventDetails = async () => {
     try {
-      const data = await fetchApi(`events/${eventId}`);
+      const response = await fetch(`/api/events/${eventId}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Failed to load event details' }));
+        throw new Error(errorData.message || 'Failed to load event details');
+      }
+      
+      const data = await response.json();
       console.log('Event data received:', data);
+      
+      if (!data || typeof data !== 'object') {
+        throw new Error('Invalid event data received');
+      }
+
       if (!data.form) {
         console.error('No form data in event response');
         message.error('This event has no registration form');
         return;
       }
+
+      // Validate form data structure
+      if (!Array.isArray(data.form.fields)) {
+        console.error('Invalid form fields data:', data.form);
+        throw new Error('Invalid form structure');
+      }
+
       setEvent(data);
     } catch (error) {
       console.error('Error fetching event:', error);
-      message.error('Failed to load event details');
+      message.error(error instanceof Error ? error.message : 'Failed to load event details');
     }
   };
 
@@ -136,41 +154,49 @@ export default function EventRegistration() {
   const handleRegistration = async (values: any) => {
     setLoading(true);
     try {
+      // Validate required fields
+      if (!event?.form?.fields) {
+        throw new Error('Form configuration is missing');
+      }
+
       // Format form data to match the expected structure
-      const formData = Object.entries(values).reduce((acc, [key, value]) => {
-        // Find the field definition to get the label
-        const field = event?.form?.fields.find(f => f.id === key);
-        if (field) {
-          // For source field, always set to "Website"
-          if (key === 'source') {
-            acc[key] = {
-              label: 'Source',
-              value: 'Website'
-            };
-          } else {
-            acc[key] = {
-              label: field.label,
-              value: value
-            };
-          }
+      const formData = event.form.fields.reduce((acc, field) => {
+        const value = values[field.id];
+        
+        // Skip empty optional fields
+        if (!field.required && (value === undefined || value === '')) {
+          return acc;
         }
+
+        // Validate required fields
+        if (field.required && (value === undefined || value === '')) {
+          throw new Error(`${field.label} is required`);
+        }
+
+        // Format the field value
+        acc[field.id] = {
+          label: field.label,
+          value: value
+        };
+
         return acc;
       }, {} as Record<string, any>);
 
       // Ensure source field exists
-      if (!formData.source) {
-        formData.source = {
-          label: 'Source',
-          value: 'Website'
-        };
-      }
+      formData.source = {
+        label: 'Source',
+        value: 'Website'
+      };
 
       // Extract name and phone from form data
       const name = formData.name?.value || '';
       const phone = formData.phone?.value || '';
 
-      const data = await fetchApi('visitors/register', {
+      const response = await fetch('/api/visitors/register', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           eventId,
           name,
@@ -179,6 +205,13 @@ export default function EventRegistration() {
           formData
         }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ message: 'Registration failed' }));
+        throw new Error(errorData.message || 'Registration failed');
+      }
+
+      const data = await response.json();
       
       setVisitor(data.visitor);
       setCurrentStep(3);

@@ -42,21 +42,45 @@ const eventSchema = new mongoose.Schema({
   },
   startDate: {
     type: Date,
-    required: true
+    required: true,
+    validate: {
+      validator: function(v: Date) {
+        return v instanceof Date && !isNaN(v.getTime());
+      },
+      message: 'Start date must be a valid date'
+    }
   },
   endDate: {
     type: Date,
-    required: true
+    required: true,
+    validate: {
+      validator: function(v: Date) {
+        return v instanceof Date && !isNaN(v.getTime());
+      },
+      message: 'End date must be a valid date'
+    }
   },
   time: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    validate: {
+      validator: function(v: string) {
+        return /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v);
+      },
+      message: 'Time must be in HH:MM format'
+    }
   },
   endTime: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    validate: {
+      validator: function(v: string) {
+        return /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v);
+      },
+      message: 'End time must be in HH:MM format'
+    }
   },
   category: {
     type: String,
@@ -116,7 +140,19 @@ const eventSchema = new mongoose.Schema({
     default: Date.now
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: {
+    transform: function(doc, ret) {
+      ret._id = ret._id.toString();
+      if (ret.formId) ret.formId = ret.formId.toString();
+      if (ret.startDate) ret.startDate = ret.startDate.toISOString();
+      if (ret.endDate) ret.endDate = ret.endDate.toISOString();
+      if (ret.registrationDeadline) ret.registrationDeadline = ret.registrationDeadline.toISOString();
+      if (ret.createdAt) ret.createdAt = ret.createdAt.toISOString();
+      if (ret.updatedAt) ret.updatedAt = ret.updatedAt.toISOString();
+      return ret;
+    }
+  }
 });
 
 // Create indexes for common queries
@@ -134,6 +170,37 @@ eventSchema.pre('save', function(next) {
   if (this.isNew) {
     this.visitors = 0;
   }
+  next();
+});
+
+// Validate dates
+eventSchema.pre('save', function(next) {
+  // Ensure dates are valid
+  if (!(this.startDate instanceof Date) || isNaN(this.startDate.getTime())) {
+    next(new Error('Invalid start date'));
+    return;
+  }
+  if (!(this.endDate instanceof Date) || isNaN(this.endDate.getTime())) {
+    next(new Error('Invalid end date'));
+    return;
+  }
+  if (this.registrationDeadline && (!(this.registrationDeadline instanceof Date) || isNaN(this.registrationDeadline.getTime()))) {
+    next(new Error('Invalid registration deadline'));
+    return;
+  }
+
+  // Ensure end date is after start date
+  if (this.endDate < this.startDate) {
+    next(new Error('End date must be after start date'));
+    return;
+  }
+
+  // Ensure registration deadline is before start date if set
+  if (this.registrationDeadline && this.registrationDeadline > this.startDate) {
+    next(new Error('Registration deadline must be before start date'));
+    return;
+  }
+
   next();
 });
 
