@@ -141,19 +141,33 @@ export default function EventRegistration() {
       setLoading(true);
       setError(null);
 
-      // Validate OTP
-      if (!values.otp || !/^\d{6}$/.test(values.otp)) {
+      // Validate OTP format first
+      if (!values.otp) {
+        throw new Error('Please enter the OTP');
+      }
+
+      // Remove any whitespace and ensure it's a string
+      const cleanOTP = values.otp.toString().trim();
+      if (!/^\d{6}$/.test(cleanOTP)) {
         throw new Error('Please enter a valid 6-digit OTP');
       }
 
       const email = form.getFieldValue('email');
-      await fetchApi('auth/verify-otp', {
+      if (!email) {
+        throw new Error('Email is required');
+      }
+
+      const response = await fetchApi('auth/verify-otp', {
         method: 'POST',
         body: JSON.stringify({
           email,
-          otp: values.otp,
+          otp: cleanOTP,
         }),
       });
+
+      if (!response || !response.message) {
+        throw new Error('Invalid response from server');
+      }
 
       if (!event?.form) {
         throw new Error('This event has no registration form');
@@ -164,16 +178,17 @@ export default function EventRegistration() {
     } catch (error) {
       console.error('Error in OTP verification:', error);
       if (error instanceof Error) {
-        if (error.message.includes('No valid OTP found')) {
+        const errorMessage = error.message;
+        if (errorMessage.includes('No valid OTP found')) {
           setError('OTP has expired. Please request a new OTP.');
-        } else if (error.message.includes('Too many failed attempts')) {
+        } else if (errorMessage.includes('Too many failed attempts')) {
           setError('Too many failed attempts. Please request a new OTP.');
-        } else if (error.message.includes('Invalid OTP')) {
+        } else if (errorMessage.includes('Invalid OTP')) {
           setError('Invalid OTP. Please try again.');
         } else {
-          setError(error.message);
+          setError(errorMessage);
         }
-        message.error(error.message);
+        message.error(errorMessage);
       } else {
         setError('Failed to verify OTP. Please try again.');
         message.error('Failed to verify OTP. Please try again.');
@@ -632,10 +647,20 @@ export default function EventRegistration() {
                 label={<div className="text-center">OTP</div>}
                 rules={[
                   { required: true, message: 'Please enter the OTP' },
-                  { pattern: /^\d{6}$/, message: 'Please enter a valid 6-digit OTP' }
+                  { 
+                    pattern: /^\d{6}$/,
+                    message: 'Please enter a valid 6-digit OTP',
+                    validateTrigger: 'onBlur'
+                  }
                 ]}
+                validateTrigger={['onChange', 'onBlur']}
               >
-                <Input prefix={<SafetyOutlined />} placeholder="Enter 6-digit OTP" />
+                <Input 
+                  prefix={<SafetyOutlined />} 
+                  placeholder="Enter 6-digit OTP"
+                  maxLength={6}
+                  autoComplete="one-time-code"
+                />
               </Form.Item>
               <Form.Item className="text-center">
                 <Button type="primary" htmlType="submit" loading={loading} block>
@@ -662,8 +687,9 @@ export default function EventRegistration() {
           id: 'registration-form',
           name: 'Registration Form',
           description: 'Please fill in your details',
-          fields: [
-            ...event.form.fields.map(field => {
+          fields: event.form.fields
+            .filter(field => field.id !== 'source') // Filter out source field
+            .map(field => {
               // Map field type to supported DynamicForm field type
               let fieldType: FormField['type'] = 'text';
               const fieldTypeStr = field.type as string;
@@ -683,13 +709,16 @@ export default function EventRegistration() {
                 fieldType = 'text';
               }
 
-              return {
+              const formField: FormField = {
                 id: field.id,
                 label: field.label,
                 type: fieldType,
                 required: field.required,
                 placeholder: field.placeholder,
-                options: field.options,
+                options: field.options ? field.options.map(opt => ({
+                  label: String(opt),
+                  value: String(opt)
+                })) : undefined,
                 validation: field.validation ? [
                   ...(field.validation.min !== undefined ? [{
                     type: 'number' as const,
@@ -707,17 +736,9 @@ export default function EventRegistration() {
                   }] : [])
                 ] : []
               };
-            }),
-            // Add source field with default value
-            {
-              id: 'source',
-              label: 'Source',
-              type: 'text',
-              required: true,
-              defaultValue: 'Website',
-              disabled: true
-            }
-          ]
+
+              return formField;
+            })
         };
 
         return (
