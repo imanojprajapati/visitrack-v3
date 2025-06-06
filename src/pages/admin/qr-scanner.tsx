@@ -743,7 +743,7 @@ const QRScanner: React.FC = () => {
           <div className="space-y-6">
             {/* Scanner Section */}
             {showScanner && (
-              <div className="w-full max-w-2xl mx-auto">
+              <div className="w-full max-w-screen">
                 <div id="qr-reader" className="w-full aspect-square max-w-md mx-auto" />
                 {cameraError && (
                   <Result

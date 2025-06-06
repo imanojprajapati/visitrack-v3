@@ -131,7 +131,7 @@ const Settings: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
+      <div className="w-full px-2 sm:px-4 lg:px-8 py-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
         </div>

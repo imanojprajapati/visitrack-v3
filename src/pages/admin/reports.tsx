@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs, Card, Typography, Space, Alert } from 'antd';
-import { UserOutlined, HistoryOutlined, BarChartOutlined } from '@ant-design/icons';
+import { UserOutlined, HistoryOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
 import RegistrationReport from './reports/registrations';
 
@@ -10,21 +10,19 @@ const { Title, Text } = Typography;
 export default function ReportsPage() {
   return (
     <AdminLayout>
-      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <div>
-            <Title level={2} className="text-xl sm:text-2xl font-bold">Reports</Title>
-            <Text type="secondary">View and analyze visitor registration data and entry logs</Text>
-          </div>
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex-none mb-6">
+          <Title level={2}>Reports</Title>
+          <Text type="secondary">View and analyze visitor registration data and entry logs</Text>
         </div>
 
-        <Card>
+        <Card className="bg-white shadow-sm flex-1 flex flex-col overflow-hidden">
           <Tabs 
             defaultActiveKey="registrations"
             type="card"
             size="large"
             tabBarStyle={{ marginBottom: 24 }}
-            className="overflow-x-auto"
+            className="flex-1 flex flex-col reports-tabs"
           >
             <TabPane 
               tab={
@@ -34,58 +32,96 @@ export default function ReportsPage() {
                 </Space>
               } 
               key="registrations"
+              className="flex-1 flex flex-col overflow-hidden"
             >
-              <RegistrationReport />
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <RegistrationReport />
+              </div>
             </TabPane>
-
-            <TabPane
+            
+            <TabPane 
               tab={
                 <Space>
                   <HistoryOutlined />
-                  <span>Entry Logs</span>
+                  <span>Entry Log</span>
                 </Space>
-              }
-              key="entry-logs"
+              } 
+              key="entry-log"
+              className="flex-1 flex flex-col overflow-hidden"
             >
-              <div className="p-4">
+              <div className="p-6 flex-1 flex flex-col overflow-hidden">
                 <Alert
-                  message="Coming Soon"
-                  description="Entry logs report will be available in the next update. This will include detailed visitor check-in and check-out times, duration of visits, and location tracking."
+                  message="Entry Log Coming Soon"
+                  description="The entry log feature is currently under development. It will show detailed check-in and check-out records for all visitors."
                   type="info"
                   showIcon
+                  className="mb-6"
                 />
-              </div>
-            </TabPane>
-
-            <TabPane
-              tab={
-                <Space>
-                  <BarChartOutlined />
-                  <span>Analytics</span>
-                </Space>
-              }
-              key="analytics"
-            >
-              <div className="p-4">
-                <Alert
-                  message="Coming Soon"
-                  description="Analytics dashboard will provide insights into visitor demographics, peak hours, popular events, and more."
-                  type="info"
-                  showIcon
-                />
+                <Card className="flex-1 overflow-hidden">
+                  <div className="text-center py-12">
+                    <HistoryOutlined style={{ fontSize: 48, color: '#1890ff' }} />
+                    <Title level={4} className="mt-4">Entry Log Feature</Title>
+                    <Text type="secondary" className="block mt-2">
+                      This feature will provide:
+                    </Text>
+                    <ul className="text-left max-w-md mx-auto mt-4 text-gray-600">
+                      <li>• Real-time check-in and check-out tracking</li>
+                      <li>• Visitor movement history</li>
+                      <li>• Time-based analytics</li>
+                      <li>• Export capabilities for entry logs</li>
+                    </ul>
+                  </div>
+                </Card>
               </div>
             </TabPane>
           </Tabs>
         </Card>
+
+        <style jsx global>{`
+          .ant-card {
+            border-radius: 8px;
+          }
+          .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+            border-radius: 8px 8px 0 0;
+          }
+          .ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
+            background: #fff;
+            border-bottom-color: #fff;
+          }
+          .ant-tabs-content {
+            background: #fff;
+            border-radius: 0 0 8px 8px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          .ant-tabs-tabpane {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          .ant-tabs-content-holder {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+          .reports-tabs {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            overflow: hidden;
+          }
+          .reports-tabs .ant-tabs-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+          }
+        `}</style>
       </div>
     </AdminLayout>
   );
-}
-
-export async function getServerSideProps() {
-  return {
-    props: {
-      isAdminPage: true,
-    },
-  };
-}
+} 

@@ -332,7 +332,7 @@ export default function EventManagement() {
 
   return (
     <AdminLayout>
-      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
+      <div className="w-full max-w-screen px-2 sm:px-4 lg:px-8 py-6">
         <Card
           title={
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

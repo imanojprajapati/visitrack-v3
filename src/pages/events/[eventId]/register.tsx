@@ -422,32 +422,68 @@ export default function EventRegistration() {
     const qrCodeValue = visitor._id ? visitor._id.toString() : '';
 
     return (
-      <div className="mb-8 text-left">
-        <Title level={4}>Registration Details</Title>
-        <Divider />
-        {qrError ? (
-          <Result
-            status="error"
-            title="Error Generating QR Code"
-            subTitle={qrError}
-          />
-        ) : (
-          <div className="mb-8">
-            <QRCode value={qrCodeValue} />
+      <div className="mb-8">
+        <div className="mb-6">
+          <Title level={4}>Your QR Code</Title>
+          <div className="my-4 p-4 bg-white rounded-lg shadow-sm inline-block">
+            {qrError ? (
+              <Result
+                status="error"
+                title="Error Generating QR Code"
+                subTitle={qrError}
+              />
+            ) : (
+              <QRCode value={qrCodeValue} />
+            )}
           </div>
-        )}
-        <Space direction="vertical" size="small" style={{ width: '100%' }} className="p-4 bg-gray-50 rounded-lg">
-          <div><Text strong>Visitor ID:</Text> {visitor._id}</div>
-          <div><Text strong>Event ID:</Text> {visitor.eventId}</div>
-          <div><Text strong>Name:</Text> {visitor.name}</div>
-          <div><Text strong>Email:</Text> {visitor.email}</div>
-          {visitor.phone && <div><Text strong>Phone:</Text> {visitor.phone}</div>}
-          {visitor.company && <div><Text strong>Company:</Text> {visitor.company}</div>}
-          {visitor.eventName && <div><Text strong>Event:</Text> {visitor.eventName}</div>}
-          {visitor.eventLocation && <div><Text strong>Location:</Text> {visitor.eventLocation}</div>}
-          {visitor.eventStartDate && <div><Text strong>Start:</Text> {formatDate(visitor.eventStartDate)}</div>}
-          {visitor.eventEndDate && <div><Text strong>End:</Text> {formatDate(visitor.eventEndDate)}</div>}
-        </Space>
+        </div>
+
+        <div className="text-left">
+          <Title level={4}>Registration Details</Title>
+          <Divider />
+          <Space direction="vertical" size="middle" style={{ width: '100%' }} className="p-4 bg-gray-50 rounded-lg">
+            <div>
+              <Text type="secondary">Name</Text>
+              <div><Text strong>{visitor.name}</Text></div>
+            </div>
+            <div>
+              <Text type="secondary">Email</Text>
+              <div><Text strong>{visitor.email}</Text></div>
+            </div>
+            {visitor.phone && (
+              <div>
+                <Text type="secondary">Phone</Text>
+                <div><Text strong>{visitor.phone}</Text></div>
+              </div>
+            )}
+            {visitor.company && (
+              <div>
+                <Text type="secondary">Company</Text>
+                <div><Text strong>{visitor.company}</Text></div>
+              </div>
+            )}
+            <div>
+              <Text type="secondary">Event</Text>
+              <div><Text strong>{visitor.eventName}</Text></div>
+            </div>
+            {visitor.eventLocation && (
+              <div>
+                <Text type="secondary">Location</Text>
+                <div><Text strong>{visitor.eventLocation}</Text></div>
+              </div>
+            )}
+            {visitor.eventStartDate && (
+              <div>
+                <Text type="secondary">Event Date</Text>
+                <div><Text strong>{formatDate(visitor.eventStartDate)}</Text></div>
+              </div>
+            )}
+            <div>
+              <Text type="secondary">Registration Date</Text>
+              <div><Text strong>{formatDateTime(visitor.createdAt)}</Text></div>
+            </div>
+          </Space>
+        </div>
       </div>
     );
   };
@@ -880,15 +916,15 @@ export default function EventRegistration() {
               subTitle={`You have successfully registered for ${event.title}`}
             />
             <div className="mt-8">
-              <QRCodeSVG value={visitor._id} size={200} />
+              <RegistrationDetails visitor={visitor} />
             </div>
             <div className="mt-4">
-              <Space>
-                <Button type="primary" onClick={handleDownloadQR}>
-                  <DownloadOutlined /> Download QR Code
+              <Space size="middle">
+                <Button type="primary" onClick={handleDownloadQR} icon={<DownloadOutlined />}>
+                  Download QR Code
                 </Button>
-                <Button onClick={handleDownloadPDF}>
-                  <DownloadOutlined /> Download PDF
+                <Button onClick={handleDownloadPDF} icon={<DownloadOutlined />}>
+                  Download Badge
                 </Button>
               </Space>
             </div>

@@ -40,20 +40,28 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
-  const [selectedKey, setSelectedKey] = useState('dashboard');
+  
+  // Update selected key based on current path
+  const getSelectedKey = () => {
+    const path = router.pathname;
+    if (path.startsWith('/admin/reports')) return 'reports';
+    if (path.startsWith('/admin/settings')) return 'settings';
+    if (path.startsWith('/admin/messaging')) return 'messaging';
+    if (path.startsWith('/admin/forms')) return 'forms';
+    if (path.startsWith('/admin/events')) return 'events';
+    if (path.startsWith('/admin/dashboard')) return 'dashboard';
+    if (path.startsWith('/admin/badge-management')) return 'badge-management';
+    if (path.startsWith('/admin/visitors')) return 'visitors';
+    if (path.startsWith('/admin/qr-scanner')) return 'qr-scanner';
+    return 'dashboard';
+  };
 
-  // List of pages that should have full-width content
-  const fullWidthPages = [
-    '/admin/reports',
-    '/admin/settings',
-    '/admin/messaging',
-    '/admin/forms',
-    '/admin/events',
-    '/admin/dashboard'
-  ];
+  const [selectedKey, setSelectedKey] = useState(getSelectedKey());
 
-  // Check if current page should be full width
-  const isFullWidthPage = fullWidthPages.some(path => router.pathname.startsWith(path));
+  // Update selected key when route changes
+  useEffect(() => {
+    setSelectedKey(getSelectedKey());
+  }, [router.pathname]);
 
   // Handle responsive behavior
   useEffect(() => {
@@ -62,9 +70,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       setIsMobile(mobile);
       if (mobile) {
         setCollapsed(true);
-        setMobileMenuVisible(false); // Reset mobile menu visibility on resize
+        setMobileMenuVisible(false);
       } else {
-        setMobileMenuVisible(true); // Show menu by default on desktop
+        setMobileMenuVisible(true);
+        setCollapsed(false);
       }
     };
 
@@ -75,6 +84,10 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const toggleMobileMenu = () => {
     setMobileMenuVisible(!mobileMenuVisible);
+  };
+
+  const toggleSidebar = () => {
+    setCollapsed(!collapsed);
   };
 
   return (
@@ -104,9 +117,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       
       <Sider
         theme="light"
-        collapsible={!isMobile}
+        collapsible
         collapsed={collapsed}
-        onCollapse={setCollapsed}
+        onCollapse={toggleSidebar}
         breakpoint="md"
         collapsedWidth={isMobile ? 0 : 80}
         style={{
@@ -122,8 +135,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           transition: 'all 0.3s ease-in-out',
           width: isMobile ? '250px' : undefined,
           visibility: isMobile ? (mobileMenuVisible ? 'visible' : 'hidden') : 'visible',
+          opacity: isMobile ? (mobileMenuVisible ? 1 : 0) : 1,
         }}
-        trigger={null} // Remove default collapse trigger
+        trigger={null}
       >
         <div className="logo p-4 flex items-center justify-center border-b border-gray-100">
           <Link href="/admin" className="flex items-center justify-center w-full">
@@ -152,6 +166,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             ),
           }))}
         />
+        {/* Collapse Trigger Button */}
+        {!isMobile && (
+          <div 
+            className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 cursor-pointer hover:bg-gray-50"
+            onClick={toggleSidebar}
+          >
+            <div className="flex items-center justify-center text-gray-500">
+              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              {!collapsed && <span className="ml-2"></span>}
+            </div>
+          </div>
+        )}
       </Sider>
       
       {/* Overlay for mobile menu */}
@@ -177,35 +203,26 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         transition: 'all 0.2s',
         minHeight: '100vh',
         background: '#f0f2f5',
-        padding: isMobile ? '12px' : isFullWidthPage ? '0' : '24px',
+        padding: isMobile ? '12px' : '24px',
         width: '100%',
         maxWidth: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
       }}>
         <Content style={{ 
-          padding: isMobile ? '16px' : isFullWidthPage ? '0' : '24px',
-          minHeight: 'calc(100vh - 48px)',
+          padding: isMobile ? '16px' : '24px',
+          height: '100%',
           display: 'flex',
           flexDirection: 'column',
           width: '100%',
           maxWidth: '100%',
-          overflow: 'hidden',
           background: '#fff',
-          borderRadius: isFullWidthPage ? '0' : '8px',
-          boxShadow: isFullWidthPage ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.03)',
+          borderRadius: '8px',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+          // overflow: 'hidden',
         }}>
-          {isFullWidthPage ? (
-            // Full width content wrapper
-            <div className="w-full min-h-screen">
-              <div className="w-full px-4 md:px-6 lg:px-8">
-                {children}
-              </div>
-            </div>
-          ) : (
-            // Container width content wrapper
-            <div className="w-full max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8">
-              {children}
-            </div>
-          )}
+          {children}
         </Content>
       </Layout>
     </Layout>
