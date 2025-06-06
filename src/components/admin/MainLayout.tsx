@@ -36,11 +36,24 @@ const menuItems = [
 ];
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
-  const router = useRouter();
-  const selectedKey = router.pathname.split('/')[2] || 'dashboard';
+  const [selectedKey, setSelectedKey] = useState('dashboard');
+
+  // List of pages that should have full-width content
+  const fullWidthPages = [
+    '/admin/reports',
+    '/admin/settings',
+    '/admin/messaging',
+    '/admin/forms',
+    '/admin/events',
+    '/admin/dashboard'
+  ];
+
+  // Check if current page should be full width
+  const isFullWidthPage = fullWidthPages.some(path => router.pathname.startsWith(path));
 
   // Handle responsive behavior
   useEffect(() => {
@@ -164,12 +177,12 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         transition: 'all 0.2s',
         minHeight: '100vh',
         background: '#f0f2f5',
-        padding: isMobile ? '16px' : '24px',
+        padding: isMobile ? '12px' : isFullWidthPage ? '0' : '24px',
         width: '100%',
         maxWidth: '100%',
       }}>
         <Content style={{ 
-          padding: isMobile ? '16px' : '24px',
+          padding: isMobile ? '16px' : isFullWidthPage ? '0' : '24px',
           minHeight: 'calc(100vh - 48px)',
           display: 'flex',
           flexDirection: 'column',
@@ -177,10 +190,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           maxWidth: '100%',
           overflow: 'hidden',
           background: '#fff',
-          borderRadius: '8px',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
+          borderRadius: isFullWidthPage ? '0' : '8px',
+          boxShadow: isFullWidthPage ? 'none' : '0 1px 2px rgba(0, 0, 0, 0.03)',
         }}>
-          {children}
+          {isFullWidthPage ? (
+            // Full width content wrapper
+            <div className="w-full min-h-screen">
+              <div className="w-full px-4 md:px-6 lg:px-8">
+                {children}
+              </div>
+            </div>
+          ) : (
+            // Container width content wrapper
+            <div className="w-full max-w-[1400px] mx-auto px-4 md:px-6 lg:px-8">
+              {children}
+            </div>
+          )}
         </Content>
       </Layout>
     </Layout>
