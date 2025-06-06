@@ -139,25 +139,18 @@ export default function EventRegistration() {
   };
 
   const handleVerifyOTP = async (values: { otp: string }) => {
-    // Prevent multiple submissions
     if (isVerifying || isSubmitting) {
-      console.log('Verification or submission already in progress');
+      console.log('Verification already in progress');
       return;
     }
 
     try {
       setIsVerifying(true);
-      setIsSubmitting(true);
-      setLoading(true);
       setError(null);
-      console.log('Starting OTP verification with values:', values);
 
       // Get email from form
       const email = form.getFieldValue('email');
-      console.log('Email from form:', email);
-      
       if (!email) {
-        console.log('Email validation failed');
         form.setFields([{
           name: 'email',
           errors: ['Email is required']
@@ -165,12 +158,9 @@ export default function EventRegistration() {
         return;
       }
 
-      // Validate OTP format first
+      // Clean and validate OTP
       const cleanOTP = values.otp?.toString().trim() || '';
-      console.log('Cleaned OTP:', cleanOTP);
-      
       if (!cleanOTP) {
-        console.log('Empty OTP validation failed');
         form.setFields([{
           name: 'otp',
           errors: ['Please enter the OTP']
@@ -179,7 +169,6 @@ export default function EventRegistration() {
       }
 
       if (!/^\d{6}$/.test(cleanOTP)) {
-        console.log('OTP format validation failed');
         form.setFields([{
           name: 'otp',
           errors: ['Please enter a valid 6-digit OTP']
@@ -193,111 +182,67 @@ export default function EventRegistration() {
         errors: []
       }]);
 
-      // Add retry logic for API call
-      let retryCount = 0;
-      const maxRetries = 3;
-      let lastError = null;
+      // Verify OTP
+      const response = await fetchApi('auth/verify-otp', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          otp: cleanOTP
+        })
+      });
 
-      while (retryCount < maxRetries) {
-        try {
-          console.log(`Attempt ${retryCount + 1} to verify OTP`);
-          const response = await fetchApi('auth/verify-otp', {
-            method: 'POST',
-            body: JSON.stringify({
-              email,
-              otp: cleanOTP,
-            }),
-          });
-          console.log('OTP verification response:', response);
-
-          if (!response) {
-            throw new Error('No response from server');
-          }
-
-          if (!response.message) {
-            throw new Error('Invalid response format from server');
-          }
-
-          // OTP verification successful
-          if (!event?.form) {
-            throw new Error('This event has no registration form');
-          }
-
-          // Clear form errors and move to next step
-          form.setFields([{
-            name: 'otp',
-            errors: []
-          }]);
-          
-          // Reset form values after successful verification
-          form.resetFields(['otp']);
-          setCurrentStep(2);
-          message.success('OTP verified successfully');
-          return; // Exit the function on success
-        } catch (error) {
-          lastError = error;
-          console.error(`Attempt ${retryCount + 1} failed:`, error);
-          
-          // If it's a validation error, don't retry
-          if (error instanceof Error && 
-              (error.message.includes('Invalid OTP') || 
-               error.message.includes('expired') || 
-               error.message.includes('attempts'))) {
-            break;
-          }
-          
-          retryCount++;
-          if (retryCount < maxRetries) {
-            // Wait before retrying (exponential backoff)
-            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-          }
-        }
+      if (!response.success) {
+        throw new Error(response.message || 'Failed to verify OTP');
       }
 
-      // Handle the final error after all retries
-      if (lastError instanceof Error) {
-        const errorMessage = lastError.message;
-        console.log('Final error message:', errorMessage);
-        
-        let formError = '';
-        if (errorMessage.includes('No valid OTP found')) {
-          formError = 'OTP has expired. Please request a new OTP.';
-        } else if (errorMessage.includes('Too many failed attempts')) {
-          formError = 'Too many failed attempts. Please request a new OTP.';
-        } else if (errorMessage.includes('Invalid OTP')) {
-          formError = 'Invalid OTP. Please try again.';
-        } else if (errorMessage.includes('No response from server')) {
-          formError = 'Unable to connect to server. Please try again.';
-        } else {
-          formError = 'Failed to verify OTP. Please try again.';
-        }
-
-        form.setFields([{
-          name: 'otp',
-          errors: [formError]
-        }]);
-        setError(formError);
-        message.error(formError);
+      // OTP verification successful
+      if (!event?.form) {
+        throw new Error('This event has no registration form');
       }
+
+      // Reset form and move to next step
+      form.resetFields(['otp']);
+      setCurrentStep(2);
+      message.success('OTP verified successfully');
+
     } catch (error) {
-      console.error('Unexpected error in OTP verification:', error);
-      const defaultError = 'An unexpected error occurred. Please try again.';
+      console.error('OTP verification error:', error);
+      
+      const errorMessage = error instanceof Error ? error.message : 'Failed to verify OTP';
+      let formError = '';
+
+      if (errorMessage.includes('expired')) {
+        formError = 'OTP has expired. Please request a new OTP.';
+      } else if (errorMessage.includes('attempts')) {
+        formError = 'Too many failed attempts. Please request a new OTP.';
+      } else if (errorMessage.includes('Invalid OTP')) {
+        formError = 'Invalid OTP. Please try again.';
+      } else if (errorMessage.includes('unavailable')) {
+        formError = 'Service temporarily unavailable. Please try again.';
+      } else {
+        formError = 'Failed to verify OTP. Please try again.';
+      }
+
       form.setFields([{
         name: 'otp',
-        errors: [defaultError]
+        errors: [formError]
       }]);
-      setError(defaultError);
-      message.error(defaultError);
+      setError(formError);
+      message.error(formError);
+
     } finally {
-      setLoading(false);
       setIsVerifying(false);
-      setIsSubmitting(false);
     }
   };
 
   const handleRegistration = async (values: any) => {
+    if (isSubmitting) {
+      console.log('Registration already in progress');
+      return;
+    }
+
     try {
-      setLoading(true);
+      setIsSubmitting(true);
       setError(null);
 
       // Validate required fields
@@ -318,7 +263,7 @@ export default function EventRegistration() {
         throw new Error('Name is required');
       }
 
-      // Format form data to match the expected structure
+      // Format form data
       const formData = event.form.fields.reduce((acc, field) => {
         const value = values[field.id];
         
@@ -340,7 +285,6 @@ export default function EventRegistration() {
           formattedValue = Number(value);
         }
 
-        // Format the field value without type field
         acc[field.id] = {
           label: field.label,
           value: formattedValue
@@ -355,16 +299,16 @@ export default function EventRegistration() {
         value: 'Website'
       };
 
-      // Submit registration with all required fields
+      // Submit registration
       const response = await fetchApi('visitors/register', {
         method: 'POST',
         body: JSON.stringify({
           eventId,
           email,
           name,
-          phone: phone || '', // Make phone optional
+          phone: phone || '',
           formData
-        }),
+        })
       });
 
       if (!response.visitor) {
@@ -374,12 +318,14 @@ export default function EventRegistration() {
       setVisitor(response.visitor);
       setCurrentStep(3);
       message.success('Registration successful');
+
     } catch (error) {
-      console.error('Error in registration:', error);
-      setError(error instanceof Error ? error.message : 'Failed to complete registration');
-      message.error(error instanceof Error ? error.message : 'Failed to complete registration');
+      console.error('Registration error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to complete registration';
+      setError(errorMessage);
+      message.error(errorMessage);
     } finally {
-      setLoading(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -738,70 +684,65 @@ export default function EventRegistration() {
               onFinish={handleVerifyOTP}
               layout="vertical"
               className="w-full max-w-sm"
-              validateTrigger={['onBlur', 'onSubmit']}
             >
               <Form.Item
                 name="otp"
-                label={<div className="text-center">OTP</div>}
+                label={<div className="text-center">Enter OTP</div>}
                 rules={[
                   { required: true, message: 'Please enter the OTP' },
                   { 
                     pattern: /^\d{6}$/,
-                    message: 'Please enter a valid 6-digit OTP',
-                    validateTrigger: ['onBlur', 'onSubmit']
+                    message: 'Please enter a valid 6-digit OTP'
                   }
                 ]}
-                validateTrigger={['onBlur', 'onSubmit']}
               >
-                <Input 
-                  prefix={<SafetyOutlined />} 
+                <Input
+                  prefix={<SafetyOutlined />}
                   placeholder="Enter 6-digit OTP"
                   maxLength={6}
                   autoComplete="one-time-code"
-                  disabled={isVerifying || isSubmitting}
+                  disabled={isVerifying}
                   onChange={(e) => {
                     const value = e.target.value.trim();
-                    console.log('OTP input changed:', value);
-                    if (value.length > 0) {
+                    if (value && !/^\d{6}$/.test(value)) {
+                      form.setFields([{
+                        name: 'otp',
+                        errors: ['Please enter a valid 6-digit OTP']
+                      }]);
+                    } else {
                       form.setFields([{
                         name: 'otp',
                         errors: []
                       }]);
                     }
                   }}
-                  onBlur={(e) => {
-                    const value = e.target.value.trim();
-                    console.log('OTP input blurred:', value);
-                    if (value && !/^\d{6}$/.test(value)) {
-                      form.setFields([{
-                        name: 'otp',
-                        errors: ['Please enter a valid 6-digit OTP']
-                      }]);
-                    }
-                  }}
                 />
               </Form.Item>
+
               <Form.Item className="text-center">
-                <Button 
-                  type="primary" 
-                  htmlType="submit" 
-                  loading={loading || isVerifying || isSubmitting} 
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isVerifying}
                   block
-                  disabled={isVerifying || isSubmitting}
-                  onClick={(e) => {
-                    e.preventDefault(); // Prevent default form submission
-                    if (isVerifying || isSubmitting) return;
-                    console.log('Verify OTP button clicked');
-                    form.validateFields(['otp']).then(() => {
-                      handleVerifyOTP(form.getFieldsValue());
-                    }).catch(() => {
-                      console.log('Form validation failed');
-                    });
-                  }}
+                  disabled={isVerifying}
                 >
-                  {isVerifying || isSubmitting ? 'Verifying...' : 'Verify OTP'}
+                  {isVerifying ? 'Verifying...' : 'Verify OTP'}
                 </Button>
               </Form.Item>
+
+              <div className="text-center">
+                <Button
+                  type="link"
+                  onClick={() => {
+                    form.resetFields(['otp']);
+                    setCurrentStep(0);
+                  }}
+                  disabled={isVerifying}
+                >
+                  Back to Email
+                </Button>
+              </div>
             </Form>
           </div>
         );
@@ -823,28 +764,36 @@ export default function EventRegistration() {
           name: 'Registration Form',
           description: 'Please fill in your details',
           fields: event.form.fields
-            .filter(field => field.id !== 'source') // Filter out source field
+            .filter(field => field.id !== 'source')
             .map(field => {
-              // Map field type to supported DynamicForm field type
               let fieldType: FormField['type'] = 'text';
               const fieldTypeStr = field.type as string;
-              if (fieldTypeStr === 'phone' || fieldTypeStr === 'tel') {
-                fieldType = 'phone';
-              } else if (fieldTypeStr === 'textarea') {
-                fieldType = 'textarea';
-              } else if (fieldTypeStr === 'number') {
-                fieldType = 'number';
-              } else if (fieldTypeStr === 'email') {
-                fieldType = 'email';
-              } else if (fieldTypeStr === 'date') {
-                fieldType = 'date';
-              } else if (fieldTypeStr === 'select') {
-                fieldType = 'select';
-              } else {
-                fieldType = 'text';
+              
+              switch (fieldTypeStr) {
+                case 'phone':
+                case 'tel':
+                  fieldType = 'phone';
+                  break;
+                case 'textarea':
+                  fieldType = 'textarea';
+                  break;
+                case 'number':
+                  fieldType = 'number';
+                  break;
+                case 'email':
+                  fieldType = 'email';
+                  break;
+                case 'date':
+                  fieldType = 'date';
+                  break;
+                case 'select':
+                  fieldType = 'select';
+                  break;
+                default:
+                  fieldType = 'text';
               }
 
-              const formField: FormField = {
+              return {
                 id: field.id,
                 label: field.label,
                 type: fieldType,
@@ -871,26 +820,59 @@ export default function EventRegistration() {
                   }] : [])
                 ] : []
               };
-
-              return formField;
             })
         };
 
         return (
           <div className="max-w-2xl mx-auto">
-            <DynamicForm
-              template={template}
+            <Form
+              form={form}
               onFinish={handleRegistration}
-              onFinishFailed={(errorInfo) => {
-                console.error('Form validation failed:', errorInfo);
-                message.error('Please fill in all required fields correctly');
-              }}
-            />
-            <div className="text-center mt-6">
-              <Button type="primary" size="large" onClick={() => form.submit()}>
-                Submit Registration
-              </Button>
-            </div>
+              layout="vertical"
+              className="registration-form"
+            >
+              <DynamicForm
+                template={template}
+                onFinish={handleRegistration}
+                onFinishFailed={(errorInfo) => {
+                  console.error('Form validation failed:', errorInfo);
+                  message.error('Please fill in all required fields correctly');
+                }}
+              />
+              
+              <div className="text-center mt-6 space-x-4">
+                <Button
+                  type="default"
+                  onClick={() => {
+                    form.resetFields();
+                    setCurrentStep(1);
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="primary"
+                  htmlType="submit"
+                  loading={isSubmitting}
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    if (!isSubmitting) {
+                      form.validateFields()
+                        .then(values => {
+                          handleRegistration(values);
+                        })
+                        .catch(errorInfo => {
+                          console.error('Form validation failed:', errorInfo);
+                          message.error('Please fill in all required fields correctly');
+                        });
+                    }
+                  }}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Registration'}
+                </Button>
+              </div>
+            </Form>
           </div>
         );
 

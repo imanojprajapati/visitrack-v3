@@ -7,6 +7,7 @@ interface DynamicFormProps {
   template: FormTemplate;
   onFinish?: (values: any) => void;
   onFinishFailed?: (errorInfo: any) => void;
+  form?: any; // Add form prop to allow external form control
 }
 
 const validateEmail = (email: string): boolean => {
@@ -105,8 +106,23 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
   template,
   onFinish,
   onFinishFailed,
+  form: externalForm,
 }) => {
-  const [form] = Form.useForm();
+  // Use external form if provided, otherwise create a new one
+  const [internalForm] = Form.useForm();
+  const form = externalForm || internalForm;
+
+  // Set initial values when template changes
+  React.useEffect(() => {
+    const initialValues = template.fields.reduce((acc, field) => {
+      if (field.defaultValue !== undefined) {
+        acc[field.id] = field.defaultValue;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    form.setFieldsValue(initialValues);
+  }, [template, form]);
 
   return (
     <Form
@@ -115,12 +131,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
       name={template.id}
       onFinish={onFinish}
       onFinishFailed={onFinishFailed}
-      initialValues={template.fields.reduce((acc, field) => {
-        if (field.defaultValue !== undefined) {
-          acc[field.id] = field.defaultValue;
-        }
-        return acc;
-      }, {} as Record<string, any>)}
+      validateTrigger={['onBlur', 'onChange', 'onSubmit']}
     >
       {template.fields.map((field) => (
         <Form.Item
@@ -128,6 +139,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
           name={field.id}
           label={field.label}
           rules={getFieldRules(field)}
+          validateTrigger={['onBlur', 'onChange', 'onSubmit']}
         >
           {renderField(field)}
         </Form.Item>
