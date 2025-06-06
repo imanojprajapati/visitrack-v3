@@ -144,11 +144,16 @@ export default function EventRegistration() {
       // Get email from form
       const email = form.getFieldValue('email');
       if (!email) {
-        throw new Error('Email is required');
+        form.setFields([{
+          name: 'email',
+          errors: ['Email is required']
+        }]);
+        return;
       }
 
       // Validate OTP format first
-      if (!values.otp) {
+      const cleanOTP = values.otp?.toString().trim() || '';
+      if (!cleanOTP) {
         form.setFields([{
           name: 'otp',
           errors: ['Please enter the OTP']
@@ -156,8 +161,6 @@ export default function EventRegistration() {
         return;
       }
 
-      // Remove any whitespace and ensure it's a string
-      const cleanOTP = values.otp.toString().trim();
       if (!/^\d{6}$/.test(cleanOTP)) {
         form.setFields([{
           name: 'otp',
@@ -204,34 +207,32 @@ export default function EventRegistration() {
             name: 'otp',
             errors: ['OTP has expired. Please request a new OTP.']
           }]);
-          setError('OTP has expired. Please request a new OTP.');
         } else if (errorMessage.includes('Too many failed attempts')) {
           form.setFields([{
             name: 'otp',
             errors: ['Too many failed attempts. Please request a new OTP.']
           }]);
-          setError('Too many failed attempts. Please request a new OTP.');
         } else if (errorMessage.includes('Invalid OTP')) {
           form.setFields([{
             name: 'otp',
             errors: ['Invalid OTP. Please try again.']
           }]);
-          setError('Invalid OTP. Please try again.');
         } else {
           form.setFields([{
             name: 'otp',
             errors: [errorMessage]
           }]);
-          setError(errorMessage);
         }
+        setError(errorMessage);
         message.error(errorMessage);
       } else {
+        const defaultError = 'Failed to verify OTP. Please try again.';
         form.setFields([{
           name: 'otp',
-          errors: ['Failed to verify OTP. Please try again.']
+          errors: [defaultError]
         }]);
-        setError('Failed to verify OTP. Please try again.');
-        message.error('Failed to verify OTP. Please try again.');
+        setError(defaultError);
+        message.error(defaultError);
       }
     } finally {
       setLoading(false);
@@ -701,8 +702,8 @@ export default function EventRegistration() {
                   maxLength={6}
                   autoComplete="one-time-code"
                   onChange={(e) => {
-                    // Clear error when user starts typing
-                    if (e.target.value.length > 0) {
+                    const value = e.target.value.trim();
+                    if (value.length > 0) {
                       form.setFields([{
                         name: 'otp',
                         errors: []
