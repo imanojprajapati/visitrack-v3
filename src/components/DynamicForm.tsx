@@ -139,22 +139,29 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
     form.setFieldsValue(initialValues);
   }, [template, form]);
 
+  const handleFinish = (values: any) => {
+    console.log('DynamicForm handleFinish values:', values);
+    if (onFinish) {
+      // Ensure we have actual values
+      const formValues = form.getFieldsValue();
+      console.log('DynamicForm form values:', formValues);
+      onFinish(formValues);
+    }
+  };
+
   return (
     <Form
       form={form}
       layout="vertical"
       name={template.id}
-      onFinish={(values) => {
-        console.log('DynamicForm onFinish values:', values);
-        console.log('Form validation status:', form.getFieldsError());
-        onFinish?.(values);
-      }}
+      onFinish={handleFinish}
       onFinishFailed={(errorInfo) => {
         console.log('DynamicForm validation failed:', errorInfo);
-        console.log('Form validation status:', form.getFieldsError());
+        console.log('DynamicForm form values:', form.getFieldsValue());
         onFinishFailed?.(errorInfo);
       }}
       validateTrigger={['onBlur', 'onChange', 'onSubmit']}
+      preserve={false}
     >
       {template.fields.map((field) => {
         console.log('Rendering field:', field);
@@ -166,6 +173,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
             rules={getFieldRules(field)}
             validateTrigger={['onBlur', 'onChange', 'onSubmit']}
             validateFirst={true}
+            preserve={false}
           >
             {renderField(field)}
           </Form.Item>

@@ -256,19 +256,21 @@ export default function EventRegistration() {
         throw new Error('Form configuration is missing');
       }
 
-      const email = form.getFieldValue('email');
+      // Validate that we have actual values
+      if (!values || Object.keys(values).length === 0) {
+        throw new Error('No form values provided');
+      }
+
+      const email = values.email || form.getFieldValue('email');
       if (!email) {
         throw new Error('Email is required');
       }
 
       // Extract name and phone from form data
-      const name = values.name || values.fullName || values.visitorName;
-      const phone = values.phone || values.mobile || values.contactNumber;
+      const name = values.name;
+      const phone = values.phone;
 
-      // Add debug logging
-      console.log('Extracted name:', name);
-      console.log('Extracted phone:', phone);
-      console.log('All form values:', values);
+      console.log('Extracted values:', { name, email, phone, allValues: values });
 
       if (!name) {
         throw new Error('Name is required');
@@ -841,10 +843,19 @@ export default function EventRegistration() {
               onFinish={handleRegistration}
               layout="vertical"
               className="registration-form"
+              preserve={false}
             >
               <DynamicForm
                 template={template}
-                onFinish={handleRegistration}
+                form={form}
+                onFinish={(values) => {
+                  console.log('DynamicForm submitted values:', values);
+                  if (Object.keys(values).length === 0) {
+                    message.error('Please fill in all required fields');
+                    return;
+                  }
+                  handleRegistration(values);
+                }}
                 onFinishFailed={(errorInfo) => {
                   console.error('Form validation failed:', errorInfo);
                   message.error('Please fill in all required fields correctly');
@@ -867,19 +878,28 @@ export default function EventRegistration() {
                   htmlType="submit"
                   loading={isSubmitting}
                   disabled={isSubmitting}
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
                     if (!isSubmitting) {
-                      console.log('Form values before validation:', form.getFieldsValue());
-                      console.log('Form validation status before validation:', form.getFieldsError());
+                      const values = form.getFieldsValue();
+                      console.log('Form values before submission:', values);
                       
+                      if (Object.keys(values).length === 0) {
+                        message.error('Please fill in all required fields');
+                        return;
+                      }
+
                       form.validateFields()
-                        .then(values => {
-                          console.log('Form validation successful, values:', values);
-                          handleRegistration(values);
+                        .then(validatedValues => {
+                          console.log('Form validation successful, values:', validatedValues);
+                          if (Object.keys(validatedValues).length > 0) {
+                            handleRegistration(validatedValues);
+                          } else {
+                            message.error('Please fill in all required fields');
+                          }
                         })
                         .catch(errorInfo => {
                           console.error('Form validation failed:', errorInfo);
-                          console.log('Form validation status after failure:', form.getFieldsError());
                           message.error('Please fill in all required fields correctly');
                         });
                     }
