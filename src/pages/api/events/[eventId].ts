@@ -76,10 +76,40 @@ export default async function handler(
     return res.status(400).json({ message: 'Invalid event ID' });
   }
 
-  try {
-    // Connect to database
-    await connectToDatabase();
+  // Add retry logic for database connection
+  let retries = 3;
+  let lastError: Error | null = null;
 
+  while (retries > 0) {
+    try {
+      // Connect to database with timeout
+      const connectionPromise = connectToDatabase();
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Database connection timeout')), 5000)
+      );
+      
+      await Promise.race([connectionPromise, timeoutPromise]);
+      break;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
+      console.error(`Database connection attempt failed (${retries} retries left):`, lastError);
+      retries--;
+      
+      if (retries === 0) {
+        return res.status(503).json({ 
+          message: 'Database connection failed after multiple attempts',
+          error: lastError.message
+        });
+      }
+      
+      // Exponential backoff with jitter
+      await new Promise(resolve => 
+        setTimeout(resolve, Math.pow(2, 3 - retries) * 1000 * (0.5 + Math.random()))
+      );
+    }
+  }
+
+  try {
     // Validate MongoDB ObjectId
     if (!mongoose.Types.ObjectId.isValid(eventId)) {
       console.error('Invalid event ID format:', eventId);
@@ -89,8 +119,10 @@ export default async function handler(
     switch (req.method) {
       case 'GET':
         try {
-          // Get event with form details
-          const event = await Event.findById(eventId).lean() as unknown as MongoEvent;
+          // Get event with form details using lean() for better performance
+          const event = await Event.findById(eventId)
+            .lean()
+            .exec() as unknown as MongoEvent;
 
           if (!event) {
             console.error('Event not found for ID:', eventId);
@@ -109,11 +141,19 @@ export default async function handler(
             formId: event.formId?.toString()
           } as FormattedEvent;
 
-          // If event has a formId, fetch the form details
+          // If event has a formId, fetch the form details with timeout
           if (event.formId) {
             try {
-              console.log('Fetching form for ID:', event.formId.toString());
-              const form = await Form.findById(event.formId).lean() as unknown as IFormDocument;
+              const formPromise = Form.findById(event.formId)
+                .lean()
+                .exec() as Promise<IFormDocument>;
+              
+              const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Form fetch timeout')), 5000)
+              );
+
+              const form = await Promise.race([formPromise, timeoutPromise]) as IFormDocument;
+
               if (form) {
                 // Convert form fields to match the expected type
                 const convertedFields: FormField[] = form.fields.map(field => ({
@@ -131,9 +171,6 @@ export default async function handler(
                   title: form.title,
                   fields: convertedFields
                 };
-                console.log('Form data loaded successfully');
-              } else {
-                console.error('Form not found for ID:', event.formId.toString());
               }
             } catch (formError) {
               console.error('Error fetching form:', formError);
@@ -152,7 +189,10 @@ export default async function handler(
           return res.status(200).json(eventData);
         } catch (error) {
           console.error('Error processing event:', error);
-          return res.status(500).json({ message: 'Internal server error while processing event' });
+          return res.status(500).json({ 
+            message: 'Internal server error while processing event',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
         }
 
       case 'PUT':

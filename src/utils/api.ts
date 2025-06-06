@@ -41,11 +41,12 @@ export const fetchApi = async (endpoint: string, options: FetchOptions = {}) => 
   const url = buildApiUrl(endpoint);
   
   let lastError: Error | null = null;
+  let attempt = 0;
   
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  while (attempt <= retries) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced timeout to 15 seconds
 
       const response = await fetch(url, {
         ...fetchOptions,
@@ -59,6 +60,11 @@ export const fetchApi = async (endpoint: string, options: FetchOptions = {}) => 
       });
 
       clearTimeout(timeoutId);
+
+      // Handle specific status codes
+      if (response.status === 508) {
+        throw new Error('Server is temporarily overloaded. Please try again later.');
+      }
 
       if (!response.ok) {
         let errorMessage = `HTTP error! status: ${response.status}`;
@@ -81,13 +87,12 @@ export const fetchApi = async (endpoint: string, options: FetchOptions = {}) => 
     } catch (err: unknown) {
       if (err instanceof Error) {
         lastError = err;
-        if (err.name === 'AbortError') {
-          console.error('Request timed out:', {
-            url,
-            attempt: attempt + 1,
-            error: lastError
-          });
-          throw new Error('Request timed out');
+        
+        // Don't retry on certain errors
+        if (err.name === 'AbortError' || 
+            err.message.includes('Server is temporarily overloaded') ||
+            err.message.includes('Database connection failed')) {
+          throw err;
         }
       } else {
         lastError = new Error('Unknown error occurred');
@@ -103,8 +108,10 @@ export const fetchApi = async (endpoint: string, options: FetchOptions = {}) => 
         throw lastError;
       }
       
-      // Wait before retrying
-      await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
+      // Exponential backoff with jitter
+      const backoffDelay = retryDelay * Math.pow(2, attempt) * (0.5 + Math.random());
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
+      attempt++;
     }
   }
 };
