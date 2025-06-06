@@ -5,7 +5,7 @@ import { Card, Input, Button, message, Steps, Form, Typography, Space, Divider, 
 import { MailOutlined, SafetyOutlined, UserOutlined, QrcodeOutlined, DownloadOutlined } from '@ant-design/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { jsPDF } from 'jspdf';
-import { DynamicForm } from '../../../components/DynamicForm';
+import DynamicForm from '../../../components/DynamicForm';
 import { Event } from '../../../types/event';
 import { Visitor } from '../../../types/visitor';
 import ReactDOM from 'react-dom/client';
@@ -256,29 +256,33 @@ export default function EventRegistration() {
         throw new Error('Form configuration is missing');
       }
 
+      // Get all form values
+      const formValues = form.getFieldsValue();
+      console.log('All form values:', formValues);
+
       // Validate that we have actual values
-      if (!values || Object.keys(values).length === 0) {
+      if (!formValues || Object.keys(formValues).length === 0) {
         throw new Error('No form values provided');
       }
 
-      const email = values.email || form.getFieldValue('email');
-      if (!email) {
-        throw new Error('Email is required');
-      }
+      // Extract required fields
+      const name = formValues.name;
+      const email = formValues.email || form.getFieldValue('email');
+      const phone = formValues.phone;
 
-      // Extract name and phone from form data
-      const name = values.name;
-      const phone = values.phone;
-
-      console.log('Extracted values:', { name, email, phone, allValues: values });
+      console.log('Extracted values:', { name, email, phone });
 
       if (!name) {
         throw new Error('Name is required');
       }
 
+      if (!email) {
+        throw new Error('Email is required');
+      }
+
       // Format form data
       const formData = event.form.fields.reduce((acc, field) => {
-        const value = values[field.id];
+        const value = formValues[field.id];
         
         // Skip empty optional fields
         if (!field.required && (value === undefined || value === '' || value === null)) {
@@ -848,18 +852,7 @@ export default function EventRegistration() {
               <DynamicForm
                 template={template}
                 form={form}
-                onFinish={(values) => {
-                  console.log('DynamicForm submitted values:', values);
-                  if (Object.keys(values).length === 0) {
-                    message.error('Please fill in all required fields');
-                    return;
-                  }
-                  handleRegistration(values);
-                }}
-                onFinishFailed={(errorInfo) => {
-                  console.error('Form validation failed:', errorInfo);
-                  message.error('Please fill in all required fields correctly');
-                }}
+                onFinish={handleRegistration}
               />
               
               <div className="text-center mt-6 space-x-4">
@@ -881,22 +874,10 @@ export default function EventRegistration() {
                   onClick={(e) => {
                     e.preventDefault();
                     if (!isSubmitting) {
-                      const values = form.getFieldsValue();
-                      console.log('Form values before submission:', values);
-                      
-                      if (Object.keys(values).length === 0) {
-                        message.error('Please fill in all required fields');
-                        return;
-                      }
-
                       form.validateFields()
                         .then(validatedValues => {
                           console.log('Form validation successful, values:', validatedValues);
-                          if (Object.keys(validatedValues).length > 0) {
-                            handleRegistration(validatedValues);
-                          } else {
-                            message.error('Please fill in all required fields');
-                          }
+                          handleRegistration(validatedValues);
                         })
                         .catch(errorInfo => {
                           console.error('Form validation failed:', errorInfo);
