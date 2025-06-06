@@ -49,6 +49,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       setIsMobile(mobile);
       if (mobile) {
         setCollapsed(true);
+        setMobileMenuVisible(false); // Reset mobile menu visibility on resize
+      } else {
+        setMobileMenuVisible(true); // Show menu by default on desktop
       }
     };
 
@@ -81,13 +84,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
+            borderRadius: '4px',
           }}
         />
       )}
       
       <Sider
         theme="light"
-        collapsible
+        collapsible={!isMobile}
         collapsed={collapsed}
         onCollapse={setCollapsed}
         breakpoint="md"
@@ -102,9 +106,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)',
           overflow: 'auto',
           transform: isMobile ? (mobileMenuVisible ? 'translateX(0)' : 'translateX(-100%)') : 'none',
-          transition: 'transform 0.3s ease-in-out',
+          transition: 'all 0.3s ease-in-out',
           width: isMobile ? '250px' : undefined,
+          visibility: isMobile ? (mobileMenuVisible ? 'visible' : 'hidden') : 'visible',
         }}
+        trigger={null} // Remove default collapse trigger
       >
         <div className="logo p-4 flex items-center justify-center border-b border-gray-100">
           <Link href="/admin" className="flex items-center justify-center w-full">
@@ -146,13 +152,15 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             bottom: 0,
             background: 'rgba(0, 0, 0, 0.5)',
             zIndex: 999,
+            opacity: mobileMenuVisible ? 1 : 0,
+            transition: 'opacity 0.3s ease-in-out',
           }}
           onClick={() => setMobileMenuVisible(false)}
         />
       )}
 
       <Layout style={{ 
-        marginLeft: isMobile ? 0 : (collapsed ? 80 : 200),
+        marginLeft: isMobile ? 0 : (collapsed ? 0 : 0),
         transition: 'all 0.2s',
         minHeight: '100vh',
         background: '#f0f2f5',
