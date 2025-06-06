@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connectToDatabase } from '../../../lib/mongodb';
-import Visitor from '../../../models/Visitor';
-import Event from '../../../models/Event';
+import Visitor, { IVisitor } from '../../../models/Visitor';
+import Event, { IEvent } from '../../../models/Event';
 import mongoose from 'mongoose';
 import { handleApiError, ApiError, isDatabaseError } from '../../../utils/api-error';
 
@@ -10,6 +10,42 @@ interface RegistrationData {
     label: string;
     value: any;
   };
+}
+
+interface FormattedEvent {
+  _id: string;
+  title: string;
+  location: string;
+  startDate: string;
+  endDate: string;
+}
+
+type VisitorStatus = 'registered' | 'checked_in' | 'checked_out' | 'cancelled' | 'Visited';
+
+interface FormattedVisitor {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company?: string;
+  age?: number;
+  eventId: FormattedEvent | null;
+  eventName: string;
+  eventLocation: string;
+  eventStartDate: string;
+  eventEndDate: string;
+  status: VisitorStatus;
+  checkInTime: string;
+  checkOutTime?: string;
+  formData?: Record<string, { label: string; value: any }>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface PopulatedVisitor extends Omit<IVisitor, 'eventId' | 'status'> {
+  eventId: IEvent & { _id: mongoose.Types.ObjectId };
+  status: VisitorStatus;
+  _id: mongoose.Types.ObjectId;
 }
 
 export default async function handler(
@@ -76,7 +112,7 @@ export default async function handler(
 
           // Fetch visitors with populated event data
           const visitors = await Visitor.find(query)
-            .populate('eventId', 'title location startDate endDate')
+            .populate<{ eventId: IEvent }>('eventId', 'title location startDate endDate')
             .sort({ checkInTime: -1 })
             .lean()
             .exec();
@@ -88,26 +124,28 @@ export default async function handler(
           // Format response
           const formattedVisitors = visitors.map(visitor => {
             try {
+              const populatedVisitor = visitor as unknown as PopulatedVisitor;
               const formatted: FormattedVisitor = {
-                ...visitor,
-                _id: visitor._id.toString(),
-                eventId: visitor.eventId ? {
-                  ...visitor.eventId,
-                  _id: visitor.eventId._id.toString(),
-                  startDate: new Date(visitor.eventId.startDate).toISOString(),
-                  endDate: new Date(visitor.eventId.endDate).toISOString()
+                ...populatedVisitor,
+                _id: populatedVisitor._id.toString(),
+                eventId: populatedVisitor.eventId ? {
+                  _id: populatedVisitor.eventId._id.toString(),
+                  title: populatedVisitor.eventId.title,
+                  location: populatedVisitor.eventId.location,
+                  startDate: new Date(populatedVisitor.eventId.startDate).toISOString(),
+                  endDate: new Date(populatedVisitor.eventId.endDate).toISOString()
                 } : null,
-                checkInTime: new Date(visitor.checkInTime).toISOString(),
-                createdAt: new Date(visitor.createdAt).toISOString(),
-                updatedAt: new Date(visitor.updatedAt).toISOString()
+                checkInTime: new Date(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
+                createdAt: new Date(populatedVisitor.createdAt).toISOString(),
+                updatedAt: new Date(populatedVisitor.updatedAt).toISOString()
               };
 
               // Handle optional fields
-              if (visitor.checkOutTime) {
-                formatted.checkOutTime = new Date(visitor.checkOutTime).toISOString();
+              if (populatedVisitor.checkOutTime) {
+                formatted.checkOutTime = new Date(populatedVisitor.checkOutTime).toISOString();
               }
-              if (visitor.formData) {
-                formatted.formData = visitor.formData;
+              if (populatedVisitor.additionalData) {
+                formatted.formData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
               }
 
               return formatted;
@@ -161,29 +199,31 @@ export default async function handler(
           });
 
           // Populate event data
-          await newVisitor.populate('eventId', 'title location startDate endDate');
+          await newVisitor.populate<{ eventId: IEvent }>('eventId', 'title location startDate endDate');
 
           // Format response
+          const populatedVisitor = newVisitor.toObject() as unknown as PopulatedVisitor;
           const formattedVisitor: FormattedVisitor = {
-            ...newVisitor.toObject(),
-            _id: newVisitor._id.toString(),
-            eventId: newVisitor.eventId ? {
-              ...newVisitor.eventId,
-              _id: newVisitor.eventId._id.toString(),
-              startDate: new Date(newVisitor.eventId.startDate).toISOString(),
-              endDate: new Date(newVisitor.eventId.endDate).toISOString()
+            ...populatedVisitor,
+            _id: populatedVisitor._id.toString(),
+            eventId: populatedVisitor.eventId ? {
+              _id: populatedVisitor.eventId._id.toString(),
+              title: populatedVisitor.eventId.title,
+              location: populatedVisitor.eventId.location,
+              startDate: new Date(populatedVisitor.eventId.startDate).toISOString(),
+              endDate: new Date(populatedVisitor.eventId.endDate).toISOString()
             } : null,
-            checkInTime: newVisitor.checkInTime.toISOString(),
-            createdAt: newVisitor.createdAt.toISOString(),
-            updatedAt: newVisitor.updatedAt.toISOString()
+            checkInTime: new Date(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
+            createdAt: new Date(populatedVisitor.createdAt).toISOString(),
+            updatedAt: new Date(populatedVisitor.updatedAt).toISOString()
           };
 
           // Handle optional fields
-          if (newVisitor.checkOutTime) {
-            formattedVisitor.checkOutTime = newVisitor.checkOutTime.toISOString();
+          if (populatedVisitor.checkOutTime) {
+            formattedVisitor.checkOutTime = new Date(populatedVisitor.checkOutTime).toISOString();
           }
-          if (newVisitor.formData) {
-            formattedVisitor.formData = newVisitor.formData;
+          if (populatedVisitor.additionalData) {
+            formattedVisitor.formData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
           }
 
           return res.status(201).json(formattedVisitor);
