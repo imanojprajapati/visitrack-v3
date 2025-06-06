@@ -92,11 +92,8 @@ export default async function handler(
     // 2. Second Row: QR code (scaled size, centered)
     if (visitorData) {
       try {
-        const qrData = JSON.stringify({
-          visitorId: visitorData.id || visitorData._id,
-          templateId: template._id,
-          eventId: template.eventId,
-        });
+        // Only use visitor ID for QR code
+        const qrData = visitorData._id || visitorData.id || '';
         const qrCodeDataUrl = await QRCode.toDataURL(qrData);
         const qrCodeBuffer = Buffer.from(qrCodeDataUrl.split(',')[1], 'base64');
         const qrScaled = scaled(qrSize);
