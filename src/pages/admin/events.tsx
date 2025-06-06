@@ -332,12 +332,12 @@ export default function EventManagement() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
+      <div className="w-full max-w-7xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
         <Card
           title={
-            <div className="flex items-center justify-between">
-              <span>Events</span>
-              <Space>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <span className="text-lg font-semibold">Events</span>
+              <Space wrap>
                 <Button
                   type="default"
                   icon={<ReloadOutlined />}
@@ -360,43 +360,44 @@ export default function EventManagement() {
               </Space>
             </div>
           }
+          className="mb-6"
         >
-          <Table
-            columns={columns}
-            dataSource={events}
-            rowKey="_id"
-            loading={isLoading}
-            pagination={{
-              defaultPageSize: 10,
-              showSizeChanger: true,
-              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} events`
-            }}
-          />
+          <div className="overflow-x-auto">
+            <Table
+              columns={columns}
+              dataSource={events}
+              rowKey="_id"
+              loading={isLoading}
+              pagination={{
+                defaultPageSize: 10,
+                showSizeChanger: true,
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} events`
+              }}
+            />
+          </div>
         </Card>
-
         <Modal
           title={isViewMode ? 'View Event' : selectedEvent ? 'Edit Event' : 'Add Event'}
           open={modalVisible}
           onCancel={handleModalClose}
           footer={null}
-          width={800}
+          width={window.innerWidth < 640 ? '100vw' : 800}
+          style={{ top: 24, padding: 0 }}
+          bodyStyle={{ padding: window.innerWidth < 640 ? 8 : 24 }}
         >
           {isViewMode && selectedEvent ? (
-            <div className="p-4">
+            <div className="p-2 sm:p-4">
               {selectedEvent.banner && (
                 <div className="mb-6">
                   <img 
                     src={selectedEvent.banner} 
                     alt={selectedEvent.title}
-                    className="w-full h-48 object-cover rounded-lg"
+                    className="w-full h-40 sm:h-48 object-cover rounded-lg"
                   />
                 </div>
               )}
-              <Row gutter={[16, 16]}>
-                <Col span={24}>
-                  <h2 className="text-2xl font-bold mb-4">{selectedEvent.title}</h2>
-                </Col>
-                <Col span={12}>
+              <Row gutter={[8, 16]}>
+                <Col xs={24} sm={12}>
                   <div className="font-semibold text-gray-600">Date & Time</div>
                   <div>
                     {typeof selectedEvent.startDate === 'string' 
@@ -406,7 +407,7 @@ export default function EventManagement() {
                         : ''} at {selectedEvent.time}
                   </div>
                 </Col>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <div className="font-semibold text-gray-600">Status</div>
                   <Tag color={
                     selectedEvent.status === 'published' ? 'green' :
@@ -416,11 +417,11 @@ export default function EventManagement() {
                     {selectedEvent.status.toUpperCase()}
                   </Tag>
                 </Col>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <div className="font-semibold text-gray-600">Venue</div>
                   <div>{selectedEvent.venue || selectedEvent.location}</div>
                 </Col>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <div className="font-semibold text-gray-600">Capacity</div>
                   <div className="flex items-center gap-2">
                     {(() => {
@@ -444,12 +445,12 @@ export default function EventManagement() {
                     })()}
                   </div>
                 </Col>
-                <Col span={24}>
+                <Col xs={24}>
                   <div className="font-semibold text-gray-600">Description</div>
                   <div className="mt-1">{selectedEvent.description}</div>
                 </Col>
                 {selectedEvent.registrationDeadline && (
-                  <Col span={12}>
+                  <Col xs={24} sm={12}>
                     <div className="font-semibold text-gray-600">Registration Deadline</div>
                     <div>
                       {typeof selectedEvent.registrationDeadline === 'string'
@@ -469,8 +470,8 @@ export default function EventManagement() {
               onFinish={onSubmit}
               initialValues={getInitialValues(selectedEvent)}
             >
-              <Row gutter={16}>
-                <Col span={16}>
+              <Row gutter={[8, 16]}>
+                <Col xs={24} sm={16}>
                   <Form.Item
                     name="title"
                     label="Event Title"
@@ -479,7 +480,7 @@ export default function EventManagement() {
                     <Input />
                   </Form.Item>
                 </Col>
-                <Col span={8}>
+                <Col xs={24} sm={8}>
                   <Form.Item
                     name="status"
                     label="Status"
@@ -494,9 +495,8 @@ export default function EventManagement() {
                   </Form.Item>
                 </Col>
               </Row>
-
-              <Row gutter={16}>
-                <Col span={12}>
+              <Row gutter={[8, 16]}>
+                <Col xs={24} sm={12}>
                   <Form.Item
                     name="date"
                     label="Start Date"
@@ -510,7 +510,7 @@ export default function EventManagement() {
                     />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Form.Item
                     name="endDate"
                     label="End Date"
@@ -533,9 +533,8 @@ export default function EventManagement() {
                   </Form.Item>
                 </Col>
               </Row>
-
-              <Row gutter={16}>
-                <Col span={12}>
+              <Row gutter={[8, 16]}>
+                <Col xs={24} sm={12}>
                   <Form.Item
                     name="time"
                     label="Start Time"
@@ -544,7 +543,7 @@ export default function EventManagement() {
                     <Input placeholder="e.g., 09:00 AM" />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Form.Item
                     name="endTime"
                     label="End Time"
@@ -554,7 +553,6 @@ export default function EventManagement() {
                   </Form.Item>
                 </Col>
               </Row>
-
               <Form.Item
                 name="venue"
                 label="Venue"
@@ -562,9 +560,8 @@ export default function EventManagement() {
               >
                 <Input />
               </Form.Item>
-
-              <Row gutter={16}>
-                <Col span={12}>
+              <Row gutter={[8, 16]}>
+                <Col xs={24} sm={12}>
                   <Form.Item
                     name="capacity"
                     label="Capacity"
@@ -573,7 +570,7 @@ export default function EventManagement() {
                     <InputNumber style={{ width: '100%' }} min={1} />
                   </Form.Item>
                 </Col>
-                <Col span={12}>
+                <Col xs={24} sm={12}>
                   <Form.Item
                     name="registrationDeadline"
                     label="Registration Deadline"
@@ -585,14 +582,12 @@ export default function EventManagement() {
                   </Form.Item>
                 </Col>
               </Row>
-
               <Form.Item
                 name="description"
                 label="Description"
               >
                 <TextArea rows={4} />
               </Form.Item>
-
               <Form.Item
                 name="banner"
                 label="Event Banner"
@@ -651,9 +646,8 @@ export default function EventManagement() {
                   )}
                 </Upload>
               </Form.Item>
-
               <Form.Item>
-                <Space>
+                <Space wrap>
                   <Button type="primary" htmlType="submit">
                     {selectedEvent ? 'Update Event' : 'Create Event'}
                   </Button>

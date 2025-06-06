@@ -22,7 +22,7 @@ export default function BadgeManagement() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
+      <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
         <h1 className="text-2xl font-bold mb-6">Badge Management</h1>
         
         <Row gutter={[16, 16]}>

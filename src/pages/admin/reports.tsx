@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs, Card, Typography, Space, Alert } from 'antd';
-import { UserOutlined, HistoryOutlined } from '@ant-design/icons';
+import { UserOutlined, HistoryOutlined, BarChartOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
 import RegistrationReport from './reports/registrations';
 
@@ -10,10 +10,12 @@ const { Title, Text } = Typography;
 export default function ReportsPage() {
   return (
     <AdminLayout>
-      <div className="p-6">
-        <div className="mb-6">
-          <Title level={2}>Reports</Title>
-          <Text type="secondary">View and analyze visitor registration data and entry logs</Text>
+      <div className="w-full max-w-6xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <div>
+            <Title level={2} className="text-xl sm:text-2xl font-bold">Reports</Title>
+            <Text type="secondary">View and analyze visitor registration data and entry logs</Text>
+          </div>
         </div>
 
         <Card>
@@ -22,6 +24,7 @@ export default function ReportsPage() {
             type="card"
             size="large"
             tabBarStyle={{ marginBottom: 24 }}
+            className="overflow-x-auto"
           >
             <TabPane 
               tab={
@@ -34,39 +37,42 @@ export default function ReportsPage() {
             >
               <RegistrationReport />
             </TabPane>
-            
-            <TabPane 
+
+            <TabPane
               tab={
                 <Space>
                   <HistoryOutlined />
-                  <span>Entry Log</span>
+                  <span>Entry Logs</span>
                 </Space>
-              } 
-              key="entry-log"
+              }
+              key="entry-logs"
             >
-              <div className="p-6">
+              <div className="p-4">
                 <Alert
-                  message="Entry Log Coming Soon"
-                  description="The entry log feature is currently under development. It will show detailed check-in and check-out records for all visitors."
+                  message="Coming Soon"
+                  description="Entry logs report will be available in the next update. This will include detailed visitor check-in and check-out times, duration of visits, and location tracking."
                   type="info"
                   showIcon
-                  className="mb-6"
                 />
-                <Card>
-                  <div className="text-center py-12">
-                    <HistoryOutlined style={{ fontSize: 48, color: '#1890ff' }} />
-                    <Title level={4} className="mt-4">Entry Log Feature</Title>
-                    <Text type="secondary" className="block mt-2">
-                      This feature will provide:
-                    </Text>
-                    <ul className="text-left max-w-md mx-auto mt-4 text-gray-600">
-                      <li>• Real-time check-in and check-out tracking</li>
-                      <li>• Visitor movement history</li>
-                      <li>• Time-based analytics</li>
-                      <li>• Export capabilities for entry logs</li>
-                    </ul>
-                  </div>
-                </Card>
+              </div>
+            </TabPane>
+
+            <TabPane
+              tab={
+                <Space>
+                  <BarChartOutlined />
+                  <span>Analytics</span>
+                </Space>
+              }
+              key="analytics"
+            >
+              <div className="p-4">
+                <Alert
+                  message="Coming Soon"
+                  description="Analytics dashboard will provide insights into visitor demographics, peak hours, popular events, and more."
+                  type="info"
+                  showIcon
+                />
               </div>
             </TabPane>
           </Tabs>
@@ -74,4 +80,12 @@ export default function ReportsPage() {
       </div>
     </AdminLayout>
   );
+}
+
+export async function getServerSideProps() {
+  return {
+    props: {
+      isAdminPage: true,
+    },
+  };
 }

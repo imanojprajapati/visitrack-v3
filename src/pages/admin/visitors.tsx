@@ -150,38 +150,44 @@ export default function VisitorsPage() {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
-      render: (name: string, record: Visitor) => name || record.additionalData?.name?.value || '-'
+      render: (name: string, record: Visitor) => name || record.additionalData?.name?.value || '-',
+      responsive: ['xs'],
     },
     {
       title: 'Email',
       dataIndex: 'email',
       key: 'email',
-      render: (email: string, record: Visitor) => email || record.additionalData?.email?.value || '-'
+      render: (email: string, record: Visitor) => email || record.additionalData?.email?.value || '-',
+      responsive: ['sm'],
     },
     {
       title: 'Phone',
       dataIndex: 'phone',
       key: 'phone',
-      render: (phone: string, record: Visitor) => phone || record.additionalData?.phone?.value || '-'
+      render: (phone: string, record: Visitor) => phone || record.additionalData?.phone?.value || '-',
+      responsive: ['sm'],
     },
     {
       title: 'Company',
       dataIndex: 'company',
       key: 'company',
       render: (company: string, record: Visitor) => 
-        company || record.additionalData?.company?.value || '-'
+        company || record.additionalData?.company?.value || '-',
+      responsive: ['md'],
     },
     {
       title: 'Event',
       dataIndex: 'eventName',
       key: 'eventName',
-      render: (eventName: string) => eventName || '-'
+      render: (eventName: string) => eventName || '-',
+      responsive: ['md'],
     },
     {
       title: 'Location',
       dataIndex: 'eventLocation',
       key: 'eventLocation',
-      render: (location: string) => location || '-'
+      render: (location: string) => location || '-',
+      responsive: ['lg'],
     },
     {
       title: 'Status',
@@ -192,6 +198,7 @@ export default function VisitorsPage() {
           {formatStatus(status)}
         </Tag>
       ),
+      responsive: ['xs'],
     },
     {
       title: 'Registration Date',
@@ -214,12 +221,13 @@ export default function VisitorsPage() {
           return '-';
         }
       },
+      responsive: ['lg'],
     },
     {
       title: 'Actions',
       key: 'actions',
       render: (_: any, record: Visitor) => (
-        <Space>
+        <Space size="small" className="flex-wrap">
           <Button
             type="text"
             icon={<EyeOutlined />}
@@ -240,7 +248,8 @@ export default function VisitorsPage() {
           />
         </Space>
       ),
-    }
+      responsive: ['xs'],
+    },
   ];
 
   const handleSearch = (values: SearchFormValues) => {
@@ -446,21 +455,22 @@ export default function VisitorsPage() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
+      <div className="p-4 sm:p-6">
         <Card
-          title={<h1 className="text-2xl font-bold">Visitor Management</h1>}
+          title={<h1 className="text-xl sm:text-2xl font-bold">Visitor Management</h1>}
           extra={
-            <Space>
-              <Button icon={<ExportOutlined />} onClick={handleExport}>
+            <Space className="flex-wrap">
+              <Button icon={<ExportOutlined />} onClick={handleExport} className="w-full sm:w-auto">
                 Export
               </Button>
-              <Button icon={<ImportOutlined />} onClick={handleImport}>
+              <Button icon={<ImportOutlined />} onClick={handleImport} className="w-full sm:w-auto">
                 Import
               </Button>
               <Button
                 icon={<FilterOutlined />}
                 onClick={() => setShowFilters(!showFilters)}
                 type={showFilters ? 'primary' : 'default'}
+                className="w-full sm:w-auto"
               >
                 Filters
               </Button>
@@ -474,13 +484,13 @@ export default function VisitorsPage() {
               className="mb-6"
               onFinish={handleSearch}
             >
-              <Row gutter={16}>
-                <Col span={6}>
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12} md={6}>
                   <Form.Item name="search" label="Search">
                     <Input prefix={<SearchOutlined />} placeholder="Search by name, email, or phone" />
                   </Form.Item>
                 </Col>
-                <Col span={6}>
+                <Col xs={24} sm={12} md={6}>
                   <Form.Item name="eventId" label="Event">
                     <Select placeholder="Select event" allowClear>
                       {events.map(event => (
@@ -491,7 +501,7 @@ export default function VisitorsPage() {
                     </Select>
                   </Form.Item>
                 </Col>
-                <Col span={6}>
+                <Col xs={24} sm={12} md={6}>
                   <Form.Item name="status" label="Status">
                     <Select placeholder="Select status" allowClear>
                       <Option value="registered">Registered</Option>
@@ -501,7 +511,7 @@ export default function VisitorsPage() {
                     </Select>
                   </Form.Item>
                 </Col>
-                <Col span={6}>
+                <Col xs={24} sm={12} md={6}>
                   <Form.Item name="dateRange" label="Date Range">
                     <RangePicker className="w-full" />
                   </Form.Item>
@@ -509,7 +519,7 @@ export default function VisitorsPage() {
               </Row>
               <Row>
                 <Col span={24} className="text-right">
-                  <Space>
+                  <Space className="flex-wrap justify-end">
                     <Button onClick={handleReset}>Reset</Button>
                     <Button type="primary" htmlType="submit">
                       Apply Filters
@@ -530,7 +540,10 @@ export default function VisitorsPage() {
               pageSize: 10,
               showSizeChanger: true,
               showTotal: (total) => `Total ${total} visitors`,
+              responsive: true,
             }}
+            scroll={{ x: 'max-content' }}
+            className="overflow-x-auto"
           />
         </Card>
 

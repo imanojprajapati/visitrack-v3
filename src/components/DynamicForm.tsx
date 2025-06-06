@@ -1,11 +1,14 @@
 import React, { useEffect } from 'react';
-import { Form, Input, InputNumber, Select, DatePicker } from 'antd';
+import { Form, Input, InputNumber, Select, DatePicker, Upload } from 'antd';
 import type { Rule } from 'antd/lib/form';
 import { FormField, FormTemplate } from '../utils/formBuilder';
+import { PlusOutlined } from '@ant-design/icons';
+
+const { Option } = Select;
 
 interface DynamicFormProps {
   template: FormTemplate;
-  form?: any; // Add form prop to allow external form control
+  form?: any;
   onFinish?: (values: any) => void;
   initialValues?: Record<string, any>;
   disabled?: boolean;
@@ -32,77 +35,121 @@ const getFieldRules = (field: FormField): Rule[] => {
     });
   }
 
-  switch (field.type) {
-    case 'email':
-      rules.push({
-        validator: async (_, value) => {
-          if (!value) return; // Skip validation if empty (required rule will handle it)
-          if (!validateEmail(value)) {
-            throw new Error('Please enter a valid email address');
-          }
-        },
-        validateTrigger: ['onBlur', 'onChange', 'onSubmit']
-      });
-      break;
-
-    case 'phone':
-      rules.push({
-        validator: async (_, value) => {
-          if (!value) return; // Skip validation if empty (required rule will handle it)
-          if (!validatePhone(value)) {
-            throw new Error('Please enter a valid phone number');
-          }
-        },
-        validateTrigger: ['onBlur', 'onChange', 'onSubmit']
-      });
-      break;
-
-    case 'number':
-      rules.push({
-        type: 'number',
-        message: 'Please enter a valid number',
-        validateTrigger: ['onBlur', 'onChange', 'onSubmit']
-      });
-      break;
-  }
-
   if (field.validation) {
-    rules.push(...field.validation.map(rule => ({
-      ...rule,
-      validateTrigger: ['onBlur', 'onChange', 'onSubmit']
-    })));
+    if (field.validation.maxLength) {
+      rules.push({
+        max: field.validation.maxLength,
+        message: `${field.label} must be at most ${field.validation.maxLength} characters`,
+        validateTrigger: ['onBlur', 'onChange']
+      });
+    }
+
+    if (field.validation.pattern) {
+      rules.push({
+        pattern: new RegExp(field.validation.pattern),
+        message: field.validation.message || `${field.label} is invalid`,
+        validateTrigger: ['onBlur', 'onChange']
+      });
+    }
+
+    if (field.type === 'number') {
+      if (field.validation.min !== undefined) {
+        rules.push({
+          type: 'number',
+          min: field.validation.min,
+          message: `${field.label} must be at least ${field.validation.min}`,
+          validateTrigger: ['onBlur', 'onChange']
+        });
+      }
+      if (field.validation.max !== undefined) {
+        rules.push({
+          type: 'number',
+          max: field.validation.max,
+          message: `${field.label} must be at most ${field.validation.max}`,
+          validateTrigger: ['onBlur', 'onChange']
+        });
+      }
+    }
+
+    if (field.type === 'email') {
+      rules.push({
+        type: 'email',
+        message: 'Please enter a valid email address',
+        validateTrigger: ['onBlur', 'onChange']
+      });
+    }
+
+    if (field.type === 'phone') {
+      rules.push({
+        pattern: /^\+?[\d\s-]{10,}$/,
+        message: 'Please enter a valid phone number',
+        validateTrigger: ['onBlur', 'onChange']
+      });
+    }
   }
 
-  console.log(`Field rules for ${field.id}:`, rules);
   return rules;
 };
 
-const renderField = (field: FormField, disabled?: boolean): React.ReactNode => {
+const renderField = (field: FormField, disabled: boolean) => {
+  const commonProps = {
+    className: "w-full",
+    disabled: disabled || field.readOnly,
+    placeholder: field.placeholder || `Enter ${field.label.toLowerCase()}`,
+  };
+
   switch (field.type) {
     case 'text':
-      return <Input placeholder={field.placeholder} disabled={disabled} />;
+      return <Input {...commonProps} maxLength={field.validation?.maxLength as number} />;
+    
     case 'textarea':
-      return <Input.TextArea rows={4} placeholder={field.placeholder} disabled={disabled} />;
+      return (
+        <Input.TextArea 
+          {...commonProps} 
+          rows={4}
+          maxLength={field.validation?.maxLength as number}
+          showCount
+        />
+      );
+    
     case 'number':
-      return <InputNumber style={{ width: '100%' }} placeholder={field.placeholder} disabled={disabled} />;
-    case 'email':
-      return <Input type="email" placeholder={field.placeholder || 'Enter email'} disabled={disabled} />;
-    case 'phone':
-      return <Input placeholder={field.placeholder || 'Enter phone number'} disabled={disabled} />;
+      return (
+        <InputNumber
+          {...commonProps}
+          min={field.validation?.min as number}
+          max={field.validation?.max as number}
+          style={{ width: '100%' }}
+        />
+      );
+    
     case 'select':
       return (
-        <Select placeholder={field.placeholder} disabled={disabled}>
-          {field.options?.map((option) => (
-            <Select.Option key={option.value} value={option.value}>
+        <Select {...commonProps}>
+          {field.options?.map(option => (
+            <Option key={option.value} value={option.value}>
               {option.label}
-            </Select.Option>
+            </Option>
           ))}
         </Select>
       );
+    
     case 'date':
-      return <DatePicker style={{ width: '100%' }} disabled={disabled} />;
+      return <DatePicker {...commonProps} style={{ width: '100%' }} />;
+    
+    case 'email':
+      return <Input type="email" {...commonProps} />;
+    
+    case 'phone':
+      return <Input type="tel" {...commonProps} />;
+    
+    case 'checkbox':
+      return <Input type="checkbox" {...commonProps} />;
+    
+    case 'radio':
+      return <Input type="radio" {...commonProps} />;
+    
     default:
-      return <Input placeholder={field.placeholder} disabled={disabled} />;
+      return <Input {...commonProps} />;
   }
 };
 
@@ -171,27 +218,42 @@ const DynamicForm: React.FC<DynamicFormProps> = ({
       onFinish={handleFinish}
       preserve={false}
       validateTrigger={['onChange', 'onBlur']}
+      className="w-full"
     >
-      {template.fields.map((field) => {
-        console.log('Rendering field:', field);
-        
-        const rules = getFieldRules(field);
-        console.log(`Validation rules for ${field.id}:`, rules);
+      <div className="grid grid-cols-1 gap-4">
+        {template.fields.map((field) => {
+          console.log('Rendering field:', field);
+          
+          const rules = getFieldRules(field);
+          console.log(`Validation rules for ${field.id}:`, rules);
 
-        return (
-          <Form.Item
-            key={field.id}
-            name={field.id}
-            label={field.label}
-            rules={rules}
-            validateTrigger={['onChange', 'onBlur']}
-            validateFirst
-            preserve={false}
-          >
-            {renderField(field, disabled)}
-          </Form.Item>
-        );
-      })}
+          // Determine if field should be full width
+          const isFullWidth = field.type === 'textarea' || 
+                            field.type === 'select' || 
+                            field.type === 'date' ||
+                            field.type === 'email' ||
+                            field.type === 'phone';
+
+          return (
+            <div 
+              key={field.id} 
+              className={`${isFullWidth ? 'col-span-1' : 'col-span-1 md:col-span-2'}`}
+            >
+              <Form.Item
+                name={field.id}
+                label={field.label}
+                rules={rules}
+                validateTrigger={['onChange', 'onBlur']}
+                validateFirst
+                preserve={false}
+                className="w-full"
+              >
+                {renderField(field, disabled)}
+              </Form.Item>
+            </div>
+          );
+        })}
+      </div>
     </Form>
   );
 };

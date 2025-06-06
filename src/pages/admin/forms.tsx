@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Button, Table, Space, message } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
-import FormBuilder from '../../components/admin/FormBuilder';
+import FormBuilder from '@/components/admin/FormBuilder';
 import { EventForm } from '../../types/form';
 import { useRouter } from 'next/router';
 
@@ -90,44 +91,53 @@ export default function FormsPage() {
     }
   };
 
-  const columns = [
+  const columns: ColumnsType<FormRecord> = [
     {
       title: 'Form Title',
       dataIndex: 'title',
       key: 'title',
+      fixed: 'left' as const,
+      width: 200,
     },
     {
       title: 'Event ID',
       dataIndex: 'eventId',
       key: 'eventId',
+      width: 150,
     },
     {
       title: 'Fields',
       dataIndex: 'fields',
       key: 'fields',
       render: (fields: any[]) => fields.length,
+      width: 100,
     },
     {
       title: 'Created At',
       dataIndex: 'createdAt',
       key: 'createdAt',
       render: (date: string) => new Date(date).toLocaleDateString(),
+      width: 150,
     },
     {
       title: 'Actions',
       key: 'actions',
+      fixed: 'right' as const,
+      width: 120,
       render: (_: any, record: FormRecord) => (
-        <Space>
+        <Space size="small" className="flex-wrap">
           <Button
             type="text"
             icon={<EditOutlined />}
             onClick={() => router.push(`/admin/forms/edit/${record._id}`)}
+            size="small"
           />
           <Button
             type="text"
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDeleteForm(record._id)}
+            size="small"
           />
         </Space>
       ),
@@ -140,13 +150,14 @@ export default function FormsPage() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold">Forms</h1>
+      <div className="w-full max-w-5xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold">Forms</h1>
           <Button
             type="primary"
             icon={<PlusOutlined />}
             onClick={() => setShowFormBuilder(true)}
+            className="w-full sm:w-auto"
           >
             Create New Form
           </Button>
@@ -158,12 +169,21 @@ export default function FormsPage() {
           </Card>
         ) : (
           <Card>
-            <Table
-              columns={columns}
-              dataSource={forms}
-              rowKey="_id"
-              loading={loading}
-            />
+            <div className="overflow-x-auto">
+              <Table
+                columns={columns}
+                dataSource={forms}
+                rowKey="_id"
+                loading={loading}
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `Total ${total} forms`,
+                  responsive: true,
+                }}
+                scroll={{ x: 'max-content' }}
+              />
+            </div>
           </Card>
         )}
       </div>

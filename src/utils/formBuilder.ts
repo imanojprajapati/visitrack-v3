@@ -3,14 +3,19 @@ import { Rule } from 'antd/lib/form';
 export interface FormField {
   id: string;
   label: string;
-  type: 'text' | 'number' | 'email' | 'phone' | 'date' | 'select' | 'checkbox' | 'radio' | 'textarea';
+  type: 'text' | 'textarea' | 'number' | 'select' | 'date' | 'email' | 'phone' | 'checkbox' | 'radio';
   required?: boolean;
-  options?: { label: string; value: string | number }[];
-  validation?: Rule[];
   placeholder?: string;
-  defaultValue?: any;
-  disabled?: boolean;
   readOnly?: boolean;
+  defaultValue?: any;
+  options?: Array<{ label: string; value: string | number }>;
+  validation?: {
+    min?: number;
+    max?: number;
+    maxLength?: number;
+    pattern?: string;
+    message?: string;
+  };
 }
 
 export interface FormTemplate {

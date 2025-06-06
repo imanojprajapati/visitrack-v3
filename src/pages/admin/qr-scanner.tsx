@@ -717,132 +717,159 @@ const QRScanner: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">QR Scanner</h1>
-        
-        <Card>
-          <div className="mb-4 flex gap-2">
-            <Button
-              type="primary"
-              icon={<CameraOutlined />}
-              onClick={() => setShowScanner(true)}
-            >
-              Camera Scanner
-            </Button>
-            <Button
-              icon={<UserAddOutlined />}
-              onClick={() => setShowManualEntry(true)}
-            >
-              Manual Entry
-            </Button>
+      <div className="p-4 sm:p-6">
+        <Card
+          title={<h1 className="text-xl sm:text-2xl font-bold">QR Scanner</h1>}
+          extra={
+            <Space className="flex-wrap">
+              <Button
+                type="primary"
+                icon={<CameraOutlined />}
+                onClick={() => setShowScanner(true)}
+                className="w-full sm:w-auto"
+              >
+                Start Scanner
+              </Button>
+              <Button
+                icon={<UserAddOutlined />}
+                onClick={() => setShowManualEntry(true)}
+                className="w-full sm:w-auto"
+              >
+                Manual Entry
+              </Button>
+            </Space>
+          }
+        >
+          <div className="space-y-6">
+            {/* Scanner Section */}
+            {showScanner && (
+              <div className="w-full max-w-2xl mx-auto">
+                <div id="qr-reader" className="w-full aspect-square max-w-md mx-auto" />
+                {cameraError && (
+                  <Result
+                    status="error"
+                    title="Camera Access Error"
+                    subTitle="Please allow camera access to use the QR scanner"
+                    extra={
+                      <Button type="primary" onClick={() => setRetryCount(prev => prev + 1)}>
+                        Retry
+                      </Button>
+                    }
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Image Upload Section */}
+            <Card title="Scan QR Code from Image" className="mt-6">
+              <Dragger
+                {...uploadProps}
+                className="w-full max-w-md mx-auto"
+                accept={IMAGE_CONFIG.acceptedFormats.join(',')}
+                maxCount={1}
+                showUploadList={false}
+              >
+                <p className="ant-upload-drag-icon">
+                  <UploadOutlined />
+                </p>
+                <p className="ant-upload-text">Click or drag image to this area to scan</p>
+                <p className="ant-upload-hint">
+                  Support for JPG, PNG, GIF, WEBP up to 2MB
+                </p>
+              </Dragger>
+            </Card>
+
+            {/* Scanned Visitors Table */}
+            <Card title="Scanned Visitors" className="mt-6">
+              <Table
+                columns={[
+                  {
+                    title: 'Name',
+                    dataIndex: 'name',
+                    key: 'name',
+                    responsive: ['xs'],
+                  },
+                  {
+                    title: 'Company',
+                    dataIndex: 'company',
+                    key: 'company',
+                    responsive: ['sm'],
+                  },
+                  {
+                    title: 'Event',
+                    dataIndex: 'eventName',
+                    key: 'eventName',
+                    responsive: ['md'],
+                  },
+                  {
+                    title: 'Status',
+                    dataIndex: 'status',
+                    key: 'status',
+                    render: (status: string) => (
+                      <Tag color={status === 'Visited' ? 'green' : 'blue'}>{status}</Tag>
+                    ),
+                    responsive: ['xs'],
+                  },
+                  {
+                    title: 'Entry Time',
+                    dataIndex: 'scanTime',
+                    key: 'scanTime',
+                    render: (scanTime: string) => {
+                      try {
+                        if (!scanTime) return '-';
+                        return dayjs(scanTime).format('DD/MM/YYYY HH:mm:ss');
+                      } catch (error) {
+                        console.error('Error formatting date:', error);
+                        return '-';
+                      }
+                    },
+                    responsive: ['md'],
+                  },
+                  {
+                    title: 'Entry Type',
+                    dataIndex: 'entryType',
+                    key: 'entryType',
+                    render: (text: string) => (
+                      <Tag color={text === 'manual' ? 'orange' : 'purple'}>
+                        {text.charAt(0).toUpperCase() + text.slice(1)}
+                      </Tag>
+                    ),
+                    responsive: ['sm'],
+                  },
+                  {
+                    title: 'Actions',
+                    key: 'actions',
+                    render: (_: any, record: VisitorEntry) => (
+                      <Space size="small" className="flex-wrap">
+                        <Button
+                          type="primary"
+                          icon={<PrinterOutlined />}
+                          onClick={() => handlePrint(record as unknown as VisitorData)}
+                          size="small"
+                        >
+                          Print
+                        </Button>
+                      </Space>
+                    ),
+                    responsive: ['xs'],
+                  },
+                ]}
+                dataSource={scannedVisitors}
+                rowKey="_id"
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `Total ${total} entries`,
+                  responsive: true,
+                }}
+                scroll={{ x: 'max-content' }}
+                className="overflow-x-auto"
+              />
+            </Card>
           </div>
-
-          {/* Hidden div for image scanning */}
-          <div id="qr-reader-image" style={{ display: 'none' }}></div>
-
-          <Table
-            columns={columns}
-            dataSource={scannedVisitors}
-            rowKey="_id"
-            pagination={{ pageSize: 10 }}
-            loading={loading}
-          />
         </Card>
 
-        {/* QR Scanner Modal with improved UI */}
-        <Modal
-          title="Scan QR Code"
-          open={showScanner}
-          onCancel={() => {
-            setShowScanner(false);
-            setCameraError(false);
-            if (scannerRef.current) {
-              scannerRef.current.clear();
-            }
-          }}
-          footer={[
-            <Upload key="upload" {...uploadProps}>
-              <Button icon={<UploadOutlined />}>
-                Upload QR Image
-              </Button>
-            </Upload>,
-            <Button key="manual" onClick={() => {
-              setShowScanner(false);
-              setShowManualEntry(true);
-            }}>
-              Enter Manually
-            </Button>
-          ]}
-          width={800}
-        >
-          <div className="w-full flex flex-col items-center">
-            {cameraError ? (
-              <div className="text-center p-5">
-                <CloseCircleOutlined className="text-4xl text-red-500" />
-                <Text className="block mt-4 text-base">
-                  Camera access error. Please try uploading an image or check camera permissions.
-                </Text>
-                <div className="mt-4 space-y-2">
-                  <Text className="block">Troubleshooting tips:</Text>
-                  <ul className="list-disc list-inside text-left">
-                    <li>Allow camera access in your browser settings</li>
-                    <li>Make sure your camera is not being used by another application</li>
-                    <li>Try using a different browser (Chrome or Edge recommended)</li>
-                    <li>Ensure you're using HTTPS</li>
-                    <li>If on mobile, try using the rear camera</li>
-                    <li>You can also try uploading a QR code image instead</li>
-                  </ul>
-                </div>
-                <Space className="mt-4">
-                  <Button 
-                    onClick={() => {
-                      setCameraError(false);
-                      if (scannerRef.current) {
-                        scannerRef.current.clear();
-                        scannerRef.current.render(
-                          (decodedText) => handleQrCodeScan(decodedText),
-                          (error) => {
-                            console.error('QR Scan error:', error);
-                            setCameraError(true);
-                          }
-                        );
-                      }
-                    }}
-                  >
-                    Try Again
-                  </Button>
-                  <Upload {...uploadProps}>
-                    <Button type="primary" icon={<UploadOutlined />}>
-                      Upload QR Image
-                    </Button>
-                  </Upload>
-                </Space>
-              </div>
-            ) : (
-              <>
-                <div id="qr-reader" className="w-full max-w-2xl" />
-                <div className="mt-6 text-center space-y-4">
-                  <Text className="block text-gray-500">
-                    Position the QR code within the frame to scan
-                  </Text>
-                  <div className="space-y-2">
-                    <Text className="block text-sm text-gray-400">Tips for better scanning:</Text>
-                    <ul className="list-disc list-inside text-sm text-gray-400 text-left">
-                      <li>Hold the QR code steady and parallel to the camera</li>
-                      <li>Ensure good lighting conditions</li>
-                      <li>Keep the QR code within the scanning frame</li>
-                      <li>Make sure the QR code is not damaged or blurry</li>
-                      <li>Try adjusting the distance between the camera and QR code</li>
-                      <li>If scanning doesn't work, try uploading the QR code image</li>
-                    </ul>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </Modal>
-
-        {/* Manual Entry Modal */}
+        {/* Modals */}
         <ManualEntryModal
           visible={showManualEntry}
           onCancel={() => {
@@ -854,37 +881,7 @@ const QRScanner: React.FC = () => {
           onFinish={handleManualEntry}
         />
 
-        {/* Preview Modal */}
         <PreviewModal visitor={scanResult} />
-
-        {/* Visitor Status Modal */}
-        {visitorStatus !== null && (
-          <Modal
-            title="Visitor Status"
-            open={true}
-            onCancel={() => setVisitorStatus(null)}
-            footer={null}
-            width={400}
-          >
-            <div className="text-center p-5">
-              {visitorStatus ? (
-                <>
-                  <CloseCircleOutlined className="text-4xl text-red-500" />
-                  <Text className="block mt-4 text-base">
-                    This visitor has already been registered!
-                  </Text>
-                </>
-              ) : (
-                <>
-                  <CheckCircleOutlined className="text-4xl text-green-500" />
-                  <Text className="block mt-4 text-base">
-                    New visitor detected! Would you like to print the badge?
-                  </Text>
-                </>
-              )}
-            </div>
-          </Modal>
-        )}
       </div>
     </AdminLayout>
   );

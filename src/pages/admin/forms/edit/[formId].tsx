@@ -84,7 +84,7 @@ export default function EditFormPage() {
 
   return (
     <AdminLayout>
-      <div className="p-6">
+      <div className="w-full max-w-5xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
         <Card title="Edit Form" className="mb-6">
           <FormBuilder
             onSave={handleSaveForm}

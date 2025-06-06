@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Card, Table, Form, Input, Button, Select, Space, Modal, message } from 'antd';
+import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
 
@@ -12,12 +13,7 @@ interface Role {
   permissions: string[];
 }
 
-const Settings = () => {
-  const [form] = Form.useForm();
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
-
-  // Mock data for roles
+const Settings: React.FC = () => {
   const [roles, setRoles] = useState<Role[]>([
     {
       key: '1',
@@ -27,56 +23,74 @@ const Settings = () => {
     },
     {
       key: '2',
-      name: 'Staff',
-      description: 'Limited access to visitor management',
-      permissions: ['dashboard', 'visitors'],
+      name: 'Manager',
+      description: 'Access to visitor management and reports',
+      permissions: ['dashboard', 'visitors', 'reports'],
     },
     {
       key: '3',
-      name: 'Scanner',
-      description: 'Access to badge scanning only',
-      permissions: ['badges'],
-    },
-    {
-      key: '4',
-      name: 'Visitor Manager',
-      description: 'Access to visitor management and reports',
-      permissions: ['visitors', 'reports'],
+      name: 'Staff',
+      description: 'Basic access to visitor check-in',
+      permissions: ['dashboard', 'visitors'],
     },
   ]);
 
-  const columns = [
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [editingRole, setEditingRole] = useState<Role | null>(null);
+  const [form] = Form.useForm();
+
+  const columns: ColumnsType<Role> = [
     {
       title: 'Role Name',
       dataIndex: 'name',
       key: 'name',
+      fixed: 'left' as const,
+      width: 150,
     },
     {
       title: 'Description',
       dataIndex: 'description',
       key: 'description',
+      width: 250,
     },
     {
       title: 'Permissions',
       dataIndex: 'permissions',
       key: 'permissions',
-      render: (permissions: string[]) => permissions.join(', '),
+      render: (permissions: string[]) => (
+        <Space wrap>
+          {permissions.map(permission => (
+            <span key={permission} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+              {permission}
+            </span>
+          ))}
+        </Space>
+      ),
+      width: 300,
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: any) => (
-        <Space>
+      fixed: 'right' as const,
+      width: 120,
+      render: (_, record) => (
+        <Space size="small" className="flex-wrap">
           <Button
             type="text"
             icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
+            onClick={() => {
+              setEditingRole(record);
+              form.setFieldsValue(record);
+              setIsModalVisible(true);
+            }}
+            size="small"
           />
           <Button
             type="text"
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record.key)}
+            size="small"
           />
         </Space>
       ),
@@ -86,12 +100,6 @@ const Settings = () => {
   const handleAdd = () => {
     setEditingRole(null);
     form.resetFields();
-    setIsModalVisible(true);
-  };
-
-  const handleEdit = (role: any) => {
-    setEditingRole(role);
-    form.setFieldsValue(role);
     setIsModalVisible(true);
   };
 
@@ -123,8 +131,10 @@ const Settings = () => {
 
   return (
     <AdminLayout>
-      <div className="p-6">
-        <h1 className="text-2xl font-bold mb-6">Settings</h1>
+      <div className="w-full max-w-4xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+          <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
+        </div>
         
         <Card
           title="Role Management"
@@ -133,16 +143,21 @@ const Settings = () => {
               type="primary"
               icon={<PlusOutlined />}
               onClick={handleAdd}
+              className="w-full sm:w-auto"
             >
               Add Role
             </Button>
           }
         >
-          <Table
-            dataSource={roles}
-            columns={columns}
-            pagination={false}
-          />
+          <div className="overflow-x-auto">
+            <Table
+              columns={columns}
+              dataSource={roles}
+              rowKey="key"
+              pagination={false}
+              scroll={{ x: 'max-content' }}
+            />
+          </div>
         </Card>
 
         <Modal
@@ -150,6 +165,9 @@ const Settings = () => {
           open={isModalVisible}
           onOk={handleModalOk}
           onCancel={() => setIsModalVisible(false)}
+          width={window.innerWidth < 640 ? '100%' : 600}
+          style={{ top: 24 }}
+          bodyStyle={{ padding: window.innerWidth < 640 ? 16 : 24 }}
         >
           <Form
             form={form}
@@ -158,7 +176,7 @@ const Settings = () => {
             <Form.Item
               name="name"
               label="Role Name"
-              rules={[{ required: true }]}
+              rules={[{ required: true, message: 'Please enter role name' }]}
             >
               <Input />
             </Form.Item>
@@ -166,17 +184,17 @@ const Settings = () => {
             <Form.Item
               name="description"
               label="Description"
-              rules={[{ required: true }]}
+              rules={[{ required: true, message: 'Please enter role description' }]}
             >
-              <Input.TextArea />
+              <Input.TextArea rows={3} />
             </Form.Item>
 
             <Form.Item
               name="permissions"
               label="Permissions"
-              rules={[{ required: true }]}
+              rules={[{ required: true, message: 'Please select permissions' }]}
             >
-              <Select mode="multiple">
+              <Select mode="multiple" className="w-full">
                 <Option value="dashboard">Dashboard</Option>
                 <Option value="visitors">Visitor Management</Option>
                 <Option value="badges">Badge Management</Option>

@@ -165,7 +165,7 @@ const VisitorRegistration: React.FC = () => {
   );
 
   return (
-    <div className="p-6">
+    <div className="w-full max-w-2xl mx-auto px-2 sm:px-4 lg:px-8 py-6">
       <Title level={2}>Visitor Registration</Title>
       <Form
         form={form}

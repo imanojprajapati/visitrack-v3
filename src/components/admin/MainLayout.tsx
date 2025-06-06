@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Typography, Button } from 'antd';
 import {
   DashboardOutlined,
   UserOutlined,
@@ -12,9 +12,12 @@ import {
   QrcodeOutlined,
   FileTextOutlined,
   SettingOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
 } from '@ant-design/icons';
 
 const { Content, Sider } = Layout;
+const { Text } = Typography;
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -34,28 +37,74 @@ const menuItems = [
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
   const router = useRouter();
   const selectedKey = router.pathname.split('/')[2] || 'dashboard';
-  
+
+  // Handle responsive behavior
+  useEffect(() => {
+    const checkMobile = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (mobile) {
+        setCollapsed(true);
+        setMobileMenuVisible(false);
+      } else {
+        setMobileMenuVisible(true);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const toggleMobileMenu = () => {
+    setMobileMenuVisible(!mobileMenuVisible);
+  };
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
+      {/* Mobile Menu Toggle Button */}
+      {isMobile && (
+        <Button
+          type="text"
+          icon={mobileMenuVisible ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
+          onClick={toggleMobileMenu}
+          style={{
+            position: 'fixed',
+            top: '16px',
+            left: '16px',
+            zIndex: 1001,
+            background: '#fff',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+          }}
+        />
+      )}
+      
       <Sider
         theme="light"
         collapsible
         collapsed={collapsed}
         onCollapse={setCollapsed}
+        breakpoint="md"
+        collapsedWidth={isMobile ? 0 : 80}
         style={{
           height: '100vh',
-          position: 'fixed',
+          position: isMobile ? 'fixed' : 'sticky',
           left: 0,
           top: 0,
           bottom: 0,
           zIndex: 1000,
-          boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)'
+          boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)',
+          overflow: 'auto',
+          transform: isMobile ? (mobileMenuVisible ? 'translateX(0)' : 'translateX(-100%)') : 'none',
+          transition: 'transform 0.3s ease-in-out',
         }}
       >
         <div className="logo p-4 flex items-center justify-center border-b border-gray-100">
-          <Link href="/" className="flex items-center">
+          <Link href="/admin" className="flex items-center justify-center w-full">
             {!collapsed ? (
               <img
                 src="/images/logo.png"
@@ -63,11 +112,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
                 className="h-8 w-auto"
               />
             ) : (
-              <img
-                src="/images/icon.png"
-                alt="Visitrack"
-                className="h-8 w-8"
-              />
+              <Text strong style={{ fontSize: '24px', color: '#3730A3' }}>V</Text>
             )}
           </Link>
         </div>
@@ -86,20 +131,41 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           }))}
         />
       </Sider>
+      
+      {/* Overlay for mobile menu */}
+      {isMobile && mobileMenuVisible && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.5)',
+            zIndex: 999,
+          }}
+          onClick={() => setMobileMenuVisible(false)}
+        />
+      )}
+
       <Layout style={{ 
-        marginLeft: collapsed ? 80 : 200, 
+        marginLeft: isMobile ? 0 : (collapsed ? 80 : 200),
         transition: 'all 0.2s',
         minHeight: '100vh',
-        background: '#f0f2f5'
+        background: '#f0f2f5',
+        padding: isMobile ? '16px' : '24px',
       }}>
         <Content style={{ 
-          padding: '24px',
+          padding: isMobile ? '16px' : '24px',
           minHeight: 'calc(100vh - 48px)',
           display: 'flex',
           flexDirection: 'column',
           width: '100%',
           maxWidth: '100%',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          background: '#fff',
+          borderRadius: '8px',
+          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
         }}>
           {children}
         </Content>

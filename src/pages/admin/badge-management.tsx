@@ -861,61 +861,28 @@ const BadgeManagement: React.FC = () => {
 
   return (
     <AdminLayout>
-      <div className="p-6">
-        <Card 
-          title={
-            <Space>
-              <Title level={4} style={{ margin: 0 }}>Badge Template Management</Title>
-              <Button 
-                type="primary" 
-                icon={<PlusOutlined />}
-                onClick={handleNewTemplate}
-              >
-                New Template
-              </Button>
-            </Space>
-          }
-          className="mb-6"
-          extra={
-            <Space>
-              <Button 
-                type="primary" 
-                icon={<SaveOutlined />}
-                onClick={() => form.submit()}
-                loading={loading}
-              >
-                Save Template
-              </Button>
-              <Button onClick={handleNewTemplate}>Reset</Button>
-            </Space>
-          }
-        >
+      <div className="space-y-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <Title level={2} className="m-0">Badge Management</Title>
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={handleNewTemplate}
+            className="w-full sm:w-auto"
+          >
+            New Template
+          </Button>
+        </div>
+
+        <Card>
           <Form
             form={form}
             layout="vertical"
             onFinish={handleSaveTemplate}
-            onValuesChange={handleBadgeSizeChange}
-            initialValues={defaultTemplate}
+            className="space-y-6"
           >
-            <Row gutter={24}>
-              <Col span={12}>
-                <Form.Item
-                  name="eventId"
-                  label="Select Event"
-                  rules={[{ required: true, message: 'Please select an event' }]}
-                >
-                  <Select
-                    placeholder="Select an event"
-                    onChange={(value) => setSelectedEvent(value)}
-                  >
-                    {events.map(event => (
-                      <Option key={event._id} value={event._id}>
-                        {event.title}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-
+            <Row gutter={[24, 24]}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item
                   name="name"
                   label="Template Name"
@@ -923,28 +890,56 @@ const BadgeManagement: React.FC = () => {
                 >
                   <Input placeholder="Enter template name" />
                 </Form.Item>
-
+              </Col>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item
-                  name="orientation"
-                  label="Orientation"
-                  rules={[{ required: true }]}
+                  name={['eventId']}
+                  label="Event"
+                  rules={[{ required: true, message: 'Please select an event' }]}
                 >
-                  <Radio.Group>
-                    <Radio value="portrait">Portrait</Radio>
-                    <Radio value="landscape">Landscape</Radio>
+                  <Select
+                    placeholder="Select event"
+                    loading={loading}
+                    onChange={(value) => setSelectedEvent(value)}
+                  >
+                    {events.map((event) => (
+                      <Option key={event._id} value={event._id}>
+                        {event.title}
+                      </Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  name={['orientation']}
+                  label="Orientation"
+                  rules={[{ required: true, message: 'Please select orientation' }]}
+                >
+                  <Radio.Group className="w-full sm:w-auto">
+                    <Radio.Button value="portrait">Portrait</Radio.Button>
+                    <Radio.Button value="landscape">Landscape</Radio.Button>
                   </Radio.Group>
                 </Form.Item>
+              </Col>
+            </Row>
 
-                <Form.Item label="Badge Size">
+            <Row gutter={[24, 24]}>
+              <Col xs={24} sm={12} md={8}>
+                <Form.Item
+                  name="size"
+                  label="Size"
+                  rules={[{ required: true, message: 'Please enter size' }]}
+                >
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <Space>
                       <Form.Item
-                        name={['badge', 'size', 'width']}
+                        name={['size', 'width']}
                         rules={[
                           { required: true, message: 'Please enter width' },
                           ({ getFieldValue }) => ({
                             validator(_, value) {
-                              const widthUnit = getFieldValue(['badge', 'size', 'widthUnit']);
+                              const widthUnit = getFieldValue(['size', 'widthUnit']);
                               if (widthUnit === '%' && (value < 1 || value > 100)) {
                                 return Promise.reject(new Error('Width must be between 1 and 100 for percentage'));
                               }
@@ -966,17 +961,17 @@ const BadgeManagement: React.FC = () => {
                         />
                       </Form.Item>
                       <Form.Item
-                        name={['badge', 'size', 'widthUnit']}
+                        name={['size', 'widthUnit']}
                         noStyle
                       >
                         <Select 
                           style={{ width: '80px' }}
                           onChange={(value) => {
-                            const currentWidth = form.getFieldValue(['badge', 'size', 'width']);
+                            const currentWidth = form.getFieldValue(['size', 'width']);
                             if (value === '%' && currentWidth > 100) {
-                              form.setFieldValue(['badge', 'size', 'width'], 100);
+                              form.setFieldValue(['size', 'width'], 100);
                             } else if (value === 'px' && currentWidth < 50) {
-                              form.setFieldValue(['badge', 'size', 'width'], 50);
+                              form.setFieldValue(['size', 'width'], 50);
                             }
                           }}
                         >
@@ -987,7 +982,7 @@ const BadgeManagement: React.FC = () => {
                     </Space>
                     <Space>
                       <Form.Item
-                        name={['badge', 'size', 'height']}
+                        name={['size', 'height']}
                         rules={[
                           { required: true, message: 'Please enter height' },
                           { type: 'number', min: 50, max: 500, message: 'Height must be between 50 and 500 pixels' }
@@ -1003,7 +998,7 @@ const BadgeManagement: React.FC = () => {
                         />
                       </Form.Item>
                       <Form.Item
-                        name={['badge', 'size', 'heightUnit']}
+                        name={['size', 'heightUnit']}
                         noStyle
                         initialValue="px"
                       >
@@ -1014,25 +1009,33 @@ const BadgeManagement: React.FC = () => {
                     </Space>
                   </Space>
                 </Form.Item>
-
+              </Col>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item
-                  name={['title', 'text']}
+                  name="title"
                   label="Badge Title"
-                  rules={[{ required: true }]}
+                  rules={[{ required: true, message: 'Please enter badge title' }]}
                 >
                   <Input placeholder="Enter badge title" />
                 </Form.Item>
-
+              </Col>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item
-                  name={['subtitle', 'text']}
+                  name="subtitle"
                   label="Subtitle"
+                  rules={[{ required: true, message: 'Please enter subtitle' }]}
                 >
                   <Input placeholder="Enter subtitle" />
                 </Form.Item>
+              </Col>
+            </Row>
 
+            <Row gutter={[24, 24]}>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item
-                  name={['additionalInfo', 'text']}
+                  name="additionalInfo"
                   label="Additional Information"
+                  rules={[{ required: true, message: 'Please enter additional information' }]}
                 >
                   <TextArea
                     placeholder="Enter additional information text"
@@ -1041,7 +1044,8 @@ const BadgeManagement: React.FC = () => {
                     showCount
                   />
                 </Form.Item>
-
+              </Col>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item
                   name="showQRCode"
                   label="Show QR Code"
@@ -1049,7 +1053,8 @@ const BadgeManagement: React.FC = () => {
                 >
                   <Switch />
                 </Form.Item>
-
+              </Col>
+              <Col xs={24} sm={12} md={8}>
                 <Form.Item label="Upload Badge">
                   <Upload {...uploadProps}>
                     <Button icon={<UploadOutlined />}>Upload Badge</Button>
@@ -1065,217 +1070,130 @@ const BadgeManagement: React.FC = () => {
                     </div>
                   )}
                 </Form.Item>
-
-                <Form.Item>
-                  <Space>
-                    <Button type="primary" htmlType="submit" loading={loading}>
-                      Save Template
-                    </Button>
-                    <Button onClick={() => form.resetFields()}>Reset</Button>
-                  </Space>
-                </Form.Item>
               </Col>
             </Row>
+
+            <Form.Item>
+              <Space>
+                <Button type="primary" htmlType="submit" loading={loading}>
+                  Save Template
+                </Button>
+                <Button onClick={() => form.resetFields()}>Reset</Button>
+              </Space>
+            </Form.Item>
           </Form>
         </Card>
 
-        <Card 
-          title={
-            <Space>
-              <Title level={4} style={{ margin: 0 }}>Saved Templates</Title>
-              <Tag color="blue">{templates.length} templates</Tag>
-            </Space>
-          }
-          className="mt-6"
-        >
+        <Card title="Saved Templates" className="mt-6">
           <Table
-            columns={columns}
             dataSource={templates}
+            columns={[
+              {
+                title: 'Name',
+                dataIndex: 'name',
+                key: 'name',
+                responsive: ['xs'],
+              },
+              {
+                title: 'Event',
+                dataIndex: 'eventId',
+                key: 'eventId',
+                responsive: ['sm'],
+                render: (eventId) => {
+                  const event = events.find(e => e._id === eventId);
+                  return event?.title || 'N/A';
+                },
+              },
+              {
+                title: 'Actions',
+                key: 'actions',
+                responsive: ['xs'],
+                render: (_, record) => (
+                  <Space size="small" className="flex-wrap">
+                    <Button
+                      icon={<EyeOutlined />}
+                      onClick={() => handlePreview(record)}
+                      size="small"
+                    />
+                    <Button
+                      icon={<EditOutlined />}
+                      onClick={() => handleEdit(record)}
+                      size="small"
+                    />
+                    <Button
+                      icon={<PrinterOutlined />}
+                      onClick={() => handleDownload(record)}
+                      size="small"
+                    />
+                  </Space>
+                ),
+              },
+            ]}
             rowKey="_id"
-            pagination={{ pageSize: 10 }}
+            pagination={{
+              pageSize: 10,
+              showSizeChanger: true,
+              showTotal: (total) => `Total ${total} templates`,
+              responsive: true,
+            }}
+            scroll={{ x: 'max-content' }}
           />
         </Card>
+      </div>
 
-        <Drawer
-          title="Badge Preview"
-          placement="right"
-          width={800}
-          onClose={() => setPreviewDrawerVisible(false)}
-          open={previewDrawerVisible}
-          extra={
-            <Space>
-              <Button
-                type="primary"
-                icon={<PrinterOutlined />}
-                onClick={() => selectedTemplate && handleDownload(selectedTemplate)}
-                loading={loading}
-              >
-                Download Badge
-              </Button>
-            </Space>
-          }
-        >
-          {selectedTemplate && (
-            <div 
+      {/* Preview Drawer */}
+      <Drawer
+        title="Badge Preview"
+        placement="right"
+        width={400}
+        onClose={() => setPreviewDrawerVisible(false)}
+        open={previewDrawerVisible}
+        extra={
+          <Space className="flex-wrap">
+            <Button onClick={() => setPreviewDrawerVisible(false)}>Close</Button>
+            <Button
+              type="primary"
+              onClick={() => selectedTemplate && handleDownload(selectedTemplate)}
+              icon={<PrinterOutlined />}
+            >
+              Download
+            </Button>
+          </Space>
+        }
+      >
+        {selectedTemplate && (
+          <div className="space-y-4">
+            <div
               ref={badgeRef}
               style={{
                 width: '100%',
-                minHeight: '297mm',
-                margin: '0 auto',
-                background: 'white',
-                padding: '10mm',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                display: 'flex',
-                flexDirection: 'column',
+                aspectRatio: selectedTemplate.orientation === 'portrait' ? '2/3' : '3/2',
                 position: 'relative',
-                boxSizing: 'border-box'
+                background: '#fff',
+                border: '1px solid #d9d9d9',
+                borderRadius: '4px',
+                overflow: 'hidden',
               }}
             >
-              {/* Content wrapper with fixed height to prevent overlap */}
-              <div style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '10mm',
-                height: 'calc(297mm - 20mm - 60px)', // Full height minus padding and VISITRACK space
-                paddingBottom: '60px' // Space for VISITRACK text
-              }}>
-                {/* First Row: Badge Image */}
-                <div style={{
-                  width: '100%',
-                  height: selectedTemplate.badge?.size?.height || 200,
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: '4px',
-                  overflow: 'hidden',
-                  backgroundColor: '#fafafa'
-                }}>
-                  {selectedTemplate.badge?.cloudinaryUrl && (
-                    <div style={{
-                      width: selectedTemplate.badge?.size?.widthUnit === '%' 
-                        ? `${selectedTemplate.badge?.size?.width || 100}%` 
-                        : `${selectedTemplate.badge?.size?.width || 200}px`,
-                      height: `${selectedTemplate.badge?.size?.height || 200}px`,
-                      display: 'flex',
-                      justifyContent: 'center',
-                      alignItems: 'center',
-                      padding: '2mm'
-                    }}>
-                      <Image
-                        src={selectedTemplate.badge.cloudinaryUrl}
-                        alt="Badge"
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'contain'
-                        }}
-                        preview={false}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Second Row: Event Details */}
-                <div style={{
-                  width: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  gap: '8mm',
-                  padding: '5mm',
-                  textAlign: 'center',
-                  minHeight: '120px'
-                }}>
-                  <Typography.Title 
-                    level={3} 
-                    style={{ 
-                      margin: 0, 
-                      fontSize: '20pt',
-                      color: '#000000',
-                      lineHeight: '1.2'
-                    }}
-                  >
-                    {selectedTemplate.title?.text}
-                  </Typography.Title>
-                  <Typography.Text 
-                    strong 
-                    style={{ 
-                      fontSize: '16pt',
-                      color: '#000000',
-                      lineHeight: '1.2'
-                    }}
-                  >
-                    {selectedTemplate.subtitle?.text}
-                  </Typography.Text>
-                  <Typography.Text 
-                    style={{ 
-                      fontSize: '12pt',
-                      color: '#000000',
-                      lineHeight: '1.2'
-                    }}
-                  >
-                    {selectedTemplate.additionalInfo?.text}
-                  </Typography.Text>
-                </div>
-
-                {/* Third Row: QR Code or Empty Space */}
-                <div style={{
-                  width: '100%',
-                  height: '350px',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  padding: '5mm',
-                  border: selectedTemplate.isPreview ? 'none' : '1px dashed #e5e7eb',
-                  borderRadius: '4px',
-                  backgroundColor: selectedTemplate.isPreview ? 'transparent' : '#fafafa'
-                }}>
-                  {selectedTemplate.isPreview && selectedTemplate.showQRCode && (
-                    <QRCodeSVG
-                      value={generateVerificationURL(selectedTemplate._id || '')}
-                      size={200}
-                      level="H"
-                      includeMargin={true}
-                    />
-                  )}
-                </div>
-              </div>
-
-              {/* Fourth Row: VISITRACK Text */}
-              <div style={{
-                width: '100%',
-                height: '60px',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                position: 'absolute',
-                bottom: '10mm',
-                left: 0,
-                backgroundColor: 'white',
-                borderTop: '1px solid #f0f0f0'
-              }}>
-                <Typography.Title
-                  level={1}
-                  style={{
-                    margin: 0,
-                    textAlign: 'center',
-                    fontWeight: 'bold',
-                    textTransform: 'uppercase',
-                    letterSpacing: '3px',
-                    color: '#3730A3',
-                    fontSize: '48px'
-                  }}
-                >
-                  VISITRACK
-                </Typography.Title>
-              </div>
+              {/* Badge preview content */}
             </div>
-          )}
-        </Drawer>
-      </div>
+            <Descriptions column={1} size="small" className="w-full">
+              <Descriptions.Item label="Template Name">
+                {selectedTemplate.name}
+              </Descriptions.Item>
+              <Descriptions.Item label="Event">
+                {events.find(e => e._id === selectedTemplate.eventId)?.title || 'N/A'}
+              </Descriptions.Item>
+              <Descriptions.Item label="Size">
+                {selectedTemplate.size.width} x {selectedTemplate.size.height} {selectedTemplate.size.unit}
+              </Descriptions.Item>
+              <Descriptions.Item label="Orientation">
+                {selectedTemplate.orientation}
+              </Descriptions.Item>
+            </Descriptions>
+          </div>
+        )}
+      </Drawer>
     </AdminLayout>
   );
 };

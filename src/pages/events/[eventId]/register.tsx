@@ -337,22 +337,13 @@ export default function EventRegistration() {
                   label: String(opt),
                   value: String(opt)
                 })) : undefined,
-                validation: field.validation ? [
-                  ...(field.validation.min !== undefined ? [{
-                    type: 'number' as const,
-                    min: field.validation.min,
-                    message: `Minimum value is ${field.validation.min}`
-                  }] : []),
-                  ...(field.validation.max !== undefined ? [{
-                    type: 'number' as const,
-                    max: field.validation.max,
-                    message: `Maximum value is ${field.validation.max}`
-                  }] : []),
-                  ...(field.validation.pattern ? [{
-                    pattern: new RegExp(field.validation.pattern),
-                    message: 'Invalid format'
-                  }] : [])
-                ] : []
+                validation: field.validation ? {
+                  min: field.validation.min,
+                  max: field.validation.max,
+                  maxLength: field.validation.maxLength,
+                  pattern: field.validation.pattern,
+                  message: field.validation.message,
+                } : undefined
               };
             })
         ]
@@ -892,22 +883,13 @@ export default function EventRegistration() {
                             label: String(opt),
                             value: String(opt)
                           })) : undefined,
-                          validation: field.validation ? [
-                            ...(field.validation.min !== undefined ? [{
-                              type: 'number' as const,
-                              min: field.validation.min,
-                              message: `Minimum value is ${field.validation.min}`
-                            }] : []),
-                            ...(field.validation.max !== undefined ? [{
-                              type: 'number' as const,
-                              max: field.validation.max,
-                              message: `Maximum value is ${field.validation.max}`
-                            }] : []),
-                            ...(field.validation.pattern ? [{
-                              pattern: new RegExp(field.validation.pattern),
-                              message: 'Invalid format'
-                            }] : [])
-                          ] : []
+                          validation: field.validation ? {
+                            min: field.validation.min,
+                            max: field.validation.max,
+                            maxLength: field.validation.maxLength,
+                            pattern: field.validation.pattern,
+                            message: field.validation.message,
+                          } : undefined
                         };
                       })
                   ]
