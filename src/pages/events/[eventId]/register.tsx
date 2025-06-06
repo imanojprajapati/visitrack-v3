@@ -140,10 +140,14 @@ export default function EventRegistration() {
     try {
       setLoading(true);
       setError(null);
+      console.log('Starting OTP verification with values:', values);
 
       // Get email from form
       const email = form.getFieldValue('email');
+      console.log('Email from form:', email);
+      
       if (!email) {
+        console.log('Email validation failed');
         form.setFields([{
           name: 'email',
           errors: ['Email is required']
@@ -153,7 +157,10 @@ export default function EventRegistration() {
 
       // Validate OTP format first
       const cleanOTP = values.otp?.toString().trim() || '';
+      console.log('Cleaned OTP:', cleanOTP);
+      
       if (!cleanOTP) {
+        console.log('Empty OTP validation failed');
         form.setFields([{
           name: 'otp',
           errors: ['Please enter the OTP']
@@ -162,6 +169,7 @@ export default function EventRegistration() {
       }
 
       if (!/^\d{6}$/.test(cleanOTP)) {
+        console.log('OTP format validation failed');
         form.setFields([{
           name: 'otp',
           errors: ['Please enter a valid 6-digit OTP']
@@ -175,6 +183,7 @@ export default function EventRegistration() {
         errors: []
       }]);
 
+      console.log('Sending OTP verification request');
       const response = await fetchApi('auth/verify-otp', {
         method: 'POST',
         body: JSON.stringify({
@@ -182,9 +191,14 @@ export default function EventRegistration() {
           otp: cleanOTP,
         }),
       });
+      console.log('OTP verification response:', response);
 
-      if (!response || !response.message) {
-        throw new Error('Invalid response from server');
+      if (!response) {
+        throw new Error('No response from server');
+      }
+
+      if (!response.message) {
+        throw new Error('Invalid response format from server');
       }
 
       if (!event?.form) {
@@ -199,32 +213,28 @@ export default function EventRegistration() {
       setCurrentStep(2);
       message.success('OTP verified successfully');
     } catch (error) {
-      console.error('Error in OTP verification:', error);
+      console.error('Detailed error in OTP verification:', error);
       if (error instanceof Error) {
         const errorMessage = error.message;
+        console.log('Error message:', errorMessage);
+        
+        let formError = '';
         if (errorMessage.includes('No valid OTP found')) {
-          form.setFields([{
-            name: 'otp',
-            errors: ['OTP has expired. Please request a new OTP.']
-          }]);
+          formError = 'OTP has expired. Please request a new OTP.';
         } else if (errorMessage.includes('Too many failed attempts')) {
-          form.setFields([{
-            name: 'otp',
-            errors: ['Too many failed attempts. Please request a new OTP.']
-          }]);
+          formError = 'Too many failed attempts. Please request a new OTP.';
         } else if (errorMessage.includes('Invalid OTP')) {
-          form.setFields([{
-            name: 'otp',
-            errors: ['Invalid OTP. Please try again.']
-          }]);
+          formError = 'Invalid OTP. Please try again.';
         } else {
-          form.setFields([{
-            name: 'otp',
-            errors: [errorMessage]
-          }]);
+          formError = errorMessage;
         }
-        setError(errorMessage);
-        message.error(errorMessage);
+
+        form.setFields([{
+          name: 'otp',
+          errors: [formError]
+        }]);
+        setError(formError);
+        message.error(formError);
       } else {
         const defaultError = 'Failed to verify OTP. Please try again.';
         form.setFields([{
@@ -682,6 +692,7 @@ export default function EventRegistration() {
               onFinish={handleVerifyOTP}
               layout="vertical"
               className="w-full max-w-sm"
+              validateTrigger={['onBlur', 'onSubmit']}
             >
               <Form.Item
                 name="otp"
@@ -694,7 +705,6 @@ export default function EventRegistration() {
                     validateTrigger: ['onBlur', 'onSubmit']
                   }
                 ]}
-                validateTrigger={['onBlur', 'onSubmit']}
               >
                 <Input 
                   prefix={<SafetyOutlined />} 
@@ -703,6 +713,7 @@ export default function EventRegistration() {
                   autoComplete="one-time-code"
                   onChange={(e) => {
                     const value = e.target.value.trim();
+                    console.log('OTP input changed:', value);
                     if (value.length > 0) {
                       form.setFields([{
                         name: 'otp',
@@ -710,10 +721,31 @@ export default function EventRegistration() {
                       }]);
                     }
                   }}
+                  onBlur={(e) => {
+                    const value = e.target.value.trim();
+                    console.log('OTP input blurred:', value);
+                    if (value && !/^\d{6}$/.test(value)) {
+                      form.setFields([{
+                        name: 'otp',
+                        errors: ['Please enter a valid 6-digit OTP']
+                      }]);
+                    }
+                  }}
                 />
               </Form.Item>
               <Form.Item className="text-center">
-                <Button type="primary" htmlType="submit" loading={loading} block>
+                <Button 
+                  type="primary" 
+                  htmlType="submit" 
+                  loading={loading} 
+                  block
+                  onClick={() => {
+                    console.log('Verify OTP button clicked');
+                    form.validateFields(['otp']).catch(() => {
+                      console.log('Form validation failed');
+                    });
+                  }}
+                >
                   Verify OTP
                 </Button>
               </Form.Item>
