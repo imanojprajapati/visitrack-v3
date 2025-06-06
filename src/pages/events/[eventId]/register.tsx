@@ -592,54 +592,58 @@ export default function EventRegistration() {
     switch (currentStep) {
       case 0:
         return (
-          <Form
-            form={form}
-            onFinish={handleSendOTP}
-            layout="vertical"
-            className="max-w-sm mx-auto"
-          >
-            <Form.Item
-              name="email"
-              label="Email"
-              rules={[
-                { required: true, message: 'Please enter your email' },
-                { type: 'email', message: 'Please enter a valid email' }
-              ]}
+          <div className="flex justify-center items-center">
+            <Form
+              form={form}
+              onFinish={handleSendOTP}
+              layout="vertical"
+              className="w-full max-w-sm"
             >
-              <Input prefix={<MailOutlined />} placeholder="Enter your email" />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" loading={loading} block>
-                Send OTP
-              </Button>
-            </Form.Item>
-          </Form>
+              <Form.Item
+                name="email"
+                label={<div className="text-center">Email</div>}
+                rules={[
+                  { required: true, message: 'Please enter your email' },
+                  { type: 'email', message: 'Please enter a valid email' }
+                ]}
+              >
+                <Input prefix={<MailOutlined />} placeholder="Enter your email" />
+              </Form.Item>
+              <Form.Item className="text-center">
+                <Button type="primary" htmlType="submit" loading={loading} block>
+                  Send OTP
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
         );
 
       case 1:
         return (
-          <Form
-            form={form}
-            onFinish={handleVerifyOTP}
-            layout="vertical"
-            className="max-w-sm mx-auto"
-          >
-            <Form.Item
-              name="otp"
-              label="OTP"
-              rules={[
-                { required: true, message: 'Please enter the OTP' },
-                { pattern: /^\d{6}$/, message: 'Please enter a valid 6-digit OTP' }
-              ]}
+          <div className="flex justify-center items-center">
+            <Form
+              form={form}
+              onFinish={handleVerifyOTP}
+              layout="vertical"
+              className="w-full max-w-sm"
             >
-              <Input prefix={<SafetyOutlined />} placeholder="Enter 6-digit OTP" />
-            </Form.Item>
-            <Form.Item>
-              <Button type="primary" htmlType="submit" loading={loading} block>
-                Verify OTP
-              </Button>
-            </Form.Item>
-          </Form>
+              <Form.Item
+                name="otp"
+                label={<div className="text-center">OTP</div>}
+                rules={[
+                  { required: true, message: 'Please enter the OTP' },
+                  { pattern: /^\d{6}$/, message: 'Please enter a valid 6-digit OTP' }
+                ]}
+              >
+                <Input prefix={<SafetyOutlined />} placeholder="Enter 6-digit OTP" />
+              </Form.Item>
+              <Form.Item className="text-center">
+                <Button type="primary" htmlType="submit" loading={loading} block>
+                  Verify OTP
+                </Button>
+              </Form.Item>
+            </Form>
+          </div>
         );
 
       case 2:
@@ -658,62 +662,80 @@ export default function EventRegistration() {
           id: 'registration-form',
           name: 'Registration Form',
           description: 'Please fill in your details',
-          fields: event.form.fields.map(field => {
-            // Map field type to supported DynamicForm field type
-            let fieldType: FormField['type'] = 'text';
-            const fieldTypeStr = field.type as string;
-            if (fieldTypeStr === 'phone' || fieldTypeStr === 'tel') {
-              fieldType = 'phone';
-            } else if (fieldTypeStr === 'textarea') {
-              fieldType = 'textarea';
-            } else if (fieldTypeStr === 'number') {
-              fieldType = 'number';
-            } else if (fieldTypeStr === 'email') {
-              fieldType = 'email';
-            } else if (fieldTypeStr === 'date') {
-              fieldType = 'date';
-            } else if (fieldTypeStr === 'select') {
-              fieldType = 'select';
-            } else {
-              fieldType = 'text';
-            }
+          fields: [
+            ...event.form.fields.map(field => {
+              // Map field type to supported DynamicForm field type
+              let fieldType: FormField['type'] = 'text';
+              const fieldTypeStr = field.type as string;
+              if (fieldTypeStr === 'phone' || fieldTypeStr === 'tel') {
+                fieldType = 'phone';
+              } else if (fieldTypeStr === 'textarea') {
+                fieldType = 'textarea';
+              } else if (fieldTypeStr === 'number') {
+                fieldType = 'number';
+              } else if (fieldTypeStr === 'email') {
+                fieldType = 'email';
+              } else if (fieldTypeStr === 'date') {
+                fieldType = 'date';
+              } else if (fieldTypeStr === 'select') {
+                fieldType = 'select';
+              } else {
+                fieldType = 'text';
+              }
 
-            return {
-              id: field.id,
-              label: field.label,
-              type: fieldType,
-              required: field.required,
-              placeholder: field.placeholder,
-              options: field.options,
-              validation: field.validation ? [
-                ...(field.validation.min !== undefined ? [{
-                  type: 'number' as const,
-                  min: field.validation.min,
-                  message: `Minimum value is ${field.validation.min}`
-                }] : []),
-                ...(field.validation.max !== undefined ? [{
-                  type: 'number' as const,
-                  max: field.validation.max,
-                  message: `Maximum value is ${field.validation.max}`
-                }] : []),
-                ...(field.validation.pattern ? [{
-                  pattern: new RegExp(field.validation.pattern),
-                  message: 'Invalid format'
-                }] : [])
-              ] : []
-            };
-          })
+              return {
+                id: field.id,
+                label: field.label,
+                type: fieldType,
+                required: field.required,
+                placeholder: field.placeholder,
+                options: field.options,
+                validation: field.validation ? [
+                  ...(field.validation.min !== undefined ? [{
+                    type: 'number' as const,
+                    min: field.validation.min,
+                    message: `Minimum value is ${field.validation.min}`
+                  }] : []),
+                  ...(field.validation.max !== undefined ? [{
+                    type: 'number' as const,
+                    max: field.validation.max,
+                    message: `Maximum value is ${field.validation.max}`
+                  }] : []),
+                  ...(field.validation.pattern ? [{
+                    pattern: new RegExp(field.validation.pattern),
+                    message: 'Invalid format'
+                  }] : [])
+                ] : []
+              };
+            }),
+            // Add source field with default value
+            {
+              id: 'source',
+              label: 'Source',
+              type: 'text',
+              required: true,
+              defaultValue: 'Website',
+              disabled: true
+            }
+          ]
         };
 
         return (
-          <DynamicForm
-            template={template}
-            onFinish={handleRegistration}
-            onFinishFailed={(errorInfo) => {
-              console.error('Form validation failed:', errorInfo);
-              message.error('Please fill in all required fields correctly');
-            }}
-          />
+          <div className="max-w-2xl mx-auto">
+            <DynamicForm
+              template={template}
+              onFinish={handleRegistration}
+              onFinishFailed={(errorInfo) => {
+                console.error('Form validation failed:', errorInfo);
+                message.error('Please fill in all required fields correctly');
+              }}
+            />
+            <div className="text-center mt-6">
+              <Button type="primary" size="large" onClick={() => form.submit()}>
+                Submit Registration
+              </Button>
+            </div>
+          </div>
         );
 
       case 3:

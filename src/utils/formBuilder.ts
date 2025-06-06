@@ -9,6 +9,7 @@ export interface FormField {
   validation?: Rule[];
   placeholder?: string;
   defaultValue?: any;
+  disabled?: boolean;
 }
 
 export interface FormTemplate {
