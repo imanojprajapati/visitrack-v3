@@ -268,4 +268,3 @@ export const downloadFile = async (
     }
   }
 }; 
-}; 

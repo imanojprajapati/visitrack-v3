@@ -22,7 +22,7 @@ if (!globalWithMongoose.mongoose) {
   globalWithMongoose.mongoose = { conn: null, promise: null };
 }
 
-export async function connectToDatabase() {
+export async function connectToDatabase(): Promise<typeof mongoose> {
   if (globalWithMongoose.mongoose.conn) {
     return globalWithMongoose.mongoose.conn;
   }
@@ -62,12 +62,13 @@ export async function connectToDatabase() {
 
   try {
     const connectionPromise = globalWithMongoose.mongoose.promise;
-    const timeoutPromise = new Promise((_, reject) => 
+    const timeoutPromise = new Promise<typeof mongoose>((_, reject) => 
       setTimeout(() => reject(new Error('Database connection timeout')), 5000)
     );
     
-    globalWithMongoose.mongoose.conn = await Promise.race([connectionPromise, timeoutPromise]);
-    return globalWithMongoose.mongoose.conn;
+    const result = await Promise.race([connectionPromise, timeoutPromise]);
+    globalWithMongoose.mongoose.conn = result;
+    return result;
   } catch (e) {
     globalWithMongoose.mongoose.promise = null;
     throw e;
