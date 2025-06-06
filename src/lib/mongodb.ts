@@ -29,20 +29,27 @@ export async function connectToDatabase() {
 
   if (!globalWithMongoose.mongoose.promise) {
     const opts = {
-      bufferCommands: true,
-      maxPoolSize: 10,
-      serverSelectionTimeoutMS: parseInt(process.env.MONGODB_CONNECTION_TIMEOUT || '10000'),
-      socketTimeoutMS: parseInt(process.env.MONGODB_SOCKET_TIMEOUT || '45000'),
+      bufferCommands: false,
+      maxPoolSize: 5,
+      minPoolSize: 1,
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 10000,
+      connectTimeoutMS: 5000,
       family: 4,
       retryWrites: true,
       retryReads: true,
-      connectTimeoutMS: 10000
+      heartbeatFrequencyMS: 2000,
+      maxIdleTimeMS: 10000,
+      waitQueueTimeoutMS: 5000,
+      keepAlive: true,
+      keepAliveInitialDelay: 300000,
+      autoIndex: true,
+      maxConnecting: 3
     };
 
     globalWithMongoose.mongoose.promise = mongoose.connect(MONGODB_URI as string, opts)
       .then((mongoose) => {
         console.log('MongoDB connected successfully');
-        // Register all models after successful connection
         registerModels();
         return mongoose;
       })
@@ -54,7 +61,12 @@ export async function connectToDatabase() {
   }
 
   try {
-    globalWithMongoose.mongoose.conn = await globalWithMongoose.mongoose.promise;
+    const connectionPromise = globalWithMongoose.mongoose.promise;
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Database connection timeout')), 5000)
+    );
+    
+    globalWithMongoose.mongoose.conn = await Promise.race([connectionPromise, timeoutPromise]);
     return globalWithMongoose.mongoose.conn;
   } catch (e) {
     globalWithMongoose.mongoose.promise = null;
@@ -62,7 +74,6 @@ export async function connectToDatabase() {
   }
 }
 
-// Add connection event listeners
 mongoose.connection.on('connected', () => {
   console.log('MongoDB connected successfully');
 });
@@ -73,15 +84,23 @@ mongoose.connection.on('error', (err) => {
   globalWithMongoose.mongoose.promise = null;
 });
 
-// Handle disconnection
 mongoose.connection.on('disconnected', () => {
   console.log('MongoDB disconnected');
   globalWithMongoose.mongoose.conn = null;
   globalWithMongoose.mongoose.promise = null;
 });
 
-// Handle process termination
 process.on('SIGINT', async () => {
-  await mongoose.connection.close();
-  process.exit(0);
+  try {
+    await mongoose.connection.close();
+    console.log('MongoDB connection closed through app termination');
+    process.exit(0);
+  } catch (err) {
+    console.error('Error during MongoDB connection cleanup:', err);
+    process.exit(1);
+  }
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });

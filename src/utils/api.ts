@@ -36,85 +36,96 @@ interface FetchOptions extends RequestInit {
  * @param options - Fetch options including retry configuration
  * @returns Response data
  */
-export const fetchApi = async (endpoint: string, options: FetchOptions = {}) => {
+export async function fetchApi(
+  endpoint: string,
+  options: RequestInit & { retries?: number; retryDelay?: number } = {}
+): Promise<any> {
   const { retries = 3, retryDelay = 1000, ...fetchOptions } = options;
   const url = buildApiUrl(endpoint);
-  
   let lastError: Error | null = null;
-  let attempt = 0;
-  
-  while (attempt <= retries) {
+  let attempts = 0;
+
+  while (attempts < retries) {
     try {
+      // Add timeout to the fetch request
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced timeout to 15 seconds
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
       const response = await fetch(url, {
         ...fetchOptions,
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest',
           ...fetchOptions.headers,
         },
-        credentials: 'include',
-        signal: controller.signal,
       });
 
       clearTimeout(timeoutId);
 
       // Handle specific status codes
       if (response.status === 508) {
-        throw new Error('Server is temporarily overloaded. Please try again later.');
+        throw new Error('Loop detected in API request. Please try again later.');
+      }
+
+      if (response.status === 503) {
+        throw new Error('Service temporarily unavailable. Please try again later.');
+      }
+
+      if (response.status === 504) {
+        throw new Error('Gateway timeout. Please try again later.');
       }
 
       if (!response.ok) {
-        let errorMessage = `HTTP error! status: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch {
-          errorMessage = response.statusText || errorMessage;
-        }
-        throw new Error(errorMessage);
+        const errorData = await response.json().catch(() => null);
+        throw new Error(
+          errorData?.message || `HTTP error! status: ${response.status}`
+        );
       }
 
-      // Check if response is JSON or binary
+      // Handle different response types
       const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
+      if (contentType?.includes('application/json')) {
         return await response.json();
-      } else {
+      } else if (contentType?.includes('application/pdf')) {
         return await response.blob();
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        lastError = err;
-        
-        // Don't retry on certain errors
-        if (err.name === 'AbortError' || 
-            err.message.includes('Server is temporarily overloaded') ||
-            err.message.includes('Database connection failed')) {
-          throw err;
-        }
       } else {
-        lastError = new Error('Unknown error occurred');
+        return await response.text();
+      }
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error occurred');
+      attempts++;
+
+      // Don't retry on certain errors
+      if (
+        error instanceof Error &&
+        (error.name === 'AbortError' ||
+          error.message.includes('Loop detected') ||
+          error.message.includes('Failed to fetch') ||
+          error.message.includes('NetworkError'))
+      ) {
+        throw error;
       }
 
-      // If this was the last attempt, throw the error
-      if (attempt === retries) {
+      if (attempts === retries) {
         console.error('API request failed after retries:', {
+          attempts,
+          error: lastError,
           url,
-          attempts: attempt + 1,
-          error: lastError
         });
         throw lastError;
       }
-      
+
       // Exponential backoff with jitter
-      const backoffDelay = retryDelay * Math.pow(2, attempt) * (0.5 + Math.random());
-      await new Promise(resolve => setTimeout(resolve, backoffDelay));
-      attempt++;
+      const delay = Math.min(
+        retryDelay * Math.pow(2, attempts - 1) * (0.5 + Math.random()),
+        10000
+      );
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-};
+
+  throw lastError || new Error('Failed to fetch data');
+}
 
 /**
  * Upload file to server with retry logic
@@ -256,4 +267,5 @@ export const downloadFile = async (
       await new Promise(resolve => setTimeout(resolve, retryDelay * Math.pow(2, attempt)));
     }
   }
+}; 
 }; 
