@@ -141,21 +141,36 @@ export default function EventRegistration() {
       setLoading(true);
       setError(null);
 
+      // Get email from form
+      const email = form.getFieldValue('email');
+      if (!email) {
+        throw new Error('Email is required');
+      }
+
       // Validate OTP format first
       if (!values.otp) {
-        throw new Error('Please enter the OTP');
+        form.setFields([{
+          name: 'otp',
+          errors: ['Please enter the OTP']
+        }]);
+        return;
       }
 
       // Remove any whitespace and ensure it's a string
       const cleanOTP = values.otp.toString().trim();
       if (!/^\d{6}$/.test(cleanOTP)) {
-        throw new Error('Please enter a valid 6-digit OTP');
+        form.setFields([{
+          name: 'otp',
+          errors: ['Please enter a valid 6-digit OTP']
+        }]);
+        return;
       }
 
-      const email = form.getFieldValue('email');
-      if (!email) {
-        throw new Error('Email is required');
-      }
+      // Clear any previous errors
+      form.setFields([{
+        name: 'otp',
+        errors: []
+      }]);
 
       const response = await fetchApi('auth/verify-otp', {
         method: 'POST',
@@ -173,6 +188,11 @@ export default function EventRegistration() {
         throw new Error('This event has no registration form');
       }
 
+      // Clear form errors and move to next step
+      form.setFields([{
+        name: 'otp',
+        errors: []
+      }]);
       setCurrentStep(2);
       message.success('OTP verified successfully');
     } catch (error) {
@@ -180,16 +200,36 @@ export default function EventRegistration() {
       if (error instanceof Error) {
         const errorMessage = error.message;
         if (errorMessage.includes('No valid OTP found')) {
+          form.setFields([{
+            name: 'otp',
+            errors: ['OTP has expired. Please request a new OTP.']
+          }]);
           setError('OTP has expired. Please request a new OTP.');
         } else if (errorMessage.includes('Too many failed attempts')) {
+          form.setFields([{
+            name: 'otp',
+            errors: ['Too many failed attempts. Please request a new OTP.']
+          }]);
           setError('Too many failed attempts. Please request a new OTP.');
         } else if (errorMessage.includes('Invalid OTP')) {
+          form.setFields([{
+            name: 'otp',
+            errors: ['Invalid OTP. Please try again.']
+          }]);
           setError('Invalid OTP. Please try again.');
         } else {
+          form.setFields([{
+            name: 'otp',
+            errors: [errorMessage]
+          }]);
           setError(errorMessage);
         }
         message.error(errorMessage);
       } else {
+        form.setFields([{
+          name: 'otp',
+          errors: ['Failed to verify OTP. Please try again.']
+        }]);
         setError('Failed to verify OTP. Please try again.');
         message.error('Failed to verify OTP. Please try again.');
       }
@@ -650,16 +690,25 @@ export default function EventRegistration() {
                   { 
                     pattern: /^\d{6}$/,
                     message: 'Please enter a valid 6-digit OTP',
-                    validateTrigger: 'onBlur'
+                    validateTrigger: ['onBlur', 'onSubmit']
                   }
                 ]}
-                validateTrigger={['onChange', 'onBlur']}
+                validateTrigger={['onBlur', 'onSubmit']}
               >
                 <Input 
                   prefix={<SafetyOutlined />} 
                   placeholder="Enter 6-digit OTP"
                   maxLength={6}
                   autoComplete="one-time-code"
+                  onChange={(e) => {
+                    // Clear error when user starts typing
+                    if (e.target.value.length > 0) {
+                      form.setFields([{
+                        name: 'otp',
+                        errors: []
+                      }]);
+                    }
+                  }}
                 />
               </Form.Item>
               <Form.Item className="text-center">

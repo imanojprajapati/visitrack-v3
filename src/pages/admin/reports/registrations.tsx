@@ -160,10 +160,10 @@ export default function RegistrationReportPage() {
           if (!date) return '-';
           const dateObj = new Date(date);
           if (isNaN(dateObj.getTime())) return '-';
-          return dateObj.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'short',
-            day: 'numeric'
+          return dateObj.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
           });
         } catch (error) {
           console.error('Error formatting date:', error);
@@ -219,9 +219,19 @@ export default function RegistrationReportPage() {
       ...allAdditionalKeys.map(key => visitor.additionalData?.[key]?.value || ''),
       visitor.eventName,
       visitor.eventLocation,
-      new Date(visitor.eventStartDate).toLocaleDateString(),
+      visitor.eventStartDate ? new Date(visitor.eventStartDate).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      }) : '-',
       visitor.status,
-      new Date(visitor.createdAt).toLocaleString()
+      visitor.createdAt ? new Date(visitor.createdAt).toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).replace(',', '') : '-'
     ]);
     const csvContent = [
       headers.join(','),
