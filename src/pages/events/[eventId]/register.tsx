@@ -191,43 +191,71 @@ export default function EventRegistration() {
         errors: []
       }]);
 
-      console.log('Sending OTP verification request');
-      const response = await fetchApi('auth/verify-otp', {
-        method: 'POST',
-        body: JSON.stringify({
-          email,
-          otp: cleanOTP,
-        }),
-      });
-      console.log('OTP verification response:', response);
+      // Add retry logic for API call
+      let retryCount = 0;
+      const maxRetries = 3;
+      let lastError = null;
 
-      if (!response) {
-        throw new Error('No response from server');
+      while (retryCount < maxRetries) {
+        try {
+          console.log(`Attempt ${retryCount + 1} to verify OTP`);
+          const response = await fetchApi('auth/verify-otp', {
+            method: 'POST',
+            body: JSON.stringify({
+              email,
+              otp: cleanOTP,
+            }),
+          });
+          console.log('OTP verification response:', response);
+
+          if (!response) {
+            throw new Error('No response from server');
+          }
+
+          if (!response.message) {
+            throw new Error('Invalid response format from server');
+          }
+
+          // OTP verification successful
+          if (!event?.form) {
+            throw new Error('This event has no registration form');
+          }
+
+          // Clear form errors and move to next step
+          form.setFields([{
+            name: 'otp',
+            errors: []
+          }]);
+          
+          // Reset form values after successful verification
+          form.resetFields(['otp']);
+          setCurrentStep(2);
+          message.success('OTP verified successfully');
+          return; // Exit the function on success
+        } catch (error) {
+          lastError = error;
+          console.error(`Attempt ${retryCount + 1} failed:`, error);
+          
+          // If it's a validation error, don't retry
+          if (error instanceof Error && 
+              (error.message.includes('Invalid OTP') || 
+               error.message.includes('expired') || 
+               error.message.includes('attempts'))) {
+            break;
+          }
+          
+          retryCount++;
+          if (retryCount < maxRetries) {
+            // Wait before retrying (exponential backoff)
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+          }
+        }
       }
 
-      if (!response.message) {
-        throw new Error('Invalid response format from server');
-      }
-
-      if (!event?.form) {
-        throw new Error('This event has no registration form');
-      }
-
-      // Clear form errors and move to next step
-      form.setFields([{
-        name: 'otp',
-        errors: []
-      }]);
-      
-      // Reset form values after successful verification
-      form.resetFields(['otp']);
-      setCurrentStep(2);
-      message.success('OTP verified successfully');
-    } catch (error) {
-      console.error('Detailed error in OTP verification:', error);
-      if (error instanceof Error) {
-        const errorMessage = error.message;
-        console.log('Error message:', errorMessage);
+      // Handle the final error after all retries
+      if (lastError instanceof Error) {
+        const errorMessage = lastError.message;
+        console.log('Final error message:', errorMessage);
         
         let formError = '';
         if (errorMessage.includes('No valid OTP found')) {
@@ -236,8 +264,10 @@ export default function EventRegistration() {
           formError = 'Too many failed attempts. Please request a new OTP.';
         } else if (errorMessage.includes('Invalid OTP')) {
           formError = 'Invalid OTP. Please try again.';
+        } else if (errorMessage.includes('No response from server')) {
+          formError = 'Unable to connect to server. Please try again.';
         } else {
-          formError = errorMessage;
+          formError = 'Failed to verify OTP. Please try again.';
         }
 
         form.setFields([{
@@ -246,15 +276,16 @@ export default function EventRegistration() {
         }]);
         setError(formError);
         message.error(formError);
-      } else {
-        const defaultError = 'Failed to verify OTP. Please try again.';
-        form.setFields([{
-          name: 'otp',
-          errors: [defaultError]
-        }]);
-        setError(defaultError);
-        message.error(defaultError);
       }
+    } catch (error) {
+      console.error('Unexpected error in OTP verification:', error);
+      const defaultError = 'An unexpected error occurred. Please try again.';
+      form.setFields([{
+        name: 'otp',
+        errors: [defaultError]
+      }]);
+      setError(defaultError);
+      message.error(defaultError);
     } finally {
       setLoading(false);
       setIsVerifying(false);
@@ -717,6 +748,7 @@ export default function EventRegistration() {
                     validateTrigger: ['onBlur', 'onSubmit']
                   }
                 ]}
+                validateTrigger={['onBlur', 'onSubmit']}
               >
                 <Input 
                   prefix={<SafetyOutlined />} 
@@ -761,7 +793,7 @@ export default function EventRegistration() {
                     });
                   }}
                 >
-                  Verify OTP
+                  {isVerifying ? 'Verifying...' : 'Verify OTP'}
                 </Button>
               </Form.Item>
             </Form>
