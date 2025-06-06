@@ -479,24 +479,6 @@ export default function EventRegistration() {
     }
   };
 
-  // Helper function to generate QR code data
-  const generateQRCodeData = (visitor: Visitor): string => {
-    try {
-      if (!visitor?._id) {
-        throw new Error('Invalid visitor ID');
-      }
-      // Ensure the ID is a string and trim any whitespace
-      const visitorId = visitor._id.toString().trim();
-      if (!visitorId) {
-        throw new Error('Empty visitor ID');
-      }
-      return visitorId;
-    } catch (error) {
-      console.error('Error generating QR code data:', error);
-      throw error;
-    }
-  };
-
   // Registration details component
   const RegistrationDetails: React.FC<{ visitor: Visitor }> = ({ visitor }) => {
     const [qrError, setQrError] = useState<string | null>(null);
@@ -511,13 +493,8 @@ export default function EventRegistration() {
       );
     }
 
-    let qrCodeData: string;
-    try {
-      qrCodeData = generateQRCodeData(visitor);
-    } catch (error) {
-      setQrError(error instanceof Error ? error.message : 'Failed to generate QR code');
-      qrCodeData = '';
-    }
+    // QR code should only encode the visitor ID
+    const qrCodeValue = visitor._id ? visitor._id.toString() : '';
 
     return (
       <div className="mb-8 text-left">
@@ -531,40 +508,20 @@ export default function EventRegistration() {
           />
         ) : (
           <div className="mb-8">
-            <QRCode value={qrCodeData} />
+            <QRCode value={qrCodeValue} />
           </div>
         )}
         <Space direction="vertical" size="small" style={{ width: '100%' }} className="p-4 bg-gray-50 rounded-lg">
-          <div>
-            <Text strong>Name:</Text> {visitor.name}
-          </div>
-          <div>
-            <Text strong>Email:</Text> {visitor.email}
-          </div>
-          {visitor.phone && (
-            <div>
-              <Text strong>Phone:</Text> {visitor.phone}
-            </div>
-          )}
-          {visitor.company && (
-            <div>
-              <Text strong>Company:</Text> {visitor.company}
-            </div>
-          )}
-          <div>
-            <Text strong>Registration ID:</Text> {visitor.registrationId}
-          </div>
-          <div>
-            <Text strong>Event Date:</Text> {formatDate(visitor.eventStartDate)}
-          </div>
-          <div>
-            <Text strong>Registration Date:</Text> {formatDateTime(visitor.createdAt)}
-          </div>
-          {visitor.formData && Object.entries(visitor.formData).map(([key, field]) => (
-            <div key={key}>
-              <Text strong>{field.label}:</Text> {String(field.value)}
-            </div>
-          ))}
+          <div><Text strong>Visitor ID:</Text> {visitor._id}</div>
+          <div><Text strong>Event ID:</Text> {visitor.eventId}</div>
+          <div><Text strong>Name:</Text> {visitor.name}</div>
+          <div><Text strong>Email:</Text> {visitor.email}</div>
+          {visitor.phone && <div><Text strong>Phone:</Text> {visitor.phone}</div>}
+          {visitor.company && <div><Text strong>Company:</Text> {visitor.company}</div>}
+          {visitor.eventName && <div><Text strong>Event:</Text> {visitor.eventName}</div>}
+          {visitor.eventLocation && <div><Text strong>Location:</Text> {visitor.eventLocation}</div>}
+          {visitor.eventStartDate && <div><Text strong>Start:</Text> {formatDate(visitor.eventStartDate)}</div>}
+          {visitor.eventEndDate && <div><Text strong>End:</Text> {formatDate(visitor.eventEndDate)}</div>}
         </Space>
       </div>
     );
@@ -574,7 +531,7 @@ export default function EventRegistration() {
     if (!visitor) return;
 
     try {
-      const qrCodeData = generateQRCodeData(visitor);
+      const qrCodeData = visitor._id ? visitor._id.toString().trim() : '';
       if (!qrCodeData) {
         throw new Error('Failed to generate QR code data');
       }
@@ -1015,7 +972,7 @@ export default function EventRegistration() {
               subTitle={`You have successfully registered for ${event.title}`}
             />
             <div className="mt-8">
-              <QRCodeSVG value={generateQRCodeData(visitor)} size={200} />
+              <QRCodeSVG value={visitor._id} size={200} />
             </div>
             <div className="mt-4">
               <Space>
