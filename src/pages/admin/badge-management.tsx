@@ -734,6 +734,8 @@ const BadgeManagement: React.FC = () => {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
+      fixed: 'left' as const,
+      width: 200,
       render: (text: string, record: BadgeTemplate) => (
         <Space>
           <span>{text}</span>
@@ -752,48 +754,34 @@ const BadgeManagement: React.FC = () => {
     {
       title: 'Event',
       dataIndex: 'eventId',
-      key: 'event',
+      key: 'eventId',
+      width: 200,
       render: (eventId: string) => {
         const event = events.find(e => e._id === eventId);
-        return event ? event.title : 'N/A';
+        return event?.title || 'N/A';
       },
-    },
-    {
-      title: 'Size',
-      key: 'size',
-      render: (text: string, record: BadgeTemplate) => {
-        const size = record.size || { width: 3.375, height: 2.125, unit: 'inches' };
-        return `${size.width} x ${size.height} ${size.unit}`;
-      },
-    },
-    {
-      title: 'Orientation',
-      dataIndex: 'orientation',
-      key: 'orientation',
-      render: (orientation: string) => (
-        <Tag color={orientation === 'portrait' ? 'blue' : 'green'}>
-          {orientation.charAt(0).toUpperCase() + orientation.slice(1)}
-        </Tag>
-      ),
     },
     {
       title: 'Actions',
       key: 'actions',
-      render: (text: string, record: BadgeTemplate) => (
-        <Space>
+      fixed: 'right' as const,
+      width: 150,
+      render: (_: unknown, record: BadgeTemplate) => (
+        <Space size="small">
           <Button
             icon={<EyeOutlined />}
             onClick={() => handlePreview(record)}
+            size="small"
             title="Preview"
           />
           <Button
             icon={<EditOutlined />}
             onClick={() => handleEdit(record)}
+            size="small"
             title="Edit"
           />
           <Button
             icon={<DeleteOutlined />}
-            danger
             onClick={async () => {
               try {
                 const response = await fetch(`/api/badge-templates/${record._id}`, {
@@ -807,6 +795,8 @@ const BadgeManagement: React.FC = () => {
                 message.error('Failed to delete template');
               }
             }}
+            size="small"
+            danger
             title="Delete"
           />
         </Space>
@@ -1087,48 +1077,7 @@ const BadgeManagement: React.FC = () => {
         <Card title="Saved Templates" className="mt-6">
           <Table
             dataSource={templates}
-            columns={[
-              {
-                title: 'Name',
-                dataIndex: 'name',
-                key: 'name',
-                responsive: ['xs'],
-              },
-              {
-                title: 'Event',
-                dataIndex: 'eventId',
-                key: 'eventId',
-                responsive: ['sm'],
-                render: (eventId) => {
-                  const event = events.find(e => e._id === eventId);
-                  return event?.title || 'N/A';
-                },
-              },
-              {
-                title: 'Actions',
-                key: 'actions',
-                responsive: ['xs'],
-                render: (_, record) => (
-                  <Space size="small" className="flex-wrap">
-                    <Button
-                      icon={<EyeOutlined />}
-                      onClick={() => handlePreview(record)}
-                      size="small"
-                    />
-                    <Button
-                      icon={<EditOutlined />}
-                      onClick={() => handleEdit(record)}
-                      size="small"
-                    />
-                    <Button
-                      icon={<PrinterOutlined />}
-                      onClick={() => handleDownload(record)}
-                      size="small"
-                    />
-                  </Space>
-                ),
-              },
-            ]}
+            columns={columns}
             rowKey="_id"
             pagination={{
               pageSize: 10,

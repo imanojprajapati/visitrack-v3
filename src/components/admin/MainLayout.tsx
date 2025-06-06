@@ -49,9 +49,6 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       setIsMobile(mobile);
       if (mobile) {
         setCollapsed(true);
-        setMobileMenuVisible(false);
-      } else {
-        setMobileMenuVisible(true);
       }
     };
 
@@ -79,6 +76,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             zIndex: 1001,
             background: '#fff',
             boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
           }}
         />
       )}
@@ -101,6 +103,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
           overflow: 'auto',
           transform: isMobile ? (mobileMenuVisible ? 'translateX(0)' : 'translateX(-100%)') : 'none',
           transition: 'transform 0.3s ease-in-out',
+          width: isMobile ? '250px' : undefined,
         }}
       >
         <div className="logo p-4 flex items-center justify-center border-b border-gray-100">
@@ -154,6 +157,8 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
         minHeight: '100vh',
         background: '#f0f2f5',
         padding: isMobile ? '16px' : '24px',
+        width: '100%',
+        maxWidth: '100%',
       }}>
         <Content style={{ 
           padding: isMobile ? '16px' : '24px',

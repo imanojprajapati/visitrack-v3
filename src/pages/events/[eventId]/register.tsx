@@ -269,8 +269,9 @@ export default function EventRegistration() {
       const name = formValues.name;
       const email = formValues.email || form.getFieldValue('email');
       const phone = formValues.phone;
+      const source = 'Website'; // Always set source to Website
 
-      console.log('Extracted values:', { name, email, phone });
+      console.log('Extracted values:', { name, email, phone, source });
 
       if (!name) {
         throw new Error('Name is required');
@@ -281,80 +282,12 @@ export default function EventRegistration() {
       }
 
       // Format form data
-      const template: FormTemplate = {
-        id: 'registration-form',
-        name: 'Registration Form',
-        description: 'Please fill in your details',
-        fields: [
-          // Add source field first
-          {
-            id: 'source',
-            label: 'Source',
-            type: 'text',
-            required: true,
-            placeholder: 'Registration Source',
-            defaultValue: 'Website',
-            readOnly: true
-          },
-          // Add other fields
-          ...event.form.fields
-            .filter(field => field.id !== 'source')
-            .map(field => {
-              let fieldType: FormField['type'] = 'text';
-              const fieldTypeStr = field.type as string;
-              
-              switch (fieldTypeStr) {
-                case 'phone':
-                case 'tel':
-                  fieldType = 'phone';
-                  break;
-                case 'textarea':
-                  fieldType = 'textarea';
-                  break;
-                case 'number':
-                  fieldType = 'number';
-                  break;
-                case 'email':
-                  fieldType = 'email';
-                  break;
-                case 'date':
-                  fieldType = 'date';
-                  break;
-                case 'select':
-                  fieldType = 'select';
-                  break;
-                default:
-                  fieldType = 'text';
-              }
-
-              return {
-                id: field.id,
-                label: field.label,
-                type: fieldType,
-                required: field.required,
-                placeholder: field.placeholder,
-                options: field.options ? field.options.map(opt => ({
-                  label: String(opt),
-                  value: String(opt)
-                })) : undefined,
-                validation: field.validation ? {
-                  min: field.validation.min,
-                  max: field.validation.max,
-                  maxLength: field.validation.maxLength,
-                  pattern: field.validation.pattern,
-                  message: field.validation.message,
-                } : undefined
-              };
-            })
-        ]
-      };
-
       const formData = event.form.fields.reduce((acc: Record<string, any>, field) => {
         // For source field, always use 'Website'
         if (field.id === 'source') {
           acc[field.id] = {
             label: field.label,
-            value: 'Website'
+            value: source
           };
           return acc;
         }
@@ -391,7 +324,7 @@ export default function EventRegistration() {
       if (!formData.source) {
         formData.source = {
           label: 'Source',
-          value: 'Website'
+          value: source
         };
       }
 
@@ -403,7 +336,8 @@ export default function EventRegistration() {
           email,
           name,
           phone: phone || '',
-          formData
+          formData,
+          source // Add source to the main registration data
         })
       });
 
@@ -825,74 +759,66 @@ export default function EventRegistration() {
               layout="vertical"
               className="registration-form"
               preserve={false}
+              initialValues={{ source: 'Website' }}
             >
+              <Form.Item name="source" hidden>
+                <Input />
+              </Form.Item>
+
               <DynamicForm
                 template={{
                   id: 'registration-form',
                   name: 'Registration Form',
                   description: 'Please fill in your details',
-                  fields: [
-                    // Add source field first
-                    {
-                      id: 'source',
-                      label: 'Source',
-                      type: 'text',
-                      required: true,
-                      placeholder: 'Registration Source',
-                      defaultValue: 'Website',
-                      readOnly: true
-                    },
-                    // Add other fields
-                    ...event.form.fields
-                      .filter(field => field.id !== 'source')
-                      .map(field => {
-                        let fieldType: FormField['type'] = 'text';
-                        const fieldTypeStr = field.type as string;
-                        
-                        switch (fieldTypeStr) {
-                          case 'phone':
-                          case 'tel':
-                            fieldType = 'phone';
-                            break;
-                          case 'textarea':
-                            fieldType = 'textarea';
-                            break;
-                          case 'number':
-                            fieldType = 'number';
-                            break;
-                          case 'email':
-                            fieldType = 'email';
-                            break;
-                          case 'date':
-                            fieldType = 'date';
-                            break;
-                          case 'select':
-                            fieldType = 'select';
-                            break;
-                          default:
-                            fieldType = 'text';
-                        }
+                  fields: event.form.fields
+                    .filter(field => field.id !== 'source')
+                    .map(field => {
+                      let fieldType: FormField['type'] = 'text';
+                      const fieldTypeStr = field.type as string;
+                      
+                      switch (fieldTypeStr) {
+                        case 'phone':
+                        case 'tel':
+                          fieldType = 'phone';
+                          break;
+                        case 'textarea':
+                          fieldType = 'textarea';
+                          break;
+                        case 'number':
+                          fieldType = 'number';
+                          break;
+                        case 'email':
+                          fieldType = 'email';
+                          break;
+                        case 'date':
+                          fieldType = 'date';
+                          break;
+                        case 'select':
+                          fieldType = 'select';
+                          break;
+                        default:
+                          fieldType = 'text';
+                      }
 
-                        return {
-                          id: field.id,
-                          label: field.label,
-                          type: fieldType,
-                          required: field.required,
-                          placeholder: field.placeholder,
-                          options: field.options ? field.options.map(opt => ({
-                            label: String(opt),
-                            value: String(opt)
-                          })) : undefined,
-                          validation: field.validation ? {
-                            min: field.validation.min,
-                            max: field.validation.max,
-                            maxLength: field.validation.maxLength,
-                            pattern: field.validation.pattern,
-                            message: field.validation.message,
-                          } : undefined
-                        };
-                      })
-                  ]
+                      return {
+                        id: field.id,
+                        label: field.label,
+                        type: fieldType,
+                        required: field.required,
+                        placeholder: field.placeholder,
+                        options: field.options ? field.options.map(opt => ({
+                          label: String(opt),
+                          value: String(opt)
+                        })) : undefined,
+                        validation: field.validation ? {
+                          min: field.validation.min,
+                          max: field.validation.max,
+                          maxLength: field.validation.maxLength,
+                          pattern: field.validation.pattern,
+                          message: field.validation.message,
+                        } : undefined
+                      };
+                    })
                 }}
                 form={form}
                 onFinish={handleRegistration}
