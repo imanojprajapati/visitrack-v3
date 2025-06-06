@@ -198,6 +198,14 @@ export default function EventRegistration() {
         throw new Error('Email is required');
       }
 
+      // Extract name and phone from form data
+      const name = values.name || values.fullName || values.visitorName;
+      const phone = values.phone || values.mobile || values.contactNumber;
+
+      if (!name) {
+        throw new Error('Name is required');
+      }
+
       // Format form data to match the expected structure
       const formData = event.form.fields.reduce((acc, field) => {
         const value = values[field.id];
@@ -220,11 +228,10 @@ export default function EventRegistration() {
           formattedValue = Number(value);
         }
 
-        // Format the field value
+        // Format the field value without type field
         acc[field.id] = {
           label: field.label,
-          value: formattedValue,
-          type: field.type
+          value: formattedValue
         };
 
         return acc;
@@ -233,16 +240,17 @@ export default function EventRegistration() {
       // Add source field
       formData.source = {
         label: 'Source',
-        value: 'Website',
-        type: 'text'
+        value: 'Website'
       };
 
-      // Submit registration
+      // Submit registration with all required fields
       const response = await fetchApi('visitors/register', {
         method: 'POST',
         body: JSON.stringify({
           eventId,
           email,
+          name,
+          phone: phone || '', // Make phone optional
           formData
         }),
       });
