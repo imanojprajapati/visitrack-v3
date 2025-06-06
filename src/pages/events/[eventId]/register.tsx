@@ -28,6 +28,7 @@ export default function EventRegistration() {
   const [form] = Form.useForm();
   const [messageApi, contextHolder] = message.useMessage();
   const [error, setError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const fetchEventDetails = async () => {
     try {
@@ -137,7 +138,14 @@ export default function EventRegistration() {
   };
 
   const handleVerifyOTP = async (values: { otp: string }) => {
+    // Prevent multiple submissions
+    if (isVerifying) {
+      console.log('OTP verification already in progress');
+      return;
+    }
+
     try {
+      setIsVerifying(true);
       setLoading(true);
       setError(null);
       console.log('Starting OTP verification with values:', values);
@@ -210,6 +218,9 @@ export default function EventRegistration() {
         name: 'otp',
         errors: []
       }]);
+      
+      // Reset form values after successful verification
+      form.resetFields(['otp']);
       setCurrentStep(2);
       message.success('OTP verified successfully');
     } catch (error) {
@@ -246,6 +257,7 @@ export default function EventRegistration() {
       }
     } finally {
       setLoading(false);
+      setIsVerifying(false);
     }
   };
 
@@ -711,6 +723,7 @@ export default function EventRegistration() {
                   placeholder="Enter 6-digit OTP"
                   maxLength={6}
                   autoComplete="one-time-code"
+                  disabled={isVerifying}
                   onChange={(e) => {
                     const value = e.target.value.trim();
                     console.log('OTP input changed:', value);
@@ -737,9 +750,11 @@ export default function EventRegistration() {
                 <Button 
                   type="primary" 
                   htmlType="submit" 
-                  loading={loading} 
+                  loading={loading || isVerifying} 
                   block
+                  disabled={isVerifying}
                   onClick={() => {
+                    if (isVerifying) return;
                     console.log('Verify OTP button clicked');
                     form.validateFields(['otp']).catch(() => {
                       console.log('Form validation failed');
