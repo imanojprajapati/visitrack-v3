@@ -1,6 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { connectToDatabase } from '../../../lib/mongodb';
 import OTP from '../../../models/OTP';
+import mongoose from 'mongoose';
+
+// Add a simple in-memory lock to prevent concurrent verifications
+const verificationLocks = new Map<string, boolean>();
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,8 +14,20 @@ export default async function handler(
     return res.status(405).json({ message: 'Method not allowed' });
   }
 
+  const { email, otp } = req.body;
+  const lockKey = `${email}-${otp}`;
+
+  // Check if this verification is already in progress
+  if (verificationLocks.get(lockKey)) {
+    return res.status(429).json({ 
+      message: 'Verification already in progress. Please wait.',
+      code: 'VERIFICATION_IN_PROGRESS'
+    });
+  }
+
   try {
-    const { email, otp } = req.body;
+    // Set the lock
+    verificationLocks.set(lockKey, true);
 
     // Input validation
     if (!email || !otp) {
@@ -53,49 +69,64 @@ export default async function handler(
       throw new Error('Failed to connect to database after multiple attempts');
     }
 
-    // Find the most recent OTP for this email
-    const storedOTP = await OTP.findOne({ 
-      email: email.toLowerCase().trim(),
-      expires: { $gt: new Date() }
-    }).sort({ createdAt: -1 });
+    // Start a session for transaction
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
-    if (!storedOTP) {
-      return res.status(400).json({ 
-        message: 'No valid OTP found for this email. Please request a new OTP.',
-        code: 'OTP_EXPIRED'
+    try {
+      // Find the most recent OTP for this email
+      const storedOTP = await OTP.findOne({ 
+        email: email.toLowerCase().trim(),
+        expires: { $gt: new Date() }
+      }).sort({ createdAt: -1 }).session(session);
+
+      if (!storedOTP) {
+        await session.abortTransaction();
+        return res.status(400).json({ 
+          message: 'No valid OTP found for this email. Please request a new OTP.',
+          code: 'OTP_EXPIRED'
+        });
+      }
+
+      // Check if too many attempts
+      if (storedOTP.attempts >= 3) {
+        await OTP.deleteOne({ _id: storedOTP._id }).session(session);
+        await session.commitTransaction();
+        return res.status(400).json({ 
+          message: 'Too many failed attempts. Please request a new OTP.',
+          code: 'TOO_MANY_ATTEMPTS'
+        });
+      }
+
+      // Increment attempts
+      storedOTP.attempts += 1;
+      await storedOTP.save({ session });
+
+      // Verify OTP
+      if (storedOTP.otp !== otp.trim()) {
+        await session.commitTransaction();
+        return res.status(400).json({ 
+          message: 'Invalid OTP. Please try again.',
+          code: 'INVALID_OTP',
+          attemptsRemaining: 3 - storedOTP.attempts
+        });
+      }
+
+      // OTP is valid, delete it
+      await OTP.deleteOne({ _id: storedOTP._id }).session(session);
+      await session.commitTransaction();
+
+      // Return success response
+      res.status(200).json({ 
+        message: 'OTP verified successfully',
+        code: 'SUCCESS'
       });
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
     }
-
-    // Check if too many attempts
-    if (storedOTP.attempts >= 3) {
-      await OTP.deleteOne({ _id: storedOTP._id });
-      return res.status(400).json({ 
-        message: 'Too many failed attempts. Please request a new OTP.',
-        code: 'TOO_MANY_ATTEMPTS'
-      });
-    }
-
-    // Increment attempts
-    storedOTP.attempts += 1;
-    await storedOTP.save();
-
-    // Verify OTP
-    if (storedOTP.otp !== otp.trim()) {
-      return res.status(400).json({ 
-        message: 'Invalid OTP. Please try again.',
-        code: 'INVALID_OTP',
-        attemptsRemaining: 3 - storedOTP.attempts
-      });
-    }
-
-    // OTP is valid, delete it
-    await OTP.deleteOne({ _id: storedOTP._id });
-
-    // Return success response
-    res.status(200).json({ 
-      message: 'OTP verified successfully',
-      code: 'SUCCESS'
-    });
   } catch (error) {
     console.error('Error in verify-OTP endpoint:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
@@ -111,5 +142,8 @@ export default async function handler(
       code: isDatabaseError ? 'DATABASE_ERROR' : 'SERVER_ERROR',
       error: process.env.NODE_ENV === 'development' ? errorMessage : undefined
     });
+  } finally {
+    // Clear the lock
+    verificationLocks.delete(lockKey);
   }
 } 

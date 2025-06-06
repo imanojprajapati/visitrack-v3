@@ -29,6 +29,7 @@ export default function EventRegistration() {
   const [messageApi, contextHolder] = message.useMessage();
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchEventDetails = async () => {
     try {
@@ -139,13 +140,14 @@ export default function EventRegistration() {
 
   const handleVerifyOTP = async (values: { otp: string }) => {
     // Prevent multiple submissions
-    if (isVerifying) {
-      console.log('OTP verification already in progress');
+    if (isVerifying || isSubmitting) {
+      console.log('Verification or submission already in progress');
       return;
     }
 
     try {
       setIsVerifying(true);
+      setIsSubmitting(true);
       setLoading(true);
       setError(null);
       console.log('Starting OTP verification with values:', values);
@@ -289,6 +291,7 @@ export default function EventRegistration() {
     } finally {
       setLoading(false);
       setIsVerifying(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -755,7 +758,7 @@ export default function EventRegistration() {
                   placeholder="Enter 6-digit OTP"
                   maxLength={6}
                   autoComplete="one-time-code"
-                  disabled={isVerifying}
+                  disabled={isVerifying || isSubmitting}
                   onChange={(e) => {
                     const value = e.target.value.trim();
                     console.log('OTP input changed:', value);
@@ -782,18 +785,21 @@ export default function EventRegistration() {
                 <Button 
                   type="primary" 
                   htmlType="submit" 
-                  loading={loading || isVerifying} 
+                  loading={loading || isVerifying || isSubmitting} 
                   block
-                  disabled={isVerifying}
-                  onClick={() => {
-                    if (isVerifying) return;
+                  disabled={isVerifying || isSubmitting}
+                  onClick={(e) => {
+                    e.preventDefault(); // Prevent default form submission
+                    if (isVerifying || isSubmitting) return;
                     console.log('Verify OTP button clicked');
-                    form.validateFields(['otp']).catch(() => {
+                    form.validateFields(['otp']).then(() => {
+                      handleVerifyOTP(form.getFieldsValue());
+                    }).catch(() => {
                       console.log('Form validation failed');
                     });
                   }}
                 >
-                  {isVerifying ? 'Verifying...' : 'Verify OTP'}
+                  {isVerifying || isSubmitting ? 'Verifying...' : 'Verify OTP'}
                 </Button>
               </Form.Item>
             </Form>
