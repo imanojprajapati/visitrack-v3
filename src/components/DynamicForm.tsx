@@ -27,6 +27,7 @@ const getFieldRules = (field: FormField): Rule[] => {
     rules.push({
       required: true,
       message: `${field.label} is required`,
+      validateTrigger: ['onBlur', 'onChange', 'onSubmit']
     });
   }
 
@@ -34,20 +35,24 @@ const getFieldRules = (field: FormField): Rule[] => {
     case 'email':
       rules.push({
         validator: async (_, value) => {
-          if (value && !validateEmail(value)) {
+          if (!value) return; // Skip validation if empty (required rule will handle it)
+          if (!validateEmail(value)) {
             throw new Error('Please enter a valid email address');
           }
         },
+        validateTrigger: ['onBlur', 'onChange', 'onSubmit']
       });
       break;
 
     case 'phone':
       rules.push({
         validator: async (_, value) => {
-          if (value && !validatePhone(value)) {
+          if (!value) return; // Skip validation if empty (required rule will handle it)
+          if (!validatePhone(value)) {
             throw new Error('Please enter a valid phone number');
           }
         },
+        validateTrigger: ['onBlur', 'onChange', 'onSubmit']
       });
       break;
 
@@ -55,14 +60,19 @@ const getFieldRules = (field: FormField): Rule[] => {
       rules.push({
         type: 'number',
         message: 'Please enter a valid number',
+        validateTrigger: ['onBlur', 'onChange', 'onSubmit']
       });
       break;
   }
 
   if (field.validation) {
-    rules.push(...field.validation);
+    rules.push(...field.validation.map(rule => ({
+      ...rule,
+      validateTrigger: ['onBlur', 'onChange', 'onSubmit']
+    })));
   }
 
+  console.log(`Field rules for ${field.id}:`, rules);
   return rules;
 };
 
@@ -112,6 +122,10 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
   const [internalForm] = Form.useForm();
   const form = externalForm || internalForm;
 
+  // Add debug logging
+  console.log('DynamicForm template:', template);
+  console.log('DynamicForm fields:', template.fields);
+
   // Set initial values when template changes
   React.useEffect(() => {
     const initialValues = template.fields.reduce((acc, field) => {
@@ -121,6 +135,7 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
       return acc;
     }, {} as Record<string, any>);
 
+    console.log('Setting initial form values:', initialValues);
     form.setFieldsValue(initialValues);
   }, [template, form]);
 
@@ -129,21 +144,33 @@ export const DynamicForm: React.FC<DynamicFormProps> = ({
       form={form}
       layout="vertical"
       name={template.id}
-      onFinish={onFinish}
-      onFinishFailed={onFinishFailed}
+      onFinish={(values) => {
+        console.log('DynamicForm onFinish values:', values);
+        console.log('Form validation status:', form.getFieldsError());
+        onFinish?.(values);
+      }}
+      onFinishFailed={(errorInfo) => {
+        console.log('DynamicForm validation failed:', errorInfo);
+        console.log('Form validation status:', form.getFieldsError());
+        onFinishFailed?.(errorInfo);
+      }}
       validateTrigger={['onBlur', 'onChange', 'onSubmit']}
     >
-      {template.fields.map((field) => (
-        <Form.Item
-          key={field.id}
-          name={field.id}
-          label={field.label}
-          rules={getFieldRules(field)}
-          validateTrigger={['onBlur', 'onChange', 'onSubmit']}
-        >
-          {renderField(field)}
-        </Form.Item>
-      ))}
+      {template.fields.map((field) => {
+        console.log('Rendering field:', field);
+        return (
+          <Form.Item
+            key={field.id}
+            name={field.id}
+            label={field.label}
+            rules={getFieldRules(field)}
+            validateTrigger={['onBlur', 'onChange', 'onSubmit']}
+            validateFirst={true}
+          >
+            {renderField(field)}
+          </Form.Item>
+        );
+      })}
     </Form>
   );
 }; 

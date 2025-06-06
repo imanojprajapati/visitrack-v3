@@ -91,6 +91,8 @@ export default function EventRegistration() {
       console.log('Event data:', event);
       if (event?.form) {
         console.log('Form fields:', event.form.fields);
+        console.log('Form field IDs:', event.form.fields.map(f => f.id));
+        console.log('Form field types:', event.form.fields.map(f => ({ id: f.id, type: f.type })));
       } else {
         console.log('No form data available');
       }
@@ -245,6 +247,10 @@ export default function EventRegistration() {
       setIsSubmitting(true);
       setError(null);
 
+      // Add debug logging
+      console.log('Form values received:', values);
+      console.log('Event form fields:', event?.form?.fields);
+
       // Validate required fields
       if (!event?.form?.fields) {
         throw new Error('Form configuration is missing');
@@ -258,6 +264,11 @@ export default function EventRegistration() {
       // Extract name and phone from form data
       const name = values.name || values.fullName || values.visitorName;
       const phone = values.phone || values.mobile || values.contactNumber;
+
+      // Add debug logging
+      console.log('Extracted name:', name);
+      console.log('Extracted phone:', phone);
+      console.log('All form values:', values);
 
       if (!name) {
         throw new Error('Name is required');
@@ -858,12 +869,17 @@ export default function EventRegistration() {
                   disabled={isSubmitting}
                   onClick={() => {
                     if (!isSubmitting) {
+                      console.log('Form values before validation:', form.getFieldsValue());
+                      console.log('Form validation status before validation:', form.getFieldsError());
+                      
                       form.validateFields()
                         .then(values => {
+                          console.log('Form validation successful, values:', values);
                           handleRegistration(values);
                         })
                         .catch(errorInfo => {
                           console.error('Form validation failed:', errorInfo);
+                          console.log('Form validation status after failure:', form.getFieldsError());
                           message.error('Please fill in all required fields correctly');
                         });
                     }
