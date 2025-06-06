@@ -10,6 +10,7 @@ export interface FormField {
   placeholder?: string;
   defaultValue?: any;
   disabled?: boolean;
+  readOnly?: boolean;
 }
 
 export interface FormTemplate {

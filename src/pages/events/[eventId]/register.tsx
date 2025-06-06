@@ -281,7 +281,93 @@ export default function EventRegistration() {
       }
 
       // Format form data
-      const formData = event.form.fields.reduce((acc, field) => {
+      const template: FormTemplate = {
+        id: 'registration-form',
+        name: 'Registration Form',
+        description: 'Please fill in your details',
+        fields: [
+          // Add source field first
+          {
+            id: 'source',
+            label: 'Source',
+            type: 'text',
+            required: true,
+            placeholder: 'Registration Source',
+            defaultValue: 'Website',
+            readOnly: true
+          },
+          // Add other fields
+          ...event.form.fields
+            .filter(field => field.id !== 'source')
+            .map(field => {
+              let fieldType: FormField['type'] = 'text';
+              const fieldTypeStr = field.type as string;
+              
+              switch (fieldTypeStr) {
+                case 'phone':
+                case 'tel':
+                  fieldType = 'phone';
+                  break;
+                case 'textarea':
+                  fieldType = 'textarea';
+                  break;
+                case 'number':
+                  fieldType = 'number';
+                  break;
+                case 'email':
+                  fieldType = 'email';
+                  break;
+                case 'date':
+                  fieldType = 'date';
+                  break;
+                case 'select':
+                  fieldType = 'select';
+                  break;
+                default:
+                  fieldType = 'text';
+              }
+
+              return {
+                id: field.id,
+                label: field.label,
+                type: fieldType,
+                required: field.required,
+                placeholder: field.placeholder,
+                options: field.options ? field.options.map(opt => ({
+                  label: String(opt),
+                  value: String(opt)
+                })) : undefined,
+                validation: field.validation ? [
+                  ...(field.validation.min !== undefined ? [{
+                    type: 'number' as const,
+                    min: field.validation.min,
+                    message: `Minimum value is ${field.validation.min}`
+                  }] : []),
+                  ...(field.validation.max !== undefined ? [{
+                    type: 'number' as const,
+                    max: field.validation.max,
+                    message: `Maximum value is ${field.validation.max}`
+                  }] : []),
+                  ...(field.validation.pattern ? [{
+                    pattern: new RegExp(field.validation.pattern),
+                    message: 'Invalid format'
+                  }] : [])
+                ] : []
+              };
+            })
+        ]
+      };
+
+      const formData = event.form.fields.reduce((acc: Record<string, any>, field) => {
+        // For source field, always use 'Website'
+        if (field.id === 'source') {
+          acc[field.id] = {
+            label: field.label,
+            value: 'Website'
+          };
+          return acc;
+        }
+
         const value = formValues[field.id];
         
         // Skip empty optional fields
@@ -308,13 +394,15 @@ export default function EventRegistration() {
         };
 
         return acc;
-      }, {} as Record<string, any>);
+      }, {});
 
-      // Add source field
-      formData.source = {
-        label: 'Source',
-        value: 'Website'
-      };
+      // Add source field if not already present
+      if (!formData.source) {
+        formData.source = {
+          label: 'Source',
+          value: 'Website'
+        };
+      }
 
       // Submit registration
       const response = await fetchApi('visitors/register', {
@@ -413,6 +501,16 @@ export default function EventRegistration() {
   const RegistrationDetails: React.FC<{ visitor: Visitor }> = ({ visitor }) => {
     const [qrError, setQrError] = useState<string | null>(null);
     
+    if (!visitor) {
+      return (
+        <Result
+          status="error"
+          title="Registration Not Found"
+          subTitle="Unable to load registration details."
+        />
+      );
+    }
+
     let qrCodeData: string;
     try {
       qrCodeData = generateQRCodeData(visitor);
@@ -438,33 +536,35 @@ export default function EventRegistration() {
         )}
         <Space direction="vertical" size="small" style={{ width: '100%' }} className="p-4 bg-gray-50 rounded-lg">
           <div>
-            <Text type="secondary">Name</Text>
-            <div><Text strong>{visitor.name}</Text></div>
+            <Text strong>Name:</Text> {visitor.name}
           </div>
           <div>
-            <Text type="secondary">Email</Text>
-            <div><Text strong>{visitor.email}</Text></div>
+            <Text strong>Email:</Text> {visitor.email}
+          </div>
+          {visitor.phone && (
+            <div>
+              <Text strong>Phone:</Text> {visitor.phone}
+            </div>
+          )}
+          {visitor.company && (
+            <div>
+              <Text strong>Company:</Text> {visitor.company}
+            </div>
+          )}
+          <div>
+            <Text strong>Registration ID:</Text> {visitor.registrationId}
           </div>
           <div>
-            <Text type="secondary">Phone</Text>
-            <div><Text strong>{visitor.phone}</Text></div>
+            <Text strong>Event Date:</Text> {formatDate(visitor.eventStartDate)}
           </div>
           <div>
-            <Text type="secondary">Event</Text>
-            <div><Text strong>{visitor.eventName}</Text></div>
+            <Text strong>Registration Date:</Text> {formatDateTime(visitor.createdAt)}
           </div>
-          <div>
-            <Text type="secondary">Location</Text>
-            <div><Text strong>{visitor.eventLocation}</Text></div>
-          </div>
-          <div>
-            <Text type="secondary">Event Date</Text>
-            <div><Text strong>{formatDate(visitor.eventStartDate)}</Text></div>
-          </div>
-          <div>
-            <Text type="secondary">Registration Date</Text>
-            <div><Text strong>{formatDateTime(visitor.createdAt)}</Text></div>
-          </div>
+          {visitor.formData && Object.entries(visitor.formData).map(([key, field]) => (
+            <div key={key}>
+              <Text strong>{field.label}:</Text> {String(field.value)}
+            </div>
+          ))}
         </Space>
       </div>
     );
@@ -619,14 +719,11 @@ export default function EventRegistration() {
     console.log('Printing badge');
   };
 
-  // Helper function to format dates
+  // Helper function to format date
   const formatDate = (dateString: string | Date | undefined): string => {
+    if (!dateString) return 'N/A';
     try {
-      if (!dateString) return 'Not specified';
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Not specified';
-      }
       return date.toLocaleDateString('en-GB', {
         day: '2-digit',
         month: '2-digit',
@@ -634,28 +731,25 @@ export default function EventRegistration() {
       });
     } catch (error) {
       console.error('Error formatting date:', error);
-      return 'Not specified';
+      return 'Invalid date';
     }
   };
 
-  // Helper function to format date time
+  // Helper function to format date and time
   const formatDateTime = (dateString: string | Date | undefined): string => {
+    if (!dateString) return 'N/A';
     try {
-      if (!dateString) return 'Not specified';
       const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        return 'Not specified';
-      }
-      return date.toLocaleDateString('en-GB', {
+      return date.toLocaleString('en-GB', {
         day: '2-digit',
         month: '2-digit',
         year: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-      }).replace(',', '');
+      });
     } catch (error) {
-      console.error('Error formatting date time:', error);
-      return 'Not specified';
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
     }
   };
 
@@ -775,71 +869,6 @@ export default function EventRegistration() {
           );
         }
 
-        // Create form template from event form fields
-        const template: FormTemplate = {
-          id: 'registration-form',
-          name: 'Registration Form',
-          description: 'Please fill in your details',
-          fields: event.form.fields
-            .filter(field => field.id !== 'source')
-            .map(field => {
-              let fieldType: FormField['type'] = 'text';
-              const fieldTypeStr = field.type as string;
-              
-              switch (fieldTypeStr) {
-                case 'phone':
-                case 'tel':
-                  fieldType = 'phone';
-                  break;
-                case 'textarea':
-                  fieldType = 'textarea';
-                  break;
-                case 'number':
-                  fieldType = 'number';
-                  break;
-                case 'email':
-                  fieldType = 'email';
-                  break;
-                case 'date':
-                  fieldType = 'date';
-                  break;
-                case 'select':
-                  fieldType = 'select';
-                  break;
-                default:
-                  fieldType = 'text';
-              }
-
-              return {
-                id: field.id,
-                label: field.label,
-                type: fieldType,
-                required: field.required,
-                placeholder: field.placeholder,
-                options: field.options ? field.options.map(opt => ({
-                  label: String(opt),
-                  value: String(opt)
-                })) : undefined,
-                validation: field.validation ? [
-                  ...(field.validation.min !== undefined ? [{
-                    type: 'number' as const,
-                    min: field.validation.min,
-                    message: `Minimum value is ${field.validation.min}`
-                  }] : []),
-                  ...(field.validation.max !== undefined ? [{
-                    type: 'number' as const,
-                    max: field.validation.max,
-                    message: `Maximum value is ${field.validation.max}`
-                  }] : []),
-                  ...(field.validation.pattern ? [{
-                    pattern: new RegExp(field.validation.pattern),
-                    message: 'Invalid format'
-                  }] : [])
-                ] : []
-              };
-            })
-        };
-
         return (
           <div className="max-w-2xl mx-auto">
             <Form
@@ -850,7 +879,82 @@ export default function EventRegistration() {
               preserve={false}
             >
               <DynamicForm
-                template={template}
+                template={{
+                  id: 'registration-form',
+                  name: 'Registration Form',
+                  description: 'Please fill in your details',
+                  fields: [
+                    // Add source field first
+                    {
+                      id: 'source',
+                      label: 'Source',
+                      type: 'text',
+                      required: true,
+                      placeholder: 'Registration Source',
+                      defaultValue: 'Website',
+                      readOnly: true
+                    },
+                    // Add other fields
+                    ...event.form.fields
+                      .filter(field => field.id !== 'source')
+                      .map(field => {
+                        let fieldType: FormField['type'] = 'text';
+                        const fieldTypeStr = field.type as string;
+                        
+                        switch (fieldTypeStr) {
+                          case 'phone':
+                          case 'tel':
+                            fieldType = 'phone';
+                            break;
+                          case 'textarea':
+                            fieldType = 'textarea';
+                            break;
+                          case 'number':
+                            fieldType = 'number';
+                            break;
+                          case 'email':
+                            fieldType = 'email';
+                            break;
+                          case 'date':
+                            fieldType = 'date';
+                            break;
+                          case 'select':
+                            fieldType = 'select';
+                            break;
+                          default:
+                            fieldType = 'text';
+                        }
+
+                        return {
+                          id: field.id,
+                          label: field.label,
+                          type: fieldType,
+                          required: field.required,
+                          placeholder: field.placeholder,
+                          options: field.options ? field.options.map(opt => ({
+                            label: String(opt),
+                            value: String(opt)
+                          })) : undefined,
+                          validation: field.validation ? [
+                            ...(field.validation.min !== undefined ? [{
+                              type: 'number' as const,
+                              min: field.validation.min,
+                              message: `Minimum value is ${field.validation.min}`
+                            }] : []),
+                            ...(field.validation.max !== undefined ? [{
+                              type: 'number' as const,
+                              max: field.validation.max,
+                              message: `Maximum value is ${field.validation.max}`
+                            }] : []),
+                            ...(field.validation.pattern ? [{
+                              pattern: new RegExp(field.validation.pattern),
+                              message: 'Invalid format'
+                            }] : [])
+                          ] : []
+                        };
+                      })
+                  ]
+                }}
                 form={form}
                 onFinish={handleRegistration}
               />
@@ -1042,21 +1146,11 @@ export default function EventRegistration() {
                       </div>
                       <div>
                         <Text type="secondary">Event Date</Text>
-                        <div><Text strong>{new Date(visitor.eventStartDate).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric'
-                        })}</Text></div>
+                        <div><Text strong>{formatDate(visitor.eventStartDate)}</Text></div>
                       </div>
                       <div>
                         <Text type="secondary">Registration Date</Text>
-                        <div><Text strong>{new Date(visitor.createdAt).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        }).replace(',', '')}</Text></div>
+                        <div><Text strong>{formatDateTime(visitor.createdAt)}</Text></div>
                       </div>
                       {visitor.company && (
                         <div>
