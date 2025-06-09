@@ -3,11 +3,47 @@ import { Tabs, Card, Typography, Space, Alert } from 'antd';
 import { UserOutlined, HistoryOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
 import RegistrationReport from './reports/registrations';
+import dayjs from 'dayjs';
 
 const { TabPane } = Tabs;
 const { Title, Text } = Typography;
 
+interface VisitorReport {
+  _id: string;
+  name: string;
+  email: string;
+  eventDate?: string;
+  event?: {
+    _id: string;
+    title: string;
+    startDate: string;
+    endDate: string;
+  };
+  status: string;
+  source: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export default function ReportsPage() {
+  const columns = [
+    {
+      title: 'Event Date',
+      dataIndex: 'eventDate',
+      key: 'eventDate',
+      render: (date: string, record: VisitorReport) => {
+        // Fallback to event start date if eventDate is not available
+        const eventDate = date || record.event?.startDate;
+        return eventDate ? dayjs(eventDate).format('DD MMM YYYY') : '-';
+      },
+      sorter: (a: VisitorReport, b: VisitorReport) => {
+        const dateA = a.eventDate || a.event?.startDate || '';
+        const dateB = b.eventDate || b.event?.startDate || '';
+        return dayjs(dateA).unix() - dayjs(dateB).unix();
+      },
+    },
+  ];
+
   return (
     <AdminLayout>
       <div className="h-full flex flex-col overflow-hidden">

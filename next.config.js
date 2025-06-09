@@ -64,7 +64,8 @@ const nextConfig = {
     esmExternals: true,
     serverComponentsExternalPackages: [],
     optimizeCss: false,
-    scrollRestoration: false
+    scrollRestoration: false,
+    traceBuildTraces: false
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {

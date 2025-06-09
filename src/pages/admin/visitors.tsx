@@ -151,7 +151,8 @@ export default function VisitorsPage() {
       dataIndex: 'name',
       key: 'name',
       render: (name: string, record: Visitor) => name || record.additionalData?.name?.value || '-',
-      responsive: ['xs'],
+      fixed: 'left',
+      width: 200,
     },
     {
       title: 'Email',
@@ -187,7 +188,7 @@ export default function VisitorsPage() {
       dataIndex: 'eventLocation',
       key: 'eventLocation',
       render: (location: string) => location || '-',
-      responsive: ['lg'],
+      responsive: ['md'],
     },
     {
       title: 'Status',
@@ -237,18 +238,10 @@ export default function VisitorsPage() {
             }}
             title="View Details"
           />
-          <Button
-            type="text"
-            icon={<QrcodeOutlined />}
-            onClick={() => {
-              setSelectedVisitor(record);
-              setShowQRCode(true);
-            }}
-            title="Show QR Code"
-          />
         </Space>
       ),
-      responsive: ['xs'],
+      fixed: 'right',
+      width: 100,
     },
   ];
 
@@ -296,8 +289,77 @@ export default function VisitorsPage() {
   };
 
   const handleExport = () => {
-    // Implement export functionality
-    message.success('Exporting visitor data...');
+    try {
+      const headers = [
+        'Name',
+        'Email',
+        'Phone',
+        'Company',
+        'Event',
+        'Location',
+        'Status',
+        'Registration Date',
+        'Check-in Time',
+        'Check-out Time',
+        ...Object.keys(visitors[0]?.additionalData || {}).map(key => 
+          visitors[0]?.additionalData?.[key]?.label || key
+        )
+      ];
+
+      const csvData = filteredVisitors.map(visitor => [
+        visitor.name || visitor.additionalData?.name?.value || '',
+        visitor.email || visitor.additionalData?.email?.value || '',
+        visitor.phone || visitor.additionalData?.phone?.value || '',
+        visitor.company || visitor.additionalData?.company?.value || '',
+        visitor.eventName || '',
+        visitor.eventLocation || '',
+        formatStatus(visitor.status),
+        visitor.createdAt ? new Date(visitor.createdAt).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).replace(',', '') : '',
+        visitor.checkInTime ? new Date(visitor.checkInTime).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).replace(',', '') : '',
+        visitor.checkOutTime ? new Date(visitor.checkOutTime).toLocaleDateString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }).replace(',', '') : '',
+        ...Object.keys(visitor.additionalData || {}).map(key => 
+          visitor.additionalData?.[key]?.value || ''
+        )
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.map(cell => 
+          typeof cell === 'string' ? `"${cell.replace(/"/g, '""')}"` : cell
+        ).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `visitors-export-${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      message.success('Export completed successfully');
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      message.error('Failed to export data');
+    }
   };
 
   const handleImport = () => {

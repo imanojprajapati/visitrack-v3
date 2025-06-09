@@ -624,11 +624,12 @@ const BadgeManagement: React.FC = () => {
       const downloadTemplate = { 
         ...template, 
         isPreview: false,
-        showQRCode: false
+        showQRCode: false // Don't show QR code in download
       };
       setSelectedTemplate(downloadTemplate);
       
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Wait for the template to be rendered
+      await new Promise(resolve => setTimeout(resolve, 500));
       
       if (!badgeRef.current) {
         throw new Error('Badge preview element not found');
@@ -636,7 +637,7 @@ const BadgeManagement: React.FC = () => {
 
       const badgeElement = badgeRef.current.cloneNode(true) as HTMLElement;
       
-      // Set container styles
+      // Set container styles for A4 paper
       badgeElement.style.cssText = `
         position: absolute;
         left: -9999px;
@@ -659,8 +660,8 @@ const BadgeManagement: React.FC = () => {
           display: flex;
           flex-direction: column;
           gap: 10mm;
-          height: calc(297mm - 20mm - 60px);
-          padding-bottom: 60px;
+          height: calc(297mm - 20mm - 72px);
+          padding-bottom: 72px;
           width: 100%;
         `;
       }
@@ -678,7 +679,7 @@ const BadgeManagement: React.FC = () => {
       if (visitrackContainer instanceof HTMLElement) {
         visitrackContainer.style.cssText = `
           width: 100%;
-          height: 60px;
+          height: 72px;
           display: flex;
           justify-content: center;
           align-items: center;
@@ -687,12 +688,12 @@ const BadgeManagement: React.FC = () => {
           left: 0;
           background-color: white;
           border-top: 1px solid #f0f0f0;
+          font-size: 72px;
+          font-weight: bold;
+          color: #666;
+          opacity: 0.5;
         `;
       }
-
-      // Remove any QR code elements
-      const qrCodeElements = badgeElement.querySelectorAll('svg');
-      qrCodeElements.forEach(element => element.remove());
 
       document.body.appendChild(badgeElement);
 
@@ -701,16 +702,16 @@ const BadgeManagement: React.FC = () => {
           useCORS: true,
           logging: false,
           background: '#ffffff',
-          width: 595.28,
-          height: 841.89,
-          allowTaint: true
+          width: 595.28, // A4 width in points
+          height: 841.89, // A4 height in points
+          allowTaint: true,
         });
 
         const pdf = new jsPDF({
           orientation: 'p',
           unit: 'pt',
           format: 'a4',
-          compress: true
+          compress: true,
         });
 
         const imgData = canvas.toDataURL('image/png', 1.0);
@@ -1115,16 +1116,116 @@ const BadgeManagement: React.FC = () => {
             <div
               ref={badgeRef}
               style={{
-                width: '100%',
-                aspectRatio: selectedTemplate.orientation === 'portrait' ? '2/3' : '3/2',
-                position: 'relative',
+                width: '210mm', // A4 width
+                minHeight: '297mm', // A4 height
                 background: '#fff',
                 border: '1px solid #d9d9d9',
                 borderRadius: '4px',
                 overflow: 'hidden',
+                display: 'flex',
+                flexDirection: 'column',
+                padding: '10mm',
+                boxSizing: 'border-box',
               }}
             >
-              {/* Badge preview content */}
+              {/* First Row: Badge Image */}
+              <div style={{ width: '100%', height: '200px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                {selectedTemplate.badge?.cloudinaryUrl && (
+                  <img
+                    src={selectedTemplate.badge.cloudinaryUrl}
+                    alt="Badge"
+                    style={{
+                      width: '100%',
+                      height: '200px',
+                      objectFit: 'contain',
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Second Row: QR Code (only in preview) */}
+              {selectedTemplate.isPreview && selectedTemplate.showQRCode && selectedTemplate.qrCode?.enabled && selectedTemplate.qrCode?.cloudinaryUrl && (
+                <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
+                  <img
+                    src={selectedTemplate.qrCode.cloudinaryUrl}
+                    alt="QR Code"
+                    style={{
+                      width: '200px',
+                      height: '200px',
+                      objectFit: 'contain',
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Third Row: Information */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '10px', marginTop: '20px' }}>
+                {/* Title */}
+                {selectedTemplate.title?.enabled && (
+                  <h2
+                    style={{
+                      fontSize: `${selectedTemplate.title.fontSize}px`,
+                      fontFamily: selectedTemplate.title.fontFamily,
+                      color: selectedTemplate.title.color,
+                      margin: 0,
+                      textAlign: 'center',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {selectedTemplate.title.text}
+                  </h2>
+                )}
+
+                {/* Subtitle */}
+                {selectedTemplate.subtitle?.enabled && (
+                  <p
+                    style={{
+                      fontSize: `${selectedTemplate.subtitle.fontSize}px`,
+                      fontFamily: selectedTemplate.subtitle.fontFamily,
+                      color: selectedTemplate.subtitle.color,
+                      margin: 0,
+                      textAlign: 'center',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {selectedTemplate.subtitle.text}
+                  </p>
+                )}
+
+                {/* Additional Info */}
+                {selectedTemplate.additionalInfo?.enabled && (
+                  <p
+                    style={{
+                      fontSize: `${selectedTemplate.additionalInfo.fontSize}px`,
+                      fontFamily: selectedTemplate.additionalInfo.fontFamily,
+                      color: selectedTemplate.additionalInfo.color,
+                      margin: 0,
+                      textAlign: 'center',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {selectedTemplate.additionalInfo.text}
+                  </p>
+                )}
+              </div>
+
+              {/* Fourth Row: VISITRACK */}
+              <div style={{ 
+                width: '100%', 
+                height: '72px', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                position: 'absolute',
+                bottom: '10mm',
+                left: 0,
+                fontSize: '72px',
+                fontWeight: 'bold',
+                color: '#666',
+                opacity: 0.5,
+              }}>
+                VISITRACK
+              </div>
             </div>
             <Descriptions column={1} size="small" className="w-full">
               <Descriptions.Item label="Template Name">

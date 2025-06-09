@@ -152,16 +152,19 @@ export default function RegistrationReport() {
       title: 'Event Date',
       dataIndex: 'eventStartDate',
       key: 'eventStartDate',
-      render: (date: string) => {
+      render: (date: string, record: Visitor) => {
         try {
-          if (!date) return '-';
-          const dateObj = new Date(date);
+          const dateToUse = date || record.eventEndDate;
+          if (!dateToUse) return '-';
+          const dateObj = new Date(dateToUse);
           if (isNaN(dateObj.getTime())) return '-';
           return dateObj.toLocaleDateString('en-GB', {
             day: '2-digit',
             month: '2-digit',
-            year: 'numeric'
-          });
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }).replace(',', '');
         } catch (error) {
           console.error('Error formatting date:', error);
           return '-';
@@ -360,13 +363,17 @@ export default function RegistrationReport() {
               />
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by source"
-                value={filters.source}
-                onChange={(e) => handleFilterChange('source', e.target.value)}
+              <Select
+                placeholder="Filter by source"
+                value={filters.source || undefined}
+                onChange={(value) => handleFilterChange('source', value)}
                 allowClear
+                style={{ width: '100%' }}
                 className="hover:border-blue-400 focus:border-blue-400"
-              />
+              >
+                <Select.Option value="manual">Manual</Select.Option>
+                <Select.Option value="scan">Scan</Select.Option>
+              </Select>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
               <Input
@@ -387,9 +394,7 @@ export default function RegistrationReport() {
                 className="hover:border-blue-400 focus:border-blue-400"
               >
                 <Select.Option value="registered">Registered</Select.Option>
-                <Select.Option value="checked_in">Checked In</Select.Option>
-                <Select.Option value="checked_out">Checked Out</Select.Option>
-                <Select.Option value="cancelled">Cancelled</Select.Option>
+                <Select.Option value="visited">Visited</Select.Option>
               </Select>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
