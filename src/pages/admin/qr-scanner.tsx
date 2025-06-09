@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, Button, Space, Table, Tag, Modal, message } from 'antd';
-import { QrReader } from 'react-qr-reader';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { PrinterOutlined, QrcodeOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
 import dayjs from 'dayjs';
@@ -19,7 +19,11 @@ interface VisitorEntry {
 }
 
 interface VisitorData {
-  visitorId: string;
+  _id?: string;
+  id?: string;
+  visitorId?: string;
+  eventId?: string;
+  registrationId?: string;
   name: string;
   company: string;
   designation: string;
@@ -31,9 +35,15 @@ interface VisitorData {
 
 interface QRScan {
   visitorId: string;
+  eventId?: string;
+  registrationId?: string;
+  name?: string;
+  company?: string;
+  eventName?: string;
   scanTime: string;
   entryType: 'qr' | 'manual';
-  status: 'success' | 'failed';
+  status: 'success' | 'failed' | 'Visited';
+  deviceInfo?: string;
   error?: string;
 }
 
@@ -46,6 +56,52 @@ const QRScanner: React.FC = () => {
   // Manual entry state
   const [showManualEntry, setShowManualEntry] = useState(false);
   const [manualVisitorId, setManualVisitorId] = useState('');
+  // QR scanner state
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+
+  // Initialize QR scanner when modal opens
+  useEffect(() => {
+    if (showScanner && !scannerRef.current) {
+      const scanner = new Html5QrcodeScanner(
+        "qr-reader",
+        { 
+          fps: 10, 
+          qrbox: { width: 250, height: 250 },
+          disableFlip: false 
+        },
+        false
+      );
+      
+      scanner.render((decodedText) => {
+        if (!isProcessingScan) {
+          handleQrCodeScan(decodedText);
+        }
+      }, (error) => {
+        console.error('QR Scan error:', error);
+      });
+      
+      scannerRef.current = scanner;
+    }
+
+    // Cleanup scanner when modal closes
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }
+    };
+  }, [showScanner, isProcessingScan]);
+
+  // Cleanup scanner when component unmounts
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear();
+        scannerRef.current = null;
+      }
+    };
+  }, []);
 
   // Fetch scanned visitors on component mount
   useEffect(() => {
@@ -59,15 +115,18 @@ const QRScanner: React.FC = () => {
         const data = await response.json();
         // Map scanTime to a readable format if needed
         const visitors = data.map((scan: any) => ({
-          key: scan._id,
-          name: scan.name,
-          company: scan.company,
-          eventName: scan.eventName,
-          status: scan.status,
+          visitorId: scan.visitorId || scan._id,
+          name: scan.name || 'Unknown',
+          company: scan.company || '',
+          designation: scan.designation || '',
+          email: scan.email || '',
+          phone: scan.phone || '',
+          eventName: scan.eventName || 'Unknown Event',
+          status: scan.status || 'Unknown',
           scanTime: scan.scanTime?.$date?.$numberLong
             ? Number(scan.scanTime.$date.$numberLong)
             : scan.scanTime,
-          entryType: scan.entryType,
+          entryType: scan.entryType || 'unknown',
         }));
         setScannedVisitors(visitors);
       } catch (error) {
@@ -82,11 +141,24 @@ const QRScanner: React.FC = () => {
 
   const handleQrCodeScan = async (qrData: string) => {
     try {
+      // Prevent duplicate processing
+      if (isProcessingScan) {
+        return;
+      }
+
       // Extract visitor ID from QR code
       const visitorId = qrData.trim();
       if (!visitorId) {
         throw new Error('Invalid QR code data');
       }
+
+      // Validate that the visitor ID looks like a valid MongoDB ObjectId
+      const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+      if (!objectIdPattern.test(visitorId)) {
+        throw new Error('Invalid visitor ID format. Please scan a valid QR code.');
+      }
+
+      setIsProcessingScan(true);
 
       // Show the scanned ID in a popup
       Modal.info({
@@ -95,25 +167,60 @@ const QRScanner: React.FC = () => {
           <div className="text-center">
             <p className="text-lg font-semibold mb-2">Visitor ID:</p>
             <p className="text-2xl font-mono bg-gray-100 p-2 rounded">{visitorId}</p>
+            <p className="text-sm text-gray-600 mt-2">Click "Process" to check in this visitor</p>
           </div>
         ),
         okText: 'Process',
+        cancelText: 'Cancel',
         onOk: async () => {
           try {
             setLoading(true);
             // First check if visitor exists
             const response = await fetch(`/api/visitors/${visitorId}`);
             if (!response.ok) {
-              throw new Error('Visitor not found');
+              let errorMessage = 'Visitor not found.';
+              try {
+                const errorData = await response.json();
+                errorMessage = errorData.message || errorData.error || errorMessage;
+              } catch (parseError) {
+                console.error('Failed to parse error response:', parseError);
+                if (response.status === 500) {
+                  errorMessage = 'Server error occurred while fetching visitor data.';
+                } else if (response.status === 404) {
+                  errorMessage = 'Visitor not found with the provided ID.';
+                }
+              }
+              throw new Error(errorMessage);
             }
-            const visitorData = await response.json();
+            
+            let responseData;
+            try {
+              responseData = await response.json();
+            } catch (parseError) {
+              console.error('Failed to parse visitor response:', parseError);
+              throw new Error('Invalid response format from server.');
+            }
+            
+            const visitorData = responseData.visitor || responseData; // Handle both response formats
+
+            // Check if visitor is already visited
+            if (visitorData.status === 'Visited') {
+              messageApi.warning('Visitor has already been checked in');
+              return;
+            }
 
             // Create scan record
             const scanData = {
-              visitorId: visitorData.visitorId,
+              visitorId: visitorData._id || visitorData.id || visitorId,
+              eventId: visitorData.eventId,
+              registrationId: visitorData.registrationId,
+              name: visitorData.name,
+              company: visitorData.company,
+              eventName: visitorData.eventName,
               scanTime: new Date().toISOString(),
               entryType: 'qr',
-              status: 'success'
+              status: 'Visited',
+              deviceInfo: navigator.userAgent
             };
 
             // Store scan data
@@ -126,7 +233,8 @@ const QRScanner: React.FC = () => {
             });
 
             if (!scanResponse.ok) {
-              throw new Error('Failed to record scan data');
+              const errorData = await scanResponse.json();
+              throw new Error(errorData.message || 'Failed to record scan data');
             }
 
             // Update visitor status to Visited
@@ -142,8 +250,9 @@ const QRScanner: React.FC = () => {
             });
 
             if (!updateResponse.ok) {
+              const errorData = await updateResponse.json();
               // If visitor update fails, update scan record status
-              await fetch(`/api/qrscans/${visitorId}`, {
+              await fetch(`/api/qrscans/${scanData.visitorId}`, {
                 method: 'PATCH',
                 headers: {
                   'Content-Type': 'application/json',
@@ -153,31 +262,42 @@ const QRScanner: React.FC = () => {
                   error: 'Failed to update visitor status'
                 }),
               });
-              throw new Error('Failed to update visitor status');
+              throw new Error(errorData.message || 'Failed to update visitor status');
             }
 
             // Add to scanned visitors list with updated status
             const newEntry: VisitorEntry = {
-              ...visitorData,
+              visitorId: visitorData._id || visitorData.id || visitorId,
+              name: visitorData.name,
+              company: visitorData.company,
+              designation: visitorData.designation || '',
+              email: visitorData.email || '',
+              phone: visitorData.phone || '',
+              eventName: visitorData.eventName,
+              status: 'Visited',
               scanTime: scanData.scanTime,
-              entryType: scanData.entryType,
-              status: 'Visited'
+              entryType: scanData.entryType
             };
 
             setScannedVisitors(prev => [newEntry, ...prev]);
-            messageApi.success('Visitor checked in successfully');
+            messageApi.success(`Visitor ${visitorData.name} checked in successfully`);
             setShowScanner(false);
           } catch (error) {
             console.error('Error processing visitor:', error);
             messageApi.error(error instanceof Error ? error.message : 'Failed to process visitor');
           } finally {
             setLoading(false);
+            setIsProcessingScan(false);
           }
+        },
+        onCancel: () => {
+          setIsProcessingScan(false);
         }
       });
     } catch (error) {
       console.error('Error scanning QR code:', error);
       messageApi.error(error instanceof Error ? error.message : 'Failed to process QR code');
+      setIsProcessingScan(false);
     }
   };
 
@@ -185,10 +305,16 @@ const QRScanner: React.FC = () => {
     try {
       // First, create a QR scan record
       const scanData: QRScan = {
-        visitorId: visitorData.visitorId,
+        visitorId: visitorData._id || visitorData.id || visitorData.visitorId || '',
+        eventId: visitorData.eventId,
+        registrationId: visitorData.registrationId,
+        name: visitorData.name,
+        company: visitorData.company,
+        eventName: visitorData.eventName,
         scanTime: new Date().toISOString(),
         entryType: 'qr',
-        status: 'success'
+        status: 'Visited',
+        deviceInfo: navigator.userAgent
       };
 
       // Store scan data in qrscans collection
@@ -205,7 +331,7 @@ const QRScanner: React.FC = () => {
       }
 
       // Update visitor status to Visited
-      const updateResponse = await fetch(`/api/visitors/${visitorData.visitorId}/check-in`, {
+      const updateResponse = await fetch(`/api/visitors/${scanData.visitorId}/check-in`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -233,10 +359,16 @@ const QRScanner: React.FC = () => {
 
       // Add to scanned visitors list
       const newEntry: VisitorEntry = {
-        ...visitorData,
+        visitorId: visitorData._id || visitorData.id || visitorData.visitorId || '',
+        name: visitorData.name,
+        company: visitorData.company,
+        designation: visitorData.designation || '',
+        email: visitorData.email || '',
+        phone: visitorData.phone || '',
+        eventName: visitorData.eventName,
+        status: 'Visited',
         scanTime: scanData.scanTime,
-        entryType: scanData.entryType,
-        status: 'Visited'
+        entryType: scanData.entryType
       };
 
       setScannedVisitors(prev => [newEntry, ...prev]);
@@ -263,7 +395,36 @@ const QRScanner: React.FC = () => {
     }
     try {
       setLoading(true);
-      // 1. Update visitor status to 'Visited'
+      
+      // 1. First fetch visitor data to verify it exists
+      const visitorRes = await fetch(`/api/visitors/${manualVisitorId.trim()}`);
+      if (!visitorRes.ok) {
+        let errorMessage = 'Visitor not found.';
+        try {
+          const errorData = await visitorRes.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+          if (visitorRes.status === 500) {
+            errorMessage = 'Server error occurred while fetching visitor data.';
+          } else if (visitorRes.status === 404) {
+            errorMessage = 'Visitor not found with the provided ID.';
+          }
+        }
+        throw new Error(errorMessage);
+      }
+      
+      let responseData;
+      try {
+        responseData = await visitorRes.json();
+      } catch (parseError) {
+        console.error('Failed to parse visitor response:', parseError);
+        throw new Error('Invalid response format from server.');
+      }
+      
+      const visitorData = responseData.visitor || responseData; // Handle both response formats
+
+      // 2. Update visitor status to 'Visited'
       const updateRes = await fetch(`/api/visitors/${manualVisitorId.trim()}/check-in`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -274,44 +435,52 @@ const QRScanner: React.FC = () => {
         throw new Error(err.message || 'Failed to update visitor status.');
       }
 
-      // 2. Fetch visitor data
-      const visitorRes = await fetch(`/api/visitors/${manualVisitorId.trim()}`);
-      if (!visitorRes.ok) {
-        const err = await visitorRes.json();
-        throw new Error(err.message || 'Visitor not found.');
-      }
-      const visitorData = await visitorRes.json();
-
-      // 3. Add record to qrscans collection
+      // 3. Add record to qrscans collection using the comprehensive API
       const now = new Date().toISOString();
+      
+      const scanData = {
+        visitorId: visitorData._id || visitorData.id || manualVisitorId.trim(),
+        eventId: visitorData.eventId,
+        registrationId: visitorData.registrationId,
+        name: visitorData.name,
+        company: visitorData.company,
+        eventName: visitorData.eventName,
+        scanTime: now,
+        entryType: 'manual',
+        status: 'Visited',
+        deviceInfo: navigator.userAgent
+      };
+
       const scanRes = await fetch('/api/qrscans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          visitorId: visitorData._id,
-          eventId: visitorData.eventId,
-          registrationId: visitorData.registrationId,
-          name: visitorData.name,
-          company: visitorData.company,
-          eventName: visitorData.eventName,
-          eventDate: visitorData.eventDate,
-          scanTime: now,
-          entryType: 'manual',
-          status: 'Visited',
-          deviceInfo: navigator.userAgent,
-          createdAt: now,
-          updatedAt: now,
-        }),
+        body: JSON.stringify(scanData),
       });
+      
       if (!scanRes.ok) {
         const err = await scanRes.json();
         throw new Error(err.message || 'Failed to insert scan record.');
       }
-      message.success('Manual entry recorded successfully.');
+
+      // 4. Add to scanned visitors list for immediate display
+      const newEntry: VisitorEntry = {
+        visitorId: visitorData._id || visitorData.id || manualVisitorId.trim(),
+        name: visitorData.name,
+        company: visitorData.company,
+        designation: visitorData.designation || '',
+        email: visitorData.email || '',
+        phone: visitorData.phone || '',
+        eventName: visitorData.eventName,
+        status: 'Visited',
+        scanTime: now,
+        entryType: 'manual'
+      };
+
+      setScannedVisitors(prev => [newEntry, ...prev]);
+      
+      messageApi.success('Manual entry recorded successfully.');
       setManualVisitorId('');
       setShowManualEntry(false);
-      // Optionally, re-fetch scanned visitors to update the table.
-      // fetchScannedVisitors();
     } catch (error) {
       console.error('Error recording manual entry:', error);
       messageApi.error(error instanceof Error ? error.message : 'Failed to record manual entry.');
@@ -420,28 +589,31 @@ const QRScanner: React.FC = () => {
           <Modal
             title="QR Code Scanner"
             open={showScanner}
-            onCancel={() => setShowScanner(false)}
+            onCancel={() => {
+              setShowScanner(false);
+              setIsProcessingScan(false);
+            }}
             footer={null}
             width={400}
             centered
           >
             <div className="flex flex-col items-center">
-              <div className="w-full aspect-square bg-black rounded-lg overflow-hidden mb-4">
-                <QrReader
-                  constraints={{ facingMode: 'environment' }}
-                  onResult={(result, error) => {
-                    if (result?.getText()) {
-                      handleQrCodeScan(result.getText());
-                    }
-                    if (error) {
-                      console.error('QR Scan error:', error);
-                    }
-                  }}
-                  className="w-full h-full"
-                />
+              <div className="w-full aspect-square bg-black rounded-lg overflow-hidden mb-4 relative">
+                <div id="qr-reader" className="w-full h-full"></div>
+                {isProcessingScan && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                    <div className="text-white text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                      <p>Processing scan...</p>
+                    </div>
+                  </div>
+                )}
               </div>
-              <p className="text-sm text-gray-600 text-center">
+              <p className="text-sm text-gray-600 text-center mb-2">
                 Position the QR code within the frame to scan
+              </p>
+              <p className="text-xs text-gray-500 text-center">
+                {isProcessingScan ? 'Processing previous scan...' : 'Ready to scan'}
               </p>
             </div>
           </Modal>
@@ -459,8 +631,14 @@ const QRScanner: React.FC = () => {
               type="text"
               value={manualVisitorId}
               onChange={e => setManualVisitorId(e.target.value)}
+              onKeyPress={e => {
+                if (e.key === 'Enter' && !loading) {
+                  handleManualEntry();
+                }
+              }}
               placeholder="Enter Visitor ID"
               className="ant-input w-full"
+              disabled={loading}
               autoFocus
             />
           </Modal>
@@ -469,7 +647,7 @@ const QRScanner: React.FC = () => {
           <Table
             dataSource={scannedVisitors}
             columns={columns}
-            rowKey="key"
+            rowKey={(record) => `${record.visitorId}-${record.scanTime}`}
             loading={loading}
             pagination={{
               pageSize: 10,

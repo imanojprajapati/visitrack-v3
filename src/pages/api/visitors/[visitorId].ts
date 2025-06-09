@@ -77,14 +77,40 @@ export default async function handler(
 
   } catch (error) {
     console.error('Error fetching visitor details:', error);
+    
+    // Log more details about the error
+    if (error instanceof Error) {
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    
     // Check if it's a database connection error
     if (error instanceof Error && error.message.includes('Database connection failed')) {
       return res.status(503).json({ 
         message: 'Database connection error. Please try again later.'
       });
     }
+    
+    // Check if it's a model validation error
+    if (error instanceof Error && error.name === 'ValidationError') {
+      return res.status(400).json({ 
+        message: 'Invalid visitor data format',
+        error: error.message
+      });
+    }
+    
+    // Check if it's a MongoDB error
+    if (error instanceof Error && error.name === 'MongoError') {
+      return res.status(500).json({ 
+        message: 'Database operation failed',
+        error: error.message
+      });
+    }
+    
     return res.status(500).json({ 
-      message: error instanceof Error ? error.message : 'Failed to fetch visitor details'
+      message: 'Failed to fetch visitor details',
+      error: error instanceof Error ? error.message : 'Unknown error occurred'
     });
   }
 } 

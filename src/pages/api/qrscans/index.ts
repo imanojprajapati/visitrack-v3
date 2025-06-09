@@ -27,7 +27,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === 'POST') {
     try {
       const { db } = await connectToDatabase();
-      const { visitorId, scanTime, entryType, status } = req.body;
+      const { 
+        visitorId, 
+        eventId, 
+        registrationId, 
+        name, 
+        company, 
+        eventName, 
+        scanTime, 
+        entryType, 
+        status, 
+        deviceInfo 
+      } = req.body;
 
       // Only visitorId is required for manual entry
       if (!visitorId) {
@@ -36,14 +47,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Set defaults for optional fields
       const now = new Date();
-      const result = await db.collection('qrscans').insertOne({
+      const scanRecord = {
         visitorId,
+        eventId: eventId || null,
+        registrationId: registrationId || null,
+        name: name || 'Unknown',
+        company: company || '',
+        eventName: eventName || 'Unknown Event',
         scanTime: scanTime || now,
         entryType: entryType || 'manual',
         status: status || 'Visited',
+        deviceInfo: deviceInfo || 'Unknown device',
         createdAt: now,
         updatedAt: now
-      });
+      };
+
+      const result = await db.collection('qrscans').insertOne(scanRecord);
 
       if (!result.acknowledged) {
         throw new Error('Failed to create scan record');
@@ -51,7 +70,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       return res.status(201).json({ 
         message: 'Scan record created successfully',
-        scanId: result.insertedId 
+        scanId: result.insertedId,
+        scan: scanRecord
       });
     } catch (error) {
       console.error('Error creating scan record:', error);

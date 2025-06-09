@@ -31,6 +31,10 @@ export async function connectToDatabase() {
     cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongoose) => {
       const db = mongoose.connection.db;
       if (!db) { throw new Error("MongoDB connection failed"); }
+      
+      // Register all models after connection
+      registerModels();
+      
       return { mongoose, db };
     });
   }
