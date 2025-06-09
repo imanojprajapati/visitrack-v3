@@ -1,6 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, Input, Button, Select, Tabs, message, Space, Typography } from 'antd';
-import { SendOutlined, SettingOutlined } from '@ant-design/icons';
+import { 
+  Card, 
+  Form, 
+  Input, 
+  Button, 
+  Select, 
+  Tabs, 
+  message, 
+  Space, 
+  Typography, 
+  Table, 
+  Checkbox, 
+  Tag, 
+  Row, 
+  Col,
+  Tooltip,
+  Badge
+} from 'antd';
+import { 
+  SendOutlined, 
+  SettingOutlined, 
+  UserOutlined, 
+  CheckCircleOutlined,
+  CloseCircleOutlined,
+  SelectOutlined,
+  ClearOutlined
+} from '@ant-design/icons';
 import AdminLayout from './layout';
 
 const { Option } = Select;
@@ -8,14 +33,27 @@ const { TextArea } = Input;
 const { TabPane } = Tabs;
 const { Title, Text } = Typography;
 
+interface Visitor {
+  _id: string;
+  name: string;
+  email: string;
+  phone: string;
+  company: string;
+  status: string;
+  eventName: string;
+  checkInTime?: string;
+}
+
 const Messaging: React.FC = () => {
   const [form] = Form.useForm();
   const [settingsForm] = Form.useForm();
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<string | null>(null);
-  const [recipients, setRecipients] = useState<any[]>([]);
+  const [recipients, setRecipients] = useState<Visitor[]>([]);
+  const [selectedRecipients, setSelectedRecipients] = useState<string[]>([]);
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [sending, setSending] = useState(false);
+  const [showTable, setShowTable] = useState(false);
 
   useEffect(() => {
     // Fetch events for dropdown
@@ -35,6 +73,7 @@ const Messaging: React.FC = () => {
         .then(res => res.json())
         .then(data => {
           setRecipients(data);
+          setSelectedRecipients([]); // Reset selection when event changes
           setLoadingRecipients(false);
         })
         .catch(error => {
@@ -44,19 +83,79 @@ const Messaging: React.FC = () => {
         });
     } else {
       setRecipients([]);
+      setSelectedRecipients([]);
     }
   }, [selectedEvent]);
+
+  // Quick selection functions
+  const selectAll = () => {
+    const allIds = recipients.map(recipient => recipient._id);
+    setSelectedRecipients(allIds);
+    form.setFieldsValue({ recipients: allIds });
+  };
+
+  const selectCheckedIn = () => {
+    const checkedInIds = recipients
+      .filter(recipient => recipient.status === 'Visited')
+      .map(recipient => recipient._id);
+    setSelectedRecipients(checkedInIds);
+    form.setFieldsValue({ recipients: checkedInIds });
+  };
+
+  const selectNotCheckedIn = () => {
+    const notCheckedInIds = recipients
+      .filter(recipient => recipient.status !== 'Visited')
+      .map(recipient => recipient._id);
+    setSelectedRecipients(notCheckedInIds);
+    form.setFieldsValue({ recipients: notCheckedInIds });
+  };
+
+  const clearSelection = () => {
+    setSelectedRecipients([]);
+    form.setFieldsValue({ recipients: [] });
+  };
+
+  const handleRecipientChange = (selectedIds: string[]) => {
+    setSelectedRecipients(selectedIds);
+  };
 
   const handleSend = async (values: any) => {
     try {
       setSending(true);
-      // Implement message sending logic here
-      await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated API call
-      message.success('Message sent successfully!');
+      
+      // Prepare recipients data for the API
+      const selectedVisitors = recipients.filter(recipient => 
+        selectedRecipients.includes(recipient._id)
+      );
+
+      const response = await fetch('/api/admin/send-bulk-message', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          recipients: selectedVisitors.map(visitor => ({
+            email: visitor.email,
+            name: visitor.name
+          })),
+          channel: 'email',
+          subject: values.subject,
+          message: values.message
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to send message');
+      }
+
+      message.success(result.message || 'Message sent successfully!');
       form.resetFields();
+      setSelectedRecipients([]);
     } catch (error) {
       console.error('Error sending message:', error);
-      message.error('Failed to send message');
+      message.error(error instanceof Error ? error.message : 'Failed to send message');
     } finally {
       setSending(false);
     }
@@ -73,6 +172,85 @@ const Messaging: React.FC = () => {
       message.error('Failed to save settings');
     }
   };
+
+  // Table columns for visitor selection
+  const columns = [
+    {
+      title: 'Select',
+      key: 'select',
+      width: 60,
+      render: (_, record: Visitor) => (
+        <Checkbox
+          checked={selectedRecipients.includes(record._id)}
+          onChange={(e) => {
+            if (e.target.checked) {
+              const newSelection = [...selectedRecipients, record._id];
+              setSelectedRecipients(newSelection);
+              form.setFieldsValue({ recipients: newSelection });
+            } else {
+              const newSelection = selectedRecipients.filter(id => id !== record._id);
+              setSelectedRecipients(newSelection);
+              form.setFieldsValue({ recipients: newSelection });
+            }
+          }}
+        />
+      ),
+    },
+    {
+      title: 'Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (text: string, record: Visitor) => (
+        <div>
+          <div className="font-medium">{text}</div>
+          <div className="text-sm text-gray-500">{record.email}</div>
+        </div>
+      ),
+    },
+    {
+      title: 'Company',
+      dataIndex: 'company',
+      key: 'company',
+    },
+    {
+      title: 'Status',
+      dataIndex: 'status',
+      key: 'status',
+      render: (status: string) => (
+        <Tag color={status === 'Visited' ? 'green' : 'blue'}>
+          {status === 'Visited' ? (
+            <Space size={4}>
+              <CheckCircleOutlined />
+              Checked In
+            </Space>
+          ) : (
+            <Space size={4}>
+              <CloseCircleOutlined />
+              Not Checked In
+            </Space>
+          )}
+        </Tag>
+      ),
+    },
+    {
+      title: 'Check-in Time',
+      dataIndex: 'checkInTime',
+      key: 'checkInTime',
+      render: (checkInTime: string) => {
+        if (!checkInTime) return '-';
+        return new Date(checkInTime).toLocaleString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+      },
+    },
+  ];
+
+  const checkedInCount = recipients.filter(r => r.status === 'Visited').length;
+  const notCheckedInCount = recipients.filter(r => r.status !== 'Visited').length;
 
   return (
     <AdminLayout>
@@ -104,7 +282,7 @@ const Messaging: React.FC = () => {
                 form={form}
                 layout="vertical"
                 onFinish={handleSend}
-                className="max-w-2xl mx-auto"
+                className="max-w-4xl mx-auto"
               >
                 <Form.Item
                   name="event"
@@ -125,25 +303,101 @@ const Messaging: React.FC = () => {
                   </Select>
                 </Form.Item>
 
-                <Form.Item
-                  name="recipients"
-                  label="Recipients"
-                  rules={[{ required: true, message: 'Please select recipients' }]}
-                >
-                  <Select
-                    mode="multiple"
-                    placeholder="Select recipients"
-                    loading={loadingRecipients}
-                    disabled={!selectedEvent}
-                    className="w-full"
+                {selectedEvent && recipients.length > 0 && (
+                  <Card 
+                    size="small" 
+                    className="mb-4"
+                    title={
+                      <Space>
+                        <UserOutlined />
+                        <span>Recipient Selection</span>
+                        <Badge count={selectedRecipients.length} showZero />
+                      </Space>
+                    }
+                    extra={
+                      <Space>
+                        <Button
+                          size="small"
+                          icon={<SelectOutlined />}
+                          onClick={selectAll}
+                        >
+                          Select All ({recipients.length})
+                        </Button>
+                        <Button
+                          size="small"
+                          icon={<CheckCircleOutlined />}
+                          onClick={selectCheckedIn}
+                        >
+                          Checked In ({checkedInCount})
+                        </Button>
+                        <Button
+                          size="small"
+                          icon={<CloseCircleOutlined />}
+                          onClick={selectNotCheckedIn}
+                        >
+                          Not Checked In ({notCheckedInCount})
+                        </Button>
+                        <Button
+                          size="small"
+                          icon={<ClearOutlined />}
+                          onClick={clearSelection}
+                        >
+                          Clear
+                        </Button>
+                        <Button
+                          size="small"
+                          type={showTable ? "primary" : "default"}
+                          onClick={() => setShowTable(!showTable)}
+                        >
+                          {showTable ? 'Hide Table' : 'Show Table'}
+                        </Button>
+                      </Space>
+                    }
                   >
-                    {recipients.map(recipient => (
-                      <Option key={recipient._id} value={recipient._id}>
-                        {recipient.name} ({recipient.email})
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
+                    {showTable ? (
+                      <Table
+                        dataSource={recipients}
+                        columns={columns}
+                        rowKey="_id"
+                        size="small"
+                        pagination={{
+                          pageSize: 10,
+                          showSizeChanger: true,
+                          showTotal: (total) => `Total ${total} visitors`,
+                        }}
+                        scroll={{ x: 'max-content' }}
+                      />
+                    ) : (
+                      <Form.Item
+                        name="recipients"
+                        rules={[{ required: true, message: 'Please select recipients' }]}
+                      >
+                        <Select
+                          mode="multiple"
+                          placeholder="Select recipients"
+                          loading={loadingRecipients}
+                          value={selectedRecipients}
+                          onChange={handleRecipientChange}
+                          className="w-full"
+                          maxTagCount={5}
+                          maxTagTextLength={20}
+                        >
+                          {recipients.map(recipient => (
+                            <Option key={recipient._id} value={recipient._id}>
+                              <Space>
+                                <span>{recipient.name}</span>
+                                <span className="text-gray-400">({recipient.email})</span>
+                                <Tag size="small" color={recipient.status === 'Visited' ? 'green' : 'blue'}>
+                                  {recipient.status === 'Visited' ? 'Checked In' : 'Not Checked In'}
+                                </Tag>
+                              </Space>
+                            </Option>
+                          ))}
+                        </Select>
+                      </Form.Item>
+                    )}
+                  </Card>
+                )}
 
                 <Form.Item
                   name="subject"
@@ -166,15 +420,22 @@ const Messaging: React.FC = () => {
                 </Form.Item>
 
                 <Form.Item>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    icon={<SendOutlined />}
-                    loading={sending}
-                    className="w-full sm:w-auto"
-                  >
-                    Send Message
-                  </Button>
+                  <Space>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      icon={<SendOutlined />}
+                      loading={sending}
+                      disabled={selectedRecipients.length === 0}
+                    >
+                      Send Message ({selectedRecipients.length} recipients)
+                    </Button>
+                    {selectedRecipients.length > 0 && (
+                      <Text type="secondary">
+                        Message will be sent to {selectedRecipients.length} recipient{selectedRecipients.length !== 1 ? 's' : ''}
+                      </Text>
+                    )}
+                  </Space>
                 </Form.Item>
               </Form>
             </TabPane>
