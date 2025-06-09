@@ -477,27 +477,55 @@ export default function RegistrationReport() {
             rowKey="_id"
             loading={loading}
             scroll={{ x: 'max-content' }}
-            pagination={{
-              current: pagination.current,
-              pageSize: pagination.pageSize,
-              total: pagination.total,
-              showSizeChanger: true,
-              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} visitors`,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              showQuickJumper: true,
-              className: "custom-pagination",
-              onChange: (page, pageSize) => {
-                console.log('Reports pagination changed:', { page, pageSize });
-                setPagination(prev => ({ ...prev, current: page, pageSize }));
-              },
-              onShowSizeChange: (current, size) => {
-                console.log('Reports page size changed:', { current, size });
-                setPagination(prev => ({ ...prev, current: 1, pageSize: size }));
-              }
-            }}
-            className="visitor-table"
-            size="middle"
+            pagination={false}
+            className="custom-pagination"
           />
+          
+          {/* Custom Pagination */}
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              Showing {((pagination.current - 1) * pagination.pageSize) + 1} to {Math.min(pagination.current * pagination.pageSize, pagination.total)} of {pagination.total} visitors
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Show:</span>
+              <Select
+                value={pagination.pageSize}
+                onChange={(size) => {
+                  setPagination(prev => ({
+                    ...prev,
+                    pageSize: size,
+                    current: 1,
+                  }));
+                }}
+                style={{ width: 80 }}
+              >
+                <Select.Option value={10}>10</Select.Option>
+                <Select.Option value={20}>20</Select.Option>
+                <Select.Option value={50}>50</Select.Option>
+                <Select.Option value={100}>100</Select.Option>
+              </Select>
+              <span className="text-sm text-gray-600">per page</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Button
+                size="small"
+                disabled={pagination.current === 1}
+                onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
+              >
+                Previous
+              </Button>
+              <span className="px-2 text-sm">
+                Page {pagination.current} of {Math.ceil(pagination.total / pagination.pageSize)}
+              </span>
+              <Button
+                size="small"
+                disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
+                onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
       </Card>
 

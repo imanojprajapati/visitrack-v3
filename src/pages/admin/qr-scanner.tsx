@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Card, Button, Space, Table, Tag, Modal, message } from 'antd';
+import { Card, Button, Space, Table, Tag, Modal, message, Select } from 'antd';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { PrinterOutlined, QrcodeOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
@@ -757,26 +757,55 @@ const QRScanner: React.FC = () => {
             columns={columns}
             rowKey={(record) => `${record.visitorId}-${record.scanTime}`}
             loading={loading}
-            pagination={{
-              current: pagination.current,
-              pageSize: pagination.pageSize,
-              total: pagination.total,
-              showSizeChanger: true,
-              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} visitors`,
-              pageSizeOptions: ['10', '20', '50', '100'],
-              showQuickJumper: true,
-              onChange: handleTableChange,
-              onShowSizeChange: (current, size) => {
-                console.log('QR Scanner page size changed:', { current, size });
-                setPagination(prev => ({
-                  ...prev,
-                  pageSize: size,
-                  current: 1, // Reset to first page when changing page size
-                }));
-              }
-            }}
+            pagination={false}
             scroll={{ x: 'max-content' }}
           />
+          
+          {/* Custom Pagination */}
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              Showing {((pagination.current - 1) * pagination.pageSize) + 1} to {Math.min(pagination.current * pagination.pageSize, pagination.total)} of {pagination.total} visitors
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Show:</span>
+              <Select
+                value={pagination.pageSize}
+                onChange={(size) => {
+                  setPagination(prev => ({
+                    ...prev,
+                    pageSize: size,
+                    current: 1,
+                  }));
+                }}
+                style={{ width: 80 }}
+              >
+                <Select.Option value={10}>10</Select.Option>
+                <Select.Option value={20}>20</Select.Option>
+                <Select.Option value={50}>50</Select.Option>
+                <Select.Option value={100}>100</Select.Option>
+              </Select>
+              <span className="text-sm text-gray-600">per page</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Button
+                size="small"
+                disabled={pagination.current === 1}
+                onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
+              >
+                Previous
+              </Button>
+              <span className="px-2 text-sm">
+                Page {pagination.current} of {Math.ceil(pagination.total / pagination.pageSize)}
+              </span>
+              <Button
+                size="small"
+                disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
+                onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </Card>
       </div>
     </AdminLayout>
