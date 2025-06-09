@@ -275,6 +275,28 @@ export default async function handler(
       // Commit the transaction
       await session.commitTransaction();
 
+      // Send registration success email
+      try {
+        const emailResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/visitors/send-registration-success`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            visitorId: (visitor[0]._id as any).toString()
+          })
+        });
+
+        if (emailResponse.ok) {
+          console.log('Registration success email sent successfully');
+        } else {
+          console.error('Failed to send registration success email:', await emailResponse.text());
+        }
+      } catch (emailError) {
+        console.error('Error sending registration success email:', emailError);
+        // Don't fail the registration if email sending fails
+      }
+
       // Return success response with visitor and event details
       res.status(201).json({
         message: 'Visitor registered successfully',

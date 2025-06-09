@@ -108,31 +108,56 @@ export default async function handler(
       }
     }
 
-    // 3. Third Row: User details (centered, scaled)
+    // 3. Third Row: User details (div-like section with background, similar to web page)
     if (visitorData) {
-      doc.font('Helvetica-Bold').fontSize(scaled(22)).fillColor('#222');
-      const details = [
-        visitorData._id && `Visitor ID: ${visitorData._id}`,
-        visitorData.eventId && `Event ID: ${visitorData.eventId}`,
+      const detailsY = y + scaled(detailsMarginTop);
+      const detailsBoxWidth = 400;
+      const detailsBoxHeight = 120;
+      const detailsBoxX = (pdfWidth - detailsBoxWidth) / 2;
+      
+      // Draw background rectangle for details section (like a div)
+      doc.rect(detailsBoxX, detailsY, detailsBoxWidth, detailsBoxHeight)
+         .fill('#f8f9fa')
+         .stroke('#e9ecef');
+      
+      // Section title
+      doc.font('Helvetica-Bold').fontSize(14).fillColor('#1f2937');
+      doc.text('Registration Details', detailsBoxX + 20, detailsY + 15, { align: 'left' });
+      
+      // Details in two columns for better layout
+      doc.font('Helvetica').fontSize(10).fillColor('#374151');
+      const leftColumn = [
         visitorData.name && `Name: ${visitorData.name}`,
         visitorData.email && `Email: ${visitorData.email}`,
         visitorData.phone && `Phone: ${visitorData.phone}`,
         visitorData.company && `Company: ${visitorData.company}`,
+      ].filter(Boolean);
+      
+      const rightColumn = [
         visitorData.eventName && `Event: ${visitorData.eventName}`,
         visitorData.eventLocation && `Location: ${visitorData.eventLocation}`,
-        visitorData.eventStartDate && `Start: ${visitorData.eventStartDate}`,
-        visitorData.eventEndDate && `End: ${visitorData.eventEndDate}`,
+        visitorData.eventStartDate && `Date: ${visitorData.eventStartDate}`,
+        visitorData._id && `ID: ${visitorData._id}`,
       ].filter(Boolean);
-      let detailsY = y + scaled(detailsMarginTop);
-      details.forEach((line, i) => {
-        doc.text(line, 0, detailsY + i * scaled(detailsLineHeight), { width: pdfWidth, align: 'center' });
+      
+      // Left column
+      leftColumn.forEach((line, i) => {
+        doc.text(line, detailsBoxX + 20, detailsY + 40 + (i * 15), { align: 'left' });
       });
-      y = detailsY + details.length * scaled(detailsLineHeight) + scaled(detailsMarginBottom);
+      
+      // Right column
+      rightColumn.forEach((line, i) => {
+        doc.text(line, detailsBoxX + 220, detailsY + 40 + (i * 15), { align: 'left' });
+      });
+      
+      y = detailsY + detailsBoxHeight + scaled(detailsMarginBottom);
     }
 
-    // 4. Fourth Row: VISITRACK (scaled font size, centered)
-    doc.font('Helvetica-Bold').fontSize(scaled(64)).fillColor('#4338CA');
-    doc.text('VISITRACK', 0, y + scaled(visitrackMarginTop), {
+    // 4. Fourth Row: VISITOR (at the very bottom of the page)
+    const visitorFontSize = scaled(64);
+    const visitorY = pdfHeight - visitorFontSize - 20; // 20 points from bottom
+    doc.font('Helvetica-Bold').fontSize(visitorFontSize).fillColor('#4338CA');
+    doc.text('VISITOR', 0, visitorY, {
       width: pdfWidth,
       align: 'center',
     });

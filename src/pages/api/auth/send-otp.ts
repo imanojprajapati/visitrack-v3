@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import nodemailer from 'nodemailer';
 import { connectToDatabase } from '../../../lib/mongodb';
 import OTP from '../../../models/OTP';
+import Event from '../../../models/Event';
 
 // Create reusable transporter object using SMTP transport
 const transporter = nodemailer.createTransport({
@@ -21,7 +22,7 @@ export default async function handler(
   }
 
   try {
-    const { email } = req.body;
+    const { email, eventId } = req.body;
 
     if (!email) {
       return res.status(400).json({ message: 'Email is required' });
@@ -42,6 +43,20 @@ export default async function handler(
     // Connect to database
     await connectToDatabase();
 
+    // Get event details if eventId is provided
+    let eventName = 'Visitrack Event';
+    if (eventId) {
+      try {
+        const event = await Event.findById(eventId).select('title').lean();
+        if (event && 'title' in event && event.title) {
+          eventName = event.title;
+        }
+      } catch (error) {
+        console.error('Error fetching event details:', error);
+        // Continue with default event name if there's an error
+      }
+    }
+
     // Delete any existing OTPs for this email
     await OTP.deleteMany({ email });
 
@@ -61,11 +76,11 @@ export default async function handler(
     const mailOptions = {
       from: `"Visitrack" <${process.env.GMAIL_USER}>`,
       to: email,
-      subject: 'Your Visitrack Registration OTP',
+      subject: `Registration Verify for ${eventName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #4F46E5;">Visitrack Registration</h2>
-          <p>Your OTP for registration is:</p>
+          <p>Your OTP for registration to <strong>${eventName}</strong> is:</p>
           <h1 style="font-size: 32px; color: #4F46E5; letter-spacing: 5px; text-align: center; padding: 20px; background: #F3F4F6; border-radius: 8px;">
             ${otp}
           </h1>
@@ -81,7 +96,7 @@ export default async function handler(
 
     try {
       await transporter.sendMail(mailOptions);
-      console.log('OTP sent successfully to:', email);
+      console.log('OTP sent successfully to:', email, 'for event:', eventName);
       res.status(200).json({ message: 'OTP sent successfully' });
     } catch (emailError) {
       console.error('Error sending email:', emailError);

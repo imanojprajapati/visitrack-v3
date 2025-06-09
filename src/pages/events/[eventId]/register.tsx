@@ -180,7 +180,7 @@ export default function EventRegistration() {
       // If not registered, proceed with OTP
       await fetchApi('auth/send-otp', {
         method: 'POST',
-        body: JSON.stringify({ email: values.email }),
+        body: JSON.stringify({ email: values.email, eventId }),
       });
       
       setCurrentStep(1);
@@ -373,7 +373,7 @@ export default function EventRegistration() {
 
       setVisitor(response.visitor);
       setCurrentStep(3);
-      message.success('Registration successful');
+      message.success('Registration successful! A confirmation email has been sent to your inbox.');
 
     } catch (error) {
       console.error('Registration error:', error);
