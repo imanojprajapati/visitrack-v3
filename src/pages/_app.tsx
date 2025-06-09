@@ -11,6 +11,7 @@ import { App as AntApp } from 'antd';
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
   const isAdminPage = router.pathname.startsWith('/admin');
+  const isEventRegistrationPage = router.pathname.includes('/events/') && router.pathname.includes('/register');
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -25,7 +26,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         <link rel="icon" type="image/x-icon" href="/favicon.ico" />
         <link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
       </Head>
-      {isAdminPage ? (
+      {isAdminPage || isEventRegistrationPage ? (
         <Component {...pageProps} />
       ) : (
         <div className="min-h-screen flex flex-col">

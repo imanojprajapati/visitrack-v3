@@ -1,6 +1,9 @@
+'use client';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import Image from 'next/image';
 import { Card, Input, Button, message, Steps, Form, Typography, Space, Divider, Result, Spin, Alert } from 'antd';
 import { MailOutlined, SafetyOutlined, UserOutlined, QrcodeOutlined, DownloadOutlined } from '@ant-design/icons';
 import { QRCodeSVG } from 'qrcode.react';
@@ -17,6 +20,32 @@ import dayjs from 'dayjs';
 const { Title, Text } = Typography;
 const { Step } = Steps;
 
+const countries = [
+  'United States',
+  'United Kingdom',
+  'Canada',
+  'Australia',
+  'India',
+  'Germany',
+  'France',
+  'Japan',
+  'China',
+  'Brazil',
+];
+
+const interests = [
+  'Networking',
+  'Technology',
+  'Marketing',
+  'Business Development',
+  'Product Management',
+  'Sales',
+  'Human Resources',
+  'Finance',
+  'Operations',
+  'Other',
+];
+
 export default function EventRegistration() {
   const router = useRouter();
   const { eventId } = router.query;
@@ -30,6 +59,26 @@ export default function EventRegistration() {
   const [error, setError] = useState<string | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  const [formData, setFormData] = useState({
+    phoneNumber: '',
+    otp: '',
+    name: '',
+    companyName: '',
+    email: '',
+    address: '',
+    city: '',
+    state: '',
+    country: '',
+    pinCode: '',
+    interestedIn: '',
+    eventId: '',
+  });
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const fetchEventDetails = async () => {
     try {
@@ -98,6 +147,11 @@ export default function EventRegistration() {
       }
     }
   }, [currentStep, event]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleSendOTP = async (values: { email: string }) => {
     try {
@@ -198,40 +252,12 @@ export default function EventRegistration() {
       }
 
       // OTP verification successful
-      if (!event?.form) {
-        throw new Error('This event has no registration form');
-      }
-
-      // Reset form and move to next step
-      form.resetFields(['otp']);
       setCurrentStep(2);
       message.success('OTP verified successfully');
-
     } catch (error) {
-      console.error('OTP verification error:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : 'Failed to verify OTP';
-      let formError = '';
-
-      if (errorMessage.includes('expired')) {
-        formError = 'OTP has expired. Please request a new OTP.';
-      } else if (errorMessage.includes('attempts')) {
-        formError = 'Too many failed attempts. Please request a new OTP.';
-      } else if (errorMessage.includes('Invalid OTP')) {
-        formError = 'Invalid OTP. Please try again.';
-      } else if (errorMessage.includes('unavailable')) {
-        formError = 'Service temporarily unavailable. Please try again.';
-      } else {
-        formError = 'Failed to verify OTP. Please try again.';
-      }
-
-      form.setFields([{
-        name: 'otp',
-        errors: [formError]
-      }]);
-      setError(formError);
-      message.error(formError);
-
+      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Failed to verify OTP');
+      message.error(error instanceof Error ? error.message : 'Failed to verify OTP');
     } finally {
       setIsVerifying(false);
     }
@@ -541,7 +567,7 @@ export default function EventRegistration() {
             const svgUrl = URL.createObjectURL(svgBlob);
 
             // Create an image from the SVG
-            const img = new Image();
+            const img = document.createElement('img') as HTMLImageElement;
             img.onload = () => {
               if (ctx) {
                 ctx.fillStyle = '#ffffff';
@@ -679,222 +705,470 @@ export default function EventRegistration() {
     switch (currentStep) {
       case 0:
         return (
-          <div className="flex justify-center items-center">
-            <Form
-              form={form}
-              onFinish={handleSendOTP}
-              layout="vertical"
-              className="w-full max-w-sm"
-            >
-              <Form.Item
-                name="email"
-                label={<div className="text-center">Email</div>}
-                rules={[
-                  { required: true, message: 'Please enter your email' },
-                  { type: 'email', message: 'Please enter a valid email' }
-                ]}
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
+            <div className="lg:w-1/2 text-center lg:text-left">
+              <div className="mb-6">
+                <Image
+                  src="/images/email-verification.svg"
+                  alt="Email Verification"
+                  width={300}
+                  height={300}
+                  className="mx-auto lg:mx-0"
+                  onError={(e) => {
+                    // Fallback to a placeholder if image doesn't exist
+                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3EEmail Verification%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Email Verification</h3>
+              <p className="text-gray-600 mb-6">
+                Enter your email address to receive a one-time password (OTP) for secure registration.
+              </p>
+            </div>
+            <div className="lg:w-1/2">
+              <Form
+                form={form}
+                onFinish={handleSendOTP}
+                layout="vertical"
+                className="w-full max-w-sm"
               >
-                <Input prefix={<MailOutlined />} placeholder="Enter your email" />
-              </Form.Item>
-              <Form.Item className="text-center">
-                <Button type="primary" htmlType="submit" loading={loading} block>
-                  Send OTP
-                </Button>
-              </Form.Item>
-            </Form>
+                <Form.Item
+                  name="email"
+                  label={<div className="text-center">Email</div>}
+                  rules={[
+                    { required: true, message: 'Please enter your email' },
+                    { type: 'email', message: 'Please enter a valid email' }
+                  ]}
+                >
+                  <Input prefix={<MailOutlined />} placeholder="Enter your email" />
+                </Form.Item>
+                <Form.Item className="text-center">
+                  <Button type="primary" htmlType="submit" loading={loading} block>
+                    Send OTP
+                  </Button>
+                </Form.Item>
+              </Form>
+            </div>
           </div>
         );
 
       case 1:
         return (
-          <div className="flex justify-center items-center">
-            <Form
-              form={form}
-              onFinish={handleVerifyOTP}
-              layout="vertical"
-              className="w-full max-w-sm"
-            >
-              <Form.Item
-                name="otp"
-                label={<div className="text-center">Enter OTP</div>}
-                rules={[
-                  { required: true, message: 'Please enter the OTP' },
-                  { 
-                    pattern: /^\d{6}$/,
-                    message: 'Please enter a valid 6-digit OTP'
-                  }
-                ]}
-              >
-                <Input
-                  prefix={<SafetyOutlined />}
-                  placeholder="Enter 6-digit OTP"
-                  maxLength={6}
-                  autoComplete="one-time-code"
-                  disabled={isVerifying}
-                  onChange={(e) => {
-                    const value = e.target.value.trim();
-                    if (value && !/^\d{6}$/.test(value)) {
-                      form.setFields([{
-                        name: 'otp',
-                        errors: ['Please enter a valid 6-digit OTP']
-                      }]);
-                    } else {
-                      form.setFields([{
-                        name: 'otp',
-                        errors: []
-                      }]);
-                    }
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
+            <div className="lg:w-1/2 text-center lg:text-left">
+              <div className="mb-6">
+                <Image
+                  src="/images/otp-verification.svg"
+                  alt="OTP Verification"
+                  width={300}
+                  height={300}
+                  className="mx-auto lg:mx-0"
+                  onError={(e) => {
+                    // Fallback to a placeholder if image doesn't exist
+                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3EOTP Verification%3C/text%3E%3C/svg%3E";
                   }}
                 />
-              </Form.Item>
-
-              <Form.Item className="text-center">
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={isVerifying}
-                  block
-                  disabled={isVerifying}
-                >
-                  {isVerifying ? 'Verifying...' : 'Verify OTP'}
-                </Button>
-              </Form.Item>
-
-              <div className="text-center">
-                <Button
-                  type="link"
-                  onClick={() => {
-                    form.resetFields(['otp']);
-                    setCurrentStep(0);
-                  }}
-                  disabled={isVerifying}
-                >
-                  Back to Email
-                </Button>
               </div>
-            </Form>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">OTP Verification</h3>
+              <p className="text-gray-600 mb-6">
+                Check your email for the 6-digit verification code and enter it below to continue.
+              </p>
+            </div>
+            <div className="lg:w-1/2">
+              <Form
+                form={form}
+                onFinish={handleVerifyOTP}
+                layout="vertical"
+                className="w-full max-w-sm"
+              >
+                <Form.Item
+                  name="otp"
+                  label={<div className="text-center">Enter OTP</div>}
+                  rules={[
+                    { required: true, message: 'Please enter the OTP' },
+                    { 
+                      pattern: /^\d{6}$/,
+                      message: 'Please enter a valid 6-digit OTP'
+                    }
+                  ]}
+                >
+                  <Input
+                    prefix={<SafetyOutlined />}
+                    placeholder="Enter 6-digit OTP"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    disabled={isVerifying}
+                    onChange={(e) => {
+                      const value = e.target.value.trim();
+                      if (value && !/^\d{6}$/.test(value)) {
+                        form.setFields([{
+                          name: 'otp',
+                          errors: ['Please enter a valid 6-digit OTP']
+                        }]);
+                      } else {
+                        form.setFields([{
+                          name: 'otp',
+                          errors: []
+                        }]);
+                      }
+                    }}
+                  />
+                </Form.Item>
+
+                <Form.Item className="text-center">
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={isVerifying}
+                    block
+                    disabled={isVerifying}
+                  >
+                    {isVerifying ? 'Verifying...' : 'Verify OTP'}
+                  </Button>
+                </Form.Item>
+
+                <div className="text-center">
+                  <Button
+                    type="link"
+                    onClick={() => {
+                      form.resetFields(['otp']);
+                      setCurrentStep(0);
+                    }}
+                    disabled={isVerifying}
+                  >
+                    Back to Email
+                  </Button>
+                </div>
+              </Form>
+            </div>
           </div>
         );
 
       case 2:
         if (!event.form) {
           return (
-            <Result
-              status="error"
-              title="Form not found"
-              subTitle="The registration form for this event is not available."
-            />
+            <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
+              <div className="lg:w-1/2 text-center lg:text-left">
+                <div className="mb-6">
+                  <Image
+                    src="/images/registration-form.svg"
+                    alt="Registration Form"
+                    width={300}
+                    height={300}
+                    className="mx-auto lg:mx-0"
+                    onError={(e) => {
+                      // Fallback to a placeholder if image doesn't exist
+                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3ERegistration Form%3C/text%3E%3C/svg%3E";
+                    }}
+                  />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Details</h3>
+                <p className="text-gray-600 mb-6">
+                  Please fill in your personal and professional details to complete your registration.
+                </p>
+              </div>
+              <div className="lg:w-1/2">
+                <form onSubmit={handleFormSubmit} className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                        Full Name *
+                      </label>
+                      <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleInputChange}
+                        className="visitrack-input"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-1">
+                        Company Name *
+                      </label>
+                      <input
+                        type="text"
+                        id="companyName"
+                        name="companyName"
+                        value={formData.companyName}
+                        onChange={handleInputChange}
+                        className="visitrack-input"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                        Email ID *
+                      </label>
+                      <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        className="visitrack-input"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="interestedIn" className="block text-sm font-medium text-gray-700 mb-1">
+                        Interested In *
+                      </label>
+                      <select
+                        id="interestedIn"
+                        name="interestedIn"
+                        value={formData.interestedIn}
+                        onChange={handleInputChange}
+                        className="visitrack-input"
+                        required
+                      >
+                        <option value="">Select an interest</option>
+                        {interests.map((interest) => (
+                          <option key={interest} value={interest}>
+                            {interest}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+                        Address *
+                      </label>
+                      <input
+                        type="text"
+                        id="address"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleInputChange}
+                        className="visitrack-input"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                        City *
+                      </label>
+                      <input
+                        type="text"
+                        id="city"
+                        name="city"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        className="visitrack-input"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+                        State *
+                      </label>
+                      <input
+                        type="text"
+                        id="state"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleInputChange}
+                        className="visitrack-input"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
+                        Country *
+                      </label>
+                      <select
+                        id="country"
+                        name="country"
+                        value={formData.country}
+                        onChange={handleInputChange}
+                        className="visitrack-input"
+                        required
+                      >
+                        <option value="">Select a country</option>
+                        {countries.map((country) => (
+                          <option key={country} value={country}>
+                            {country}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="pinCode" className="block text-sm font-medium text-gray-700 mb-1">
+                        PIN Code *
+                      </label>
+                      <input
+                        type="text"
+                        id="pinCode"
+                        name="pinCode"
+                        value={formData.pinCode}
+                        onChange={handleInputChange}
+                        className="visitrack-input"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-6">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className="text-[#4f46e5] hover:text-[#4338ca] font-medium"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="visitrack-button"
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Submit'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
           );
         }
 
         return (
-          <div className="max-w-2xl mx-auto">
-            <Form
-              form={form}
-              onFinish={handleRegistration}
-              layout="vertical"
-              className="registration-form"
-              preserve={false}
-              initialValues={{ source: 'Website' }}
-            >
-              <Form.Item name="source" hidden>
-                <Input />
-              </Form.Item>
-
-              <DynamicForm
-                template={{
-                  id: 'registration-form',
-                  name: 'Registration Form',
-                  description: 'Please fill in your details',
-                  fields: event.form.fields
-                    .filter(field => field.id !== 'source')
-                    .map(field => {
-                      let fieldType: FormField['type'] = 'text';
-                      const fieldTypeStr = field.type as string;
-                      
-                      switch (fieldTypeStr) {
-                        case 'phone':
-                        case 'tel':
-                          fieldType = 'phone';
-                          break;
-                        case 'textarea':
-                          fieldType = 'textarea';
-                          break;
-                        case 'number':
-                          fieldType = 'number';
-                          break;
-                        case 'email':
-                          fieldType = 'email';
-                          break;
-                        case 'date':
-                          fieldType = 'date';
-                          break;
-                        case 'select':
-                          fieldType = 'select';
-                          break;
-                        default:
-                          fieldType = 'text';
-                      }
-
-                      return {
-                        id: field.id,
-                        label: field.label,
-                        type: fieldType,
-                        required: field.required,
-                        placeholder: field.placeholder,
-                        options: field.options ? field.options.map(opt => ({
-                          label: String(opt),
-                          value: String(opt)
-                        })) : undefined,
-                        validation: field.validation ? {
-                          min: field.validation.min,
-                          max: field.validation.max,
-                          maxLength: field.validation.maxLength,
-                          pattern: field.validation.pattern,
-                          message: field.validation.message,
-                        } : undefined
-                      };
-                    })
-                }}
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
+            <div className="lg:w-1/2 text-center lg:text-left">
+              <div className="mb-6">
+                <Image
+                  src="/images/registration-form.svg"
+                  alt="Registration Form"
+                  width={300}
+                  height={300}
+                  className="mx-auto lg:mx-0"
+                  onError={(e) => {
+                    // Fallback to a placeholder if image doesn't exist
+                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3ERegistration Form%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Details</h3>
+              <p className="text-gray-600 mb-6">
+                Please fill in your personal and professional details to complete your registration.
+              </p>
+            </div>
+            <div className="lg:w-1/2">
+              <Form
                 form={form}
                 onFinish={handleRegistration}
-              />
-              
-              <div className="text-center mt-6 space-x-4">
-                <Button
-                  type="default"
-                  onClick={() => {
-                    form.resetFields();
-                    setCurrentStep(1);
+                layout="vertical"
+                className="registration-form"
+                preserve={false}
+                initialValues={{ source: 'Website' }}
+              >
+                <Form.Item name="source" hidden>
+                  <Input />
+                </Form.Item>
+
+                <DynamicForm
+                  template={{
+                    id: 'registration-form',
+                    name: 'Registration Form',
+                    description: 'Please fill in your details',
+                    fields: event.form.fields
+                      .filter(field => field.id !== 'source')
+                      .map(field => {
+                        let fieldType: FormField['type'] = 'text';
+                        const fieldTypeStr = field.type as string;
+                        
+                        switch (fieldTypeStr) {
+                          case 'phone':
+                          case 'tel':
+                            fieldType = 'phone';
+                            break;
+                          case 'textarea':
+                            fieldType = 'textarea';
+                            break;
+                          case 'number':
+                            fieldType = 'number';
+                            break;
+                          case 'email':
+                            fieldType = 'email';
+                            break;
+                          case 'date':
+                            fieldType = 'date';
+                            break;
+                          case 'select':
+                            fieldType = 'select';
+                            break;
+                          default:
+                            fieldType = 'text';
+                        }
+
+                        return {
+                          id: field.id,
+                          label: field.label,
+                          type: fieldType,
+                          required: field.required,
+                          placeholder: field.placeholder,
+                          options: field.options ? field.options.map(opt => ({
+                            label: String(opt),
+                            value: String(opt)
+                          })) : undefined,
+                          validation: field.validation ? {
+                            min: field.validation.min,
+                            max: field.validation.max,
+                            maxLength: field.validation.maxLength,
+                            pattern: field.validation.pattern,
+                            message: field.validation.message,
+                          } : undefined
+                        };
+                      })
                   }}
-                  disabled={isSubmitting}
-                >
-                  Back
-                </Button>
-                <Button
-                  type="primary"
-                  htmlType="submit"
-                  loading={isSubmitting}
-                  disabled={isSubmitting}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    if (!isSubmitting) {
-                      form.validateFields()
-                        .then(validatedValues => {
-                          console.log('Form validation successful, values:', validatedValues);
-                          handleRegistration(validatedValues);
-                        })
-                        .catch(errorInfo => {
-                          console.error('Form validation failed:', errorInfo);
-                          message.error('Please fill in all required fields correctly');
-                        });
-                    }
-                  }}
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Registration'}
-                </Button>
-              </div>
-            </Form>
+                  form={form}
+                  onFinish={handleRegistration}
+                />
+                
+                <div className="text-center mt-6 space-x-4">
+                  <Button
+                    type="default"
+                    onClick={() => {
+                      form.resetFields();
+                      setCurrentStep(1);
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Back
+                  </Button>
+                  <Button
+                    type="primary"
+                    htmlType="submit"
+                    loading={isSubmitting}
+                    disabled={isSubmitting}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (!isSubmitting) {
+                        form.validateFields()
+                          .then(validatedValues => {
+                            console.log('Form validation successful, values:', validatedValues);
+                            handleRegistration(validatedValues);
+                          })
+                          .catch(errorInfo => {
+                            console.error('Form validation failed:', errorInfo);
+                            message.error('Please fill in all required fields correctly');
+                          });
+                      }
+                    }}
+                  >
+                    {isSubmitting ? 'Submitting...' : 'Submit Registration'}
+                  </Button>
+                </div>
+              </Form>
+            </div>
           </div>
         );
 
@@ -909,24 +1183,47 @@ export default function EventRegistration() {
           );
         }
         return (
-          <div className="text-center">
-            <Result
-              status="success"
-              title="Registration Successful!"
-              subTitle={`You have successfully registered for ${event.title}`}
-            />
-            <div className="mt-8">
-              <RegistrationDetails visitor={visitor} />
+          <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
+            <div className="lg:w-1/2 text-center lg:text-left">
+              <div className="mb-6">
+                <Image
+                  src="/images/registration-success.svg"
+                  alt="Registration Success"
+                  width={300}
+                  height={300}
+                  className="mx-auto lg:mx-0"
+                  onError={(e) => {
+                    // Fallback to a placeholder if image doesn't exist
+                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3ERegistration Success%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Complete!</h3>
+              <p className="text-gray-600 mb-6">
+                Congratulations! You have successfully registered for {event.title}. Your QR code and badge are ready for download.
+              </p>
             </div>
-            <div className="mt-4">
-              <Space size="middle">
-                <Button type="primary" onClick={handleDownloadQR} icon={<DownloadOutlined />}>
-                  Download QR Code
-                </Button>
-                <Button onClick={handleDownloadPDF} icon={<DownloadOutlined />}>
-                  Download Badge
-                </Button>
-              </Space>
+            <div className="lg:w-1/2">
+              <div className="text-center">
+                <Result
+                  status="success"
+                  title="Registration Successful!"
+                  subTitle={`You have successfully registered for ${event.title}`}
+                />
+                <div className="mt-8">
+                  <RegistrationDetails visitor={visitor} />
+                </div>
+                <div className="mt-4">
+                  <Space size="middle">
+                    <Button type="primary" onClick={handleDownloadQR} icon={<DownloadOutlined />}>
+                      Download QR Code
+                    </Button>
+                    <Button onClick={handleDownloadPDF} icon={<DownloadOutlined />}>
+                      Download Badge
+                    </Button>
+                  </Space>
+                </div>
+              </div>
             </div>
           </div>
         );
@@ -936,9 +1233,48 @@ export default function EventRegistration() {
     }
   };
 
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    // Validate all fields
+    if (!formData.name || !formData.email || !formData.companyName || !formData.address || 
+        !formData.city || !formData.state || !formData.country || !formData.pinCode || 
+        !formData.interestedIn) {
+      setError('Please fill in all required fields');
+      setLoading(false);
+      return;
+    }
+
+    // Simulate form submission
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    router.push('/badge');
+  };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen">
+        <Head>
+          <title>Register - Visitrack</title>
+          <meta name="description" content="Register for our events" />
+        </Head>
+        <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
+          <div className="animate-pulse">
+            <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+            <div className="mt-4 h-4 bg-gray-200 rounded w-1/2"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
+        <Head>
+          <title>Error - {event?.title || 'Event Registration'}</title>
+        </Head>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card className="shadow-lg">
             <Result
@@ -969,6 +1305,9 @@ export default function EventRegistration() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
+        <Head>
+          <title>Loading - Event Registration</title>
+        </Head>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card className="shadow-lg">
             <div className="text-center">
@@ -984,6 +1323,9 @@ export default function EventRegistration() {
   if (!event) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
+        <Head>
+          <title>Event Not Found</title>
+        </Head>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <Card className="shadow-lg">
             <Result
@@ -1090,36 +1432,93 @@ export default function EventRegistration() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="flex flex-col">
       <Head>
         <title>Register - {event.title}</title>
+        <meta name="description" content={`Register for ${event.title}`} />
       </Head>
-      {contextHolder}
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <Card className="shadow-lg">
+
+      {/* Event Banner */}
+      <div className="relative h-[400px] w-full">
+        <div className="absolute inset-0">
+          <div className="relative w-full h-full">
+            <Image
+              src="/images/event-banner.jpg"
+              alt="Event Banner"
+              fill
+              style={{ objectFit: 'cover' }}
+              className="opacity-90"
+              priority
+            />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-75"></div>
+        </div>
+        <div className="relative max-w-7xl mx-auto py-16 px-4 sm:py-24 sm:px-6 lg:px-8 h-full flex items-center">
+          <div className="text-center w-full">
+            <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl">
+              {event.title}
+            </h1>
+            <p className="mt-6 max-w-lg mx-auto text-xl text-indigo-100 sm:max-w-3xl">
+              {event.description || `Join us for ${event.title} featuring cutting-edge innovations and industry leaders.`}
+            </p>
+            <div className="mt-4 text-indigo-100">
+              <p className="text-lg">
+                {formatDate(event.startDate)} - {formatDate(event.endDate)}
+              </p>
+              {event.location && (
+                <p className="text-lg mt-2">
+                  📍 {event.location}
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-grow max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
-            <Title level={2}>{event.title}</Title>
-            <Text type="secondary">
-              {formatDate(event.startDate)} - {formatDate(event.endDate)}
-            </Text>
+            <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-4">
+              {currentStep === 0 ? 'Email Verification' : 
+               currentStep === 1 ? 'OTP Verification' : 
+               currentStep === 2 ? 'Registration Details' : 'Registration Complete'}
+            </h1>
+            <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+              {currentStep === 0 ? 'Enter your email to receive a one-time password (OTP) for secure registration' : 
+               currentStep === 1 ? 'Check your email for the 6-digit verification code and enter it below to continue' : 
+               currentStep === 2 ? 'Complete your registration details to finalize your event registration' : 
+               'Your registration has been completed successfully! You can now download your QR code and badge.'}
+            </p>
           </div>
 
-          <Steps current={currentStep} className="mb-8">
-            <Step title="Email" icon={<MailOutlined />} />
-            <Step title="Verify" icon={<SafetyOutlined />} />
-            <Step title="Details" icon={<UserOutlined />} />
-            <Step title="Complete" icon={<QrcodeOutlined />} />
-          </Steps>
+          <div className="bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-12">
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+                <div className="flex items-center">
+                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  {error}
+                </div>
+              </div>
+            )}
 
-          {error && (
-            <div className="mb-4">
-              <Alert message={error} type="error" showIcon />
-            </div>
-          )}
+            {currentStep < 3 && (
+              <div className="mb-8">
+                <Steps current={currentStep} className="max-w-2xl mx-auto">
+                  <Step title="Email" icon={<MailOutlined />} />
+                  <Step title="Verify" icon={<SafetyOutlined />} />
+                  <Step title="Details" icon={<UserOutlined />} />
+                  <Step title="Complete" icon={<QrcodeOutlined />} />
+                </Steps>
+              </div>
+            )}
 
-          {renderStepContent()}
-        </Card>
+            {renderStepContent()}
+          </div>
+        </div>
       </div>
+      {contextHolder}
     </div>
   );
 }

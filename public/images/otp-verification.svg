@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="300" viewBox="0 0 300 300">
+  <defs>
+    <linearGradient id="otpGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="150" cy="150" r="120" fill="url(#otpGradient)" opacity="0.1"/>
+  
+  <!-- Phone -->
+  <rect x="110" y="80" width="80" height="140" rx="12" fill="url(#otpGradient)" stroke="#f59e0b" stroke-width="2"/>
+  
+  <!-- Screen -->
+  <rect x="120" y="95" width="60" height="90" rx="4" fill="#1f2937"/>
+  
+  <!-- OTP digits -->
+  <rect x="130" y="110" width="8" height="12" rx="2" fill="#f59e0b"/>
+  <rect x="142" y="110" width="8" height="12" rx="2" fill="#f59e0b"/>
+  <rect x="154" y="110" width="8" height="12" rx="2" fill="#f59e0b"/>
+  <rect x="166" y="110" width="8" height="12" rx="2" fill="#f59e0b"/>
+  <rect x="178" y="110" width="8" height="12" rx="2" fill="#f59e0b"/>
+  <rect x="190" y="110" width="8" height="12" rx="2" fill="#f59e0b"/>
+  
+  <!-- Home button -->
+  <circle cx="150" cy="210" r="8" fill="#f59e0b" opacity="0.5"/>
+  
+  <!-- Lock icon -->
+  <rect x="140" y="140" width="20" height="15" rx="2" fill="#f59e0b"/>
+  <rect x="145" y="135" width="10" height="8" rx="2" fill="#f59e0b"/>
+  <circle cx="150" cy="147" r="2" fill="#1f2937"/>
+  
+  <!-- Decorative elements -->
+  <circle cx="100" cy="100" r="3" fill="#f59e0b" opacity="0.4"/>
+  <circle cx="200" cy="100" r="3" fill="#f59e0b" opacity="0.4"/>
+  <circle cx="100" cy="200" r="3" fill="#f59e0b" opacity="0.4"/>
+  <circle cx="200" cy="200" r="3" fill="#f59e0b" opacity="0.4"/>
+  
+  <!-- Security shield -->
+  <path d="M150 180 L170 190 L170 210 L150 220 L130 210 L130 190 Z" fill="#f59e0b" opacity="0.2"/>
+  <path d="M150 185 L165 195 L165 205 L150 215 L135 205 L135 195 Z" fill="#f59e0b" opacity="0.3"/>
+</svg> 
