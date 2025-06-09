@@ -41,7 +41,7 @@ interface QRScan {
   company?: string;
   eventName?: string;
   scanTime: string;
-  entryType: 'qr' | 'manual';
+  entryType: 'QR' | 'Manual';
   status: 'success' | 'failed' | 'Visited';
   deviceInfo?: string;
   error?: string;
@@ -175,7 +175,49 @@ const QRScanner: React.FC = () => {
         onOk: async () => {
           try {
             setLoading(true);
-            // First check if visitor exists
+            
+            // First check if visitor already exists in qrscans collection
+            const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}`);
+            if (!scanCheckResponse.ok) {
+              throw new Error('Failed to check visitor scan status');
+            }
+            
+            const scanCheckData = await scanCheckResponse.json();
+            
+            if (scanCheckData.exists) {
+              // Visitor already exists in qrscans collection
+              const existingScan = scanCheckData.scan;
+              const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+              });
+              
+              Modal.warning({
+                title: 'Visitor Already Checked In',
+                content: (
+                  <div className="text-center">
+                    <p className="text-lg font-semibold mb-2">{existingScan.name}</p>
+                    <p className="text-sm text-gray-600 mb-2">Company: {existingScan.company}</p>
+                    <p className="text-sm text-gray-600 mb-2">Event: {existingScan.eventName}</p>
+                    <p className="text-sm text-gray-600 mb-2">Entry Type: {existingScan.entryType}</p>
+                    <p className="text-sm text-gray-600 mb-2">Check-in Time: {scanTime}</p>
+                    <p className="text-sm text-red-600 font-semibold">This visitor has already been checked in!</p>
+                  </div>
+                ),
+                okText: 'OK',
+                onOk: () => {
+                  setIsProcessingScan(false);
+                }
+              });
+              return;
+            }
+
+            // If visitor doesn't exist in qrscans, proceed with normal check-in process
+            // First check if visitor exists in visitors collection
             const response = await fetch(`/api/visitors/${visitorId}`);
             if (!response.ok) {
               let errorMessage = 'Visitor not found.';
@@ -210,7 +252,7 @@ const QRScanner: React.FC = () => {
             }
 
             // Create scan record
-            const scanData = {
+            const scanData: QRScan = {
               visitorId: visitorData._id || visitorData.id || visitorId,
               eventId: visitorData.eventId,
               registrationId: visitorData.registrationId,
@@ -218,7 +260,7 @@ const QRScanner: React.FC = () => {
               company: visitorData.company,
               eventName: visitorData.eventName,
               scanTime: new Date().toISOString(),
-              entryType: 'qr',
+              entryType: 'QR',
               status: 'Visited',
               deviceInfo: navigator.userAgent
             };
@@ -312,7 +354,7 @@ const QRScanner: React.FC = () => {
         company: visitorData.company,
         eventName: visitorData.eventName,
         scanTime: new Date().toISOString(),
-        entryType: 'qr',
+        entryType: 'QR',
         status: 'Visited',
         deviceInfo: navigator.userAgent
       };
@@ -396,6 +438,47 @@ const QRScanner: React.FC = () => {
     try {
       setLoading(true);
       
+      // First check if visitor already exists in qrscans collection
+      const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${manualVisitorId.trim()}`);
+      if (!scanCheckResponse.ok) {
+        throw new Error('Failed to check visitor scan status');
+      }
+      
+      const scanCheckData = await scanCheckResponse.json();
+      
+      if (scanCheckData.exists) {
+        // Visitor already exists in qrscans collection
+        const existingScan = scanCheckData.scan;
+        const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+        
+        Modal.warning({
+          title: 'Visitor Already Checked In',
+          content: (
+            <div className="text-center">
+              <p className="text-lg font-semibold mb-2">{existingScan.name}</p>
+              <p className="text-sm text-gray-600 mb-2">Company: {existingScan.company}</p>
+              <p className="text-sm text-gray-600 mb-2">Event: {existingScan.eventName}</p>
+              <p className="text-sm text-gray-600 mb-2">Entry Type: {existingScan.entryType}</p>
+              <p className="text-sm text-gray-600 mb-2">Check-in Time: {scanTime}</p>
+              <p className="text-sm text-red-600 font-semibold">This visitor has already been checked in!</p>
+            </div>
+          ),
+          okText: 'OK',
+          onOk: () => {
+            setManualVisitorId('');
+            setShowManualEntry(false);
+          }
+        });
+        return;
+      }
+      
       // 1. First fetch visitor data to verify it exists
       const visitorRes = await fetch(`/api/visitors/${manualVisitorId.trim()}`);
       if (!visitorRes.ok) {
@@ -446,7 +529,7 @@ const QRScanner: React.FC = () => {
         company: visitorData.company,
         eventName: visitorData.eventName,
         scanTime: now,
-        entryType: 'manual',
+        entryType: 'Manual' as const,
         status: 'Visited',
         deviceInfo: navigator.userAgent
       };
@@ -473,7 +556,7 @@ const QRScanner: React.FC = () => {
         eventName: visitorData.eventName,
         status: 'Visited',
         scanTime: now,
-        entryType: 'manual'
+        entryType: 'Manual'
       };
 
       setScannedVisitors(prev => [newEntry, ...prev]);
@@ -540,8 +623,8 @@ const QRScanner: React.FC = () => {
       dataIndex: 'entryType',
       key: 'entryType',
       render: (text: string) => (
-        <Tag color={text === 'manual' ? 'orange' : 'purple'}>
-          {text.charAt(0).toUpperCase() + text.slice(1)}
+        <Tag color={text === 'Manual' ? 'orange' : 'purple'}>
+          {text}
         </Tag>
       ),
     },
