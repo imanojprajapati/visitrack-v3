@@ -24,9 +24,14 @@ interface Visitor {
 
 export default function RegistrationReport() {
   const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [loading, setLoading] = useState(true);
   const [events, setEvents] = useState<Event[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
   const [mounted, setMounted] = useState(false);
   const [filters, setFilters] = useState({
     name: '',
@@ -85,6 +90,10 @@ export default function RegistrationReport() {
       if (!response.ok) throw new Error('Failed to fetch visitors');
       const data = await response.json();
       setVisitors(data);
+      setPagination(prev => ({
+        ...prev,
+        total: data.length,
+      }));
     } catch (error) {
       console.error('Error fetching visitors:', error);
       message.error('Failed to load visitor data');
@@ -124,7 +133,14 @@ export default function RegistrationReport() {
       status: '',
       dateRange: null,
     });
-    setTimeout(fetchVisitors, 0);
+    fetchVisitors();
+  };
+
+  // Calculate paginated data
+  const getPaginatedData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return visitors.slice(startIndex, endIndex);
   };
 
   const allAdditionalKeys = Array.from(new Set(visitors.flatMap(v => Object.keys(v.additionalData || {}))));
@@ -457,16 +473,27 @@ export default function RegistrationReport() {
         <div className="flex-1 overflow-auto">
           <Table
             columns={columns}
-            dataSource={visitors}
+            dataSource={getPaginatedData()}
             rowKey="_id"
             loading={loading}
             scroll={{ x: 'max-content' }}
             pagination={{
-              pageSize: 10,
+              current: pagination.current,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
               showSizeChanger: true,
-              showTotal: (total) => `Total ${total} visitors`,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} visitors`,
+              pageSizeOptions: ['10', '20', '50', '100'],
               showQuickJumper: true,
-              className: "custom-pagination"
+              className: "custom-pagination",
+              onChange: (page, pageSize) => {
+                console.log('Reports pagination changed:', { page, pageSize });
+                setPagination(prev => ({ ...prev, current: page, pageSize }));
+              },
+              onShowSizeChange: (current, size) => {
+                console.log('Reports page size changed:', { current, size });
+                setPagination(prev => ({ ...prev, current: 1, pageSize: size }));
+              }
             }}
             className="visitor-table"
             size="middle"

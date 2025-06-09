@@ -54,6 +54,11 @@ const Messaging: React.FC = () => {
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [sending, setSending] = useState(false);
   const [showTable, setShowTable] = useState(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
 
   useEffect(() => {
     // Fetch events for dropdown
@@ -74,6 +79,10 @@ const Messaging: React.FC = () => {
         .then(data => {
           setRecipients(data);
           setSelectedRecipients([]); // Reset selection when event changes
+          setPagination(prev => ({
+            ...prev,
+            total: data.length,
+          }));
           setLoadingRecipients(false);
         })
         .catch(error => {
@@ -84,6 +93,10 @@ const Messaging: React.FC = () => {
     } else {
       setRecipients([]);
       setSelectedRecipients([]);
+      setPagination(prev => ({
+        ...prev,
+        total: 0,
+      }));
     }
   }, [selectedEvent]);
 
@@ -179,7 +192,7 @@ const Messaging: React.FC = () => {
       title: 'Select',
       key: 'select',
       width: 60,
-      render: (_, record: Visitor) => (
+      render: (_: any, record: Visitor) => (
         <Checkbox
           checked={selectedRecipients.includes(record._id)}
           onChange={(e) => {
@@ -251,6 +264,22 @@ const Messaging: React.FC = () => {
 
   const checkedInCount = recipients.filter(r => r.status === 'Visited').length;
   const notCheckedInCount = recipients.filter(r => r.status !== 'Visited').length;
+
+  const handleTableChange = (paginationConfig: any) => {
+    console.log('Messaging table pagination changed:', paginationConfig);
+    setPagination({
+      current: paginationConfig.current,
+      pageSize: paginationConfig.pageSize,
+      total: recipients.length,
+    });
+  };
+
+  // Calculate paginated data
+  const getPaginatedData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return recipients.slice(startIndex, endIndex);
+  };
 
   return (
     <AdminLayout>
@@ -356,14 +385,27 @@ const Messaging: React.FC = () => {
                   >
                     {showTable ? (
                       <Table
-                        dataSource={recipients}
+                        dataSource={getPaginatedData()}
                         columns={columns}
                         rowKey="_id"
                         size="small"
                         pagination={{
-                          pageSize: 10,
+                          current: pagination.current,
+                          pageSize: pagination.pageSize,
+                          total: pagination.total,
                           showSizeChanger: true,
-                          showTotal: (total) => `Total ${total} visitors`,
+                          showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} visitors`,
+                          pageSizeOptions: ['10', '20', '50', '100'],
+                          showQuickJumper: true,
+                          onChange: handleTableChange,
+                          onShowSizeChange: (current, size) => {
+                            console.log('Messaging table page size changed:', { current, size });
+                            setPagination(prev => ({
+                              ...prev,
+                              pageSize: size,
+                              current: 1, // Reset to first page when changing page size
+                            }));
+                          }
                         }}
                         scroll={{ x: 'max-content' }}
                       />
@@ -387,7 +429,7 @@ const Messaging: React.FC = () => {
                               <Space>
                                 <span>{recipient.name}</span>
                                 <span className="text-gray-400">({recipient.email})</span>
-                                <Tag size="small" color={recipient.status === 'Visited' ? 'green' : 'blue'}>
+                                <Tag color={recipient.status === 'Visited' ? 'green' : 'blue'}>
                                   {recipient.status === 'Visited' ? 'Checked In' : 'Not Checked In'}
                                 </Tag>
                               </Space>

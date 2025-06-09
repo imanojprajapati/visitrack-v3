@@ -59,6 +59,11 @@ const QRScanner: React.FC = () => {
   // QR scanner state
   const [isProcessingScan, setIsProcessingScan] = useState(false);
   const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
 
   // Initialize QR scanner when modal opens
   useEffect(() => {
@@ -129,6 +134,10 @@ const QRScanner: React.FC = () => {
           entryType: scan.entryType || 'unknown',
         }));
         setScannedVisitors(visitors);
+        setPagination(prev => ({
+          ...prev,
+          total: visitors.length,
+        }));
       } catch (error) {
         console.error('Error fetching scanned visitors:', error);
         messageApi.error('Failed to load scanned visitors');
@@ -572,6 +581,22 @@ const QRScanner: React.FC = () => {
     }
   };
 
+  const handleTableChange = (paginationConfig: any) => {
+    console.log('QR Scanner table pagination changed:', paginationConfig);
+    setPagination({
+      current: paginationConfig.current,
+      pageSize: paginationConfig.pageSize,
+      total: scannedVisitors.length,
+    });
+  };
+
+  // Calculate paginated data
+  const getPaginatedData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return scannedVisitors.slice(startIndex, endIndex);
+  };
+
   const columns = [
     {
       title: 'Name',
@@ -728,14 +753,27 @@ const QRScanner: React.FC = () => {
 
           {/* Scanned Visitors Table */}
           <Table
-            dataSource={scannedVisitors}
+            dataSource={getPaginatedData()}
             columns={columns}
             rowKey={(record) => `${record.visitorId}-${record.scanTime}`}
             loading={loading}
             pagination={{
-              pageSize: 10,
+              current: pagination.current,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
               showSizeChanger: true,
-              showTotal: (total) => `Total ${total} visitors`,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} visitors`,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              showQuickJumper: true,
+              onChange: handleTableChange,
+              onShowSizeChange: (current, size) => {
+                console.log('QR Scanner page size changed:', { current, size });
+                setPagination(prev => ({
+                  ...prev,
+                  pageSize: size,
+                  current: 1, // Reset to first page when changing page size
+                }));
+              }
             }}
             scroll={{ x: 'max-content' }}
           />

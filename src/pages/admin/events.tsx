@@ -59,6 +59,11 @@ export default function EventManagement() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
   
   const refreshEvents = async (showMessage = true) => {
     try {
@@ -77,6 +82,10 @@ export default function EventManagement() {
       );
       
       setEvents(sortedEvents);
+      setPagination(prev => ({
+        ...prev,
+        total: sortedEvents.length,
+      }));
       if (showMessage) {
         messageApi?.success('Events list refreshed');
       }
@@ -90,6 +99,22 @@ export default function EventManagement() {
       setIsRefreshing(false);
       setIsLoading(false);
     }
+  };
+
+  const handleTableChange = (paginationConfig: any) => {
+    console.log('Events table pagination changed:', paginationConfig);
+    setPagination({
+      current: paginationConfig.current,
+      pageSize: paginationConfig.pageSize,
+      total: events.length,
+    });
+  };
+
+  // Calculate paginated data
+  const getPaginatedData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return events.slice(startIndex, endIndex);
   };
 
   // Initial load and periodic refresh
@@ -365,13 +390,26 @@ export default function EventManagement() {
           <div className="overflow-x-auto">
             <Table
               columns={columns}
-              dataSource={events}
+              dataSource={getPaginatedData()}
               rowKey="_id"
               loading={isLoading}
               pagination={{
-                defaultPageSize: 10,
+                current: pagination.current,
+                pageSize: pagination.pageSize,
+                total: pagination.total,
                 showSizeChanger: true,
-                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} events`
+                showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} events`,
+                pageSizeOptions: ['10', '20', '50', '100'],
+                showQuickJumper: true,
+                onChange: handleTableChange,
+                onShowSizeChange: (current, size) => {
+                  console.log('Events page size changed:', { current, size });
+                  setPagination(prev => ({
+                    ...prev,
+                    pageSize: size,
+                    current: 1, // Reset to first page when changing page size
+                  }));
+                }
               }}
             />
           </div>

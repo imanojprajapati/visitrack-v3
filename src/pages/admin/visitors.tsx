@@ -83,6 +83,11 @@ export default function VisitorsPage() {
   const [filteredVisitors, setFilteredVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
   const router = useRouter();
 
   useEffect(() => {
@@ -115,6 +120,10 @@ export default function VisitorsPage() {
       console.log('Fetched visitors:', data); // Debug log
       setVisitors(data);
       setFilteredVisitors(data);
+      setPagination(prev => ({
+        ...prev,
+        total: data.length,
+      }));
     } catch (error) {
       console.error('Error fetching visitors:', error);
       message.error('Failed to load visitors');
@@ -281,11 +290,46 @@ export default function VisitorsPage() {
     }
 
     setFilteredVisitors(filtered);
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: filtered.length,
+    }));
   };
 
   const handleReset = () => {
     form.resetFields();
     setFilteredVisitors(visitors);
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: visitors.length,
+    }));
+  };
+
+  // Reset pagination when filtered data changes
+  useEffect(() => {
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: filteredVisitors.length,
+    }));
+  }, [filteredVisitors]);
+
+  const handleTableChange = (paginationConfig: any) => {
+    console.log('Table pagination changed:', paginationConfig);
+    setPagination({
+      current: paginationConfig.current,
+      pageSize: paginationConfig.pageSize,
+      total: filteredVisitors.length,
+    });
+  };
+
+  // Calculate paginated data
+  const getPaginatedData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return filteredVisitors.slice(startIndex, endIndex);
   };
 
   const handleExport = () => {
@@ -594,15 +638,27 @@ export default function VisitorsPage() {
 
           <Table
             columns={columns}
-            dataSource={filteredVisitors}
+            dataSource={getPaginatedData()}
             rowKey="_id"
             loading={loading}
             pagination={{
-              total: filteredVisitors.length,
-              pageSize: 10,
+              current: pagination.current,
+              pageSize: pagination.pageSize,
+              total: pagination.total,
               showSizeChanger: true,
-              showTotal: (total) => `Total ${total} visitors`,
+              showTotal: (total, range) => `${range[0]}-${range[1]} of ${total} visitors`,
+              pageSizeOptions: ['10', '20', '50', '100'],
+              showQuickJumper: true,
               responsive: true,
+              onChange: handleTableChange,
+              onShowSizeChange: (current, size) => {
+                console.log('Page size changed:', { current, size });
+                setPagination(prev => ({
+                  ...prev,
+                  pageSize: size,
+                  current: 1, // Reset to first page when changing page size
+                }));
+              }
             }}
             scroll={{ x: 'max-content' }}
             className="overflow-x-auto"
