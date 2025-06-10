@@ -36,7 +36,7 @@ export default function EventsPage() {
     if (registrationDeadline && now > registrationDeadline) {
       Modal.info({
         title: 'Registration Closed',
-        content: 'You are able to register for this event at the event location and event date with pay to entry badge.',
+        content: 'On-site registration will be available at the event venue on the event date. Entry will require payment for an entry badge.',
         okText: 'OK',
       });
       return;

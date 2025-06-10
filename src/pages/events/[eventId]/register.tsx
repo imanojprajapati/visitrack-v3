@@ -5,7 +5,17 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Image from 'next/image';
 import { Card, Input, Button, message, Steps, Form, Typography, Space, Divider, Result, Spin, Alert, Modal } from 'antd';
-import { MailOutlined, SafetyOutlined, UserOutlined, QrcodeOutlined, DownloadOutlined } from '@ant-design/icons';
+import {
+  UserOutlined,
+  MailOutlined,
+  PhoneOutlined,
+  BankOutlined,
+  EnvironmentOutlined,
+  CalendarOutlined,
+  SafetyOutlined,
+  DownloadOutlined,
+  HomeOutlined
+} from '@ant-design/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { jsPDF } from 'jspdf';
 import DynamicForm from '../../../components/DynamicForm';
@@ -16,6 +26,9 @@ import { fetchApi, buildApiUrl } from '../../../utils/api';
 import { FormBuilder, FormField, FormTemplate } from '../../../utils/formBuilder';
 import { Rule } from 'antd/es/form';
 import dayjs from 'dayjs';
+import html2canvas from 'html2canvas';
+import { QRCode as AntQRCode } from 'antd';
+import { Tag } from 'antd';
 
 const { Title, Text } = Typography;
 const { Step } = Steps;
@@ -390,6 +403,7 @@ export default function EventRegistration() {
 
       setVisitor(response.visitor);
       setCurrentStep(3);
+      
       message.success('Registration successful! A confirmation email has been sent to your inbox.');
 
     } catch (error) {
@@ -1240,6 +1254,17 @@ export default function EventRegistration() {
                     </Button>
                   </Space>
                 </div>
+                <div className="mt-4">
+                  <Space size="middle">
+                    <Button
+                      type="primary"
+                      icon={<HomeOutlined />}
+                      onClick={() => router.push('/events')}
+                    >
+                      Return to Events
+                    </Button>
+                  </Space>
+                </div>
               </div>
             </div>
           </div>
@@ -1439,6 +1464,17 @@ export default function EventRegistration() {
                       Download Badge
                     </Button>
                   </Space>
+                  
+                  <div className="mt-4">
+                    <Button
+                      type="primary"
+                      icon={<HomeOutlined />}
+                      onClick={() => router.push('/events')}
+                      size="large"
+                    >
+                      Return to Events
+                    </Button>
+                  </div>
                 </div>
               ]}
             />
@@ -1526,7 +1562,7 @@ export default function EventRegistration() {
                   <Step title="Email" icon={<MailOutlined />} />
                   <Step title="Verify" icon={<SafetyOutlined />} />
                   <Step title="Details" icon={<UserOutlined />} />
-                  <Step title="Complete" icon={<QrcodeOutlined />} />
+                  <Step title="Complete" icon={<UserOutlined />} />
                 </Steps>
               </div>
             )}

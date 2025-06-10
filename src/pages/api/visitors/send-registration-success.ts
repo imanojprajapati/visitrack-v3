@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { connectToDatabase } from '../../../lib/mongodb';
 import Visitor from '../../../models/Visitor';
 import Event from '../../../models/Event';
+import BadgeTemplate from '../../../models/BadgeTemplate';
 
 // Create reusable transporter object using SMTP transport
 const transporter = nodemailer.createTransport({
@@ -51,6 +52,52 @@ export default async function handler(
 
     // Type assertion for event
     const eventData = event as any;
+
+    // Generate PDF badge
+    let pdfAttachment = null;
+    try {
+      // Get badge template for this event
+      const templates = await BadgeTemplate.find({ eventId: visitor.eventId });
+      if (templates.length > 0) {
+        const templateId = templates[0]._id;
+        
+        // Prepare visitor data for PDF generation
+        const visitorData = {
+          ...visitor,
+          visitorId: visitor._id,
+          eventId: visitor.eventId,
+          eventName: visitor.eventName,
+          eventLocation: visitor.eventLocation,
+          eventStartDate: visitor.eventStartDate,
+          eventEndDate: visitor.eventEndDate,
+          _id: visitor._id
+        };
+
+        // Generate PDF using the badge download API
+        const pdfResponse = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/api/badge-templates/download`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            templateId,
+            visitorData
+          }),
+        });
+
+        if (pdfResponse.ok) {
+          const pdfBuffer = await pdfResponse.arrayBuffer();
+          pdfAttachment = {
+            filename: `visitrack-badge-${visitor.name}.pdf`,
+            content: Buffer.from(pdfBuffer),
+            contentType: 'application/pdf'
+          };
+        }
+      }
+    } catch (pdfError) {
+      console.error('Error generating PDF badge:', pdfError);
+      // Continue without PDF attachment if generation fails
+    }
 
     // Send success email
     const mailOptions = {
@@ -112,6 +159,15 @@ export default async function handler(
               </p>
             </div>
             
+            ${pdfAttachment ? `
+            <div style="background: #E0F2FE; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #0288D1;">
+              <h3 style="color: #01579B; margin-top: 0;">📎 Attachment</h3>
+              <p style="color: #0277BD; margin: 10px 0;">
+                Your event badge has been attached to this email. Please save it for easy access during the event.
+              </p>
+            </div>
+            ` : ''}
+            
             <p style="color: #6B7280; font-size: 14px; margin-top: 30px; text-align: center;">
               If you have any questions, please contact the event organizers.
             </p>
@@ -123,6 +179,7 @@ export default async function handler(
           </div>
         </div>
       `,
+      attachments: pdfAttachment ? [pdfAttachment] : undefined
     };
 
     try {
@@ -131,7 +188,8 @@ export default async function handler(
       res.status(200).json({ 
         message: 'Registration success email sent successfully',
         visitorId: visitor._id,
-        eventTitle: eventData.title
+        eventTitle: eventData.title,
+        pdfAttached: !!pdfAttachment
       });
     } catch (emailError) {
       console.error('Error sending registration success email:', emailError);
