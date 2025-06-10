@@ -711,7 +711,7 @@ const BadgeManagement: React.FC = () => {
       <Drawer
         title="Badge Preview"
         placement="right"
-        width={400}
+        width={600}
         onClose={() => setPreviewDrawerVisible(false)}
         open={previewDrawerVisible}
         extra={
@@ -740,39 +740,138 @@ const BadgeManagement: React.FC = () => {
                 overflow: 'hidden',
                 display: 'flex',
                 flexDirection: 'column',
-                padding: '10mm',
+                position: 'relative',
                 boxSizing: 'border-box',
               }}
             >
-              {/* Badge Image */}
-              <div style={{ width: '100%', height: '200px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                {selectedTemplate.badge?.cloudinaryUrl && (
+              {/* Badge Image - Top Section */}
+              <div style={{ 
+                width: '100%', 
+                height: '180px', 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center',
+                background: '#f8f9fa'
+              }}>
+                {selectedTemplate.badge?.cloudinaryUrl ? (
                   <img
                     src={selectedTemplate.badge.cloudinaryUrl}
                     alt="Badge"
                     style={{
                       width: '100%',
-                      height: '200px',
+                      height: '180px',
                       objectFit: 'contain',
                     }}
                   />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '180px',
+                    display: 'flex',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    color: '#999',
+                    fontSize: '16px',
+                    border: '2px dashed #d9d9d9'
+                  }}>
+                    Badge Image Placeholder
+                  </div>
                 )}
               </div>
 
-              {/* QR Code */}
-              {selectedTemplate.showQRCode && selectedTemplate.qrCode?.enabled && selectedTemplate.qrCode?.cloudinaryUrl && (
-                <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '20px' }}>
-                  <img
-                    src={selectedTemplate.qrCode.cloudinaryUrl}
-                    alt="QR Code"
-                    style={{
+              {/* QR Code - Middle Section */}
+              {selectedTemplate.showQRCode && (
+                <div style={{ 
+                  width: '100%', 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  marginTop: '20px',
+                  marginBottom: '20px'
+                }}>
+                  {selectedTemplate.qrCode?.cloudinaryUrl ? (
+                    <img
+                      src={selectedTemplate.qrCode.cloudinaryUrl}
+                      alt="QR Code"
+                      style={{
+                        width: '200px',
+                        height: '200px',
+                        objectFit: 'contain',
+                      }}
+                    />
+                  ) : (
+                    <div style={{
                       width: '200px',
                       height: '200px',
-                      objectFit: 'contain',
-                    }}
-                  />
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      border: '2px dashed #d9d9d9',
+                      color: '#999',
+                      fontSize: '14px'
+                    }}>
+                      QR Code Placeholder
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* Visitor Details Section - Styled like PDF */}
+              <div style={{
+                width: '400px',
+                margin: '20px auto',
+                background: '#f8f9fa',
+                border: '1px solid #e9ecef',
+                borderRadius: '4px',
+                padding: '20px',
+                minHeight: '120px'
+              }}>
+                <div style={{
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  color: '#1f2937',
+                  marginBottom: '15px'
+                }}>
+                  Registration Details
+                </div>
+                
+                <div style={{
+                  display: 'flex',
+                  gap: '20px'
+                }}>
+                  {/* Left Column */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                      Name: Sample Visitor
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                      Email: sample@example.com
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                      Phone: +1234567890
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                      Company: Sample Company
+                    </div>
+                  </div>
+                  
+                  {/* Right Column */}
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                      Event: {events.find(e => e._id === selectedTemplate.eventId)?.title || 'Sample Event'}
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                      Location: Sample Location
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                      Date: 01 Jan 2024
+                    </div>
+                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                      ID: SAMPLE123
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* VISITOR text at bottom */}
               <div style={{ 
@@ -782,16 +881,16 @@ const BadgeManagement: React.FC = () => {
                 justifyContent: 'center', 
                 alignItems: 'center',
                 position: 'absolute',
-                bottom: '10mm',
+                bottom: '20px',
                 left: 0,
-                fontSize: '72px',
+                fontSize: '64px',
                 fontWeight: 'bold',
-                color: '#666',
-                opacity: 0.5,
+                color: '#4338CA',
               }}>
                 VISITOR
               </div>
             </div>
+            
             <Descriptions column={1} size="small" className="w-full">
               <Descriptions.Item label="Template Name">
                 {selectedTemplate.name}
