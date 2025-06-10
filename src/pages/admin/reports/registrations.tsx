@@ -276,19 +276,26 @@ export default function RegistrationReport() {
       render: (date: string) => {
         try {
           if (!date) return '-';
-          // Parse DD-MM-YY format and convert to readable format
+          
+          // Handle ISO date format (2025-06-05T18:30:00.000Z)
+          const dateObj = new Date(date);
+          if (!isNaN(dateObj.getTime())) {
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const year = dateObj.getFullYear();
+            return `${day}/${month}/${year}`;
+          }
+          
+          // Fallback: try to parse DD-MM-YY format
           const [day, month, year] = date.split('-');
           if (day && month && year) {
             const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-            const dateObj = new Date(`${fullYear}-${month}-${day}`);
-            if (!isNaN(dateObj.getTime())) {
-              return dateObj.toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-              });
+            const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
+            if (!isNaN(fallbackDateObj.getTime())) {
+              return `${day}/${month}/${fullYear}`;
             }
           }
+          
           return date || '-';
         } catch (error) {
           console.error('Error formatting registration date:', error);
@@ -345,16 +352,22 @@ export default function RegistrationReport() {
       let registrationDate = '-';
       try {
         if (visitor.createdAt) {
-          const [day, month, year] = visitor.createdAt.split('-');
-          if (day && month && year) {
-            const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-            const dateObj = new Date(`${fullYear}-${month}-${day}`);
-            if (!isNaN(dateObj.getTime())) {
-              registrationDate = dateObj.toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-              });
+          // Handle ISO date format (2025-06-05T18:30:00.000Z)
+          const dateObj = new Date(visitor.createdAt);
+          if (!isNaN(dateObj.getTime())) {
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const year = dateObj.getFullYear();
+            registrationDate = `${day}/${month}/${year}`;
+          } else {
+            // Fallback: try to parse DD-MM-YY format
+            const [day, month, year] = visitor.createdAt.split('-');
+            if (day && month && year) {
+              const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+              const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
+              if (!isNaN(fallbackDateObj.getTime())) {
+                registrationDate = `${day}/${month}/${fullYear}`;
+              }
             }
           }
         }
