@@ -107,8 +107,12 @@ const BadgeManagement: React.FC = () => {
 
   // Update the handleNewTemplate function
   const handleNewTemplate = () => {
-    // Reset form with default values
-    form.setFieldsValue(defaultTemplate);
+    // Reset form with default values and clear _id
+    const newTemplate = {
+      ...defaultTemplate,
+      _id: undefined // Explicitly clear the _id field
+    };
+    form.setFieldsValue(newTemplate);
     setSelectedEvent('');
     setBadgeFile(null);
   };
@@ -303,7 +307,11 @@ const BadgeManagement: React.FC = () => {
 
       message.success('Template saved successfully');
       fetchTemplates();
-      handleNewTemplate();
+      
+      // Only reset form if we're creating a new template (no _id)
+      if (!templateData._id) {
+        handleNewTemplate();
+      }
     } catch (error) {
       console.error('Save error:', error);
       message.error('Failed to save template');
@@ -599,7 +607,7 @@ const BadgeManagement: React.FC = () => {
           </Button>
         </div>
 
-        <Card>
+        <Card title={form.getFieldValue('_id') ? 'Edit Template' : 'Create New Template'}>
           <Form
             form={form}
             layout="vertical"
@@ -667,6 +675,9 @@ const BadgeManagement: React.FC = () => {
             </Row>
 
             {/* Hidden form fields to capture badge data */}
+            <Form.Item name="_id" hidden>
+              <Input />
+            </Form.Item>
             <Form.Item name={['badge', 'cloudinaryUrl']} hidden>
               <Input />
             </Form.Item>
@@ -683,7 +694,7 @@ const BadgeManagement: React.FC = () => {
             <Form.Item>
               <Space>
                 <Button type="primary" htmlType="submit" loading={loading}>
-                  Save Template
+                  {form.getFieldValue('_id') ? 'Update Template' : 'Save Template'}
                 </Button>
                 <Button onClick={() => form.resetFields()}>Reset</Button>
               </Space>
