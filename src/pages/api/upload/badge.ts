@@ -44,8 +44,8 @@ export default async function handler(
     });
 
     res.status(200).json({
-      url: result.secure_url,
-      publicId: result.public_id,
+      cloudinaryUrl: result.secure_url,
+      cloudinaryPublicId: result.public_id,
     });
   } catch (error: any) {
     console.error('Error uploading to Cloudinary:', error);

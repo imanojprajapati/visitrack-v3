@@ -43,13 +43,11 @@ export default async function handler(
     res.status(200).json({
       template: {
         name: template.name,
-        title: template.title,
-        subtitle: template.subtitle,
-        additionalInfo: template.additionalInfo,
-        logo: template.logo,
-        photo: template.photo,
+        showQRCode: template.showQRCode,
+        badge: template.badge,
         qrCode: template.qrCode,
-        background: template.background,
+        createdAt: template.createdAt,
+        updatedAt: template.updatedAt,
       },
       event: {
         title: event.title,

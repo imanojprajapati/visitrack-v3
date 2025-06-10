@@ -28,8 +28,9 @@ export default async function handler(
         const updatedTemplate = await BadgeTemplate.findByIdAndUpdate(
           templateId,
           req.body,
-          { new: true }
+          { new: true, runValidators: true }
         );
+        
         if (!updatedTemplate) {
           return res.status(404).json({ message: 'Template not found' });
         }

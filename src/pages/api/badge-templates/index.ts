@@ -1,7 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { connectToDatabase } from '../../../lib/mongodb';
 import BadgeTemplate from '../../../models/BadgeTemplate';
-import { uploadToCloudinary, deleteFromCloudinary } from '../../../lib/cloudinary';
 import { handleApiError, ApiError, validateMongoId } from '../../../utils/api-error';
 import mongoose from 'mongoose';
 
@@ -29,6 +28,7 @@ export default async function handler(
 
       case 'POST':
         const templateData = { ...req.body };
+        console.log('Received template data:', templateData);
 
         if (!templateData.eventId) {
           throw new ApiError(400, 'Event ID is required');
@@ -37,56 +37,15 @@ export default async function handler(
         validateMongoId(templateData.eventId, 'Event ID');
 
         try {
-          // Handle logo upload if provided
-          if (templateData.logo?.enabled && templateData.logo?.imageData) {
-            const logoResult = await uploadToCloudinary(templateData.logo.imageData, 'badge-templates/logos');
-            if (!logoResult?.url) {
-              throw new ApiError(500, 'Failed to upload logo');
-            }
-            templateData.logo.cloudinaryUrl = logoResult.url;
-            templateData.logo.cloudinaryPublicId = logoResult.publicId;
-            delete templateData.logo.imageData;
-          }
-
-          // Handle photo upload if provided
-          if (templateData.photo?.enabled && templateData.photo?.imageData) {
-            const photoResult = await uploadToCloudinary(templateData.photo.imageData, 'badge-templates/photos');
-            if (!photoResult?.url) {
-              throw new ApiError(500, 'Failed to upload photo');
-            }
-            templateData.photo.cloudinaryUrl = photoResult.url;
-            templateData.photo.cloudinaryPublicId = photoResult.publicId;
-            delete templateData.photo.imageData;
-          }
-
-          // Handle background upload if provided
-          if (templateData.background?.imageData) {
-            const bgResult = await uploadToCloudinary(templateData.background.imageData, 'badge-templates/backgrounds');
-            if (!bgResult?.url) {
-              throw new ApiError(500, 'Failed to upload background');
-            }
-            templateData.background = {
-              cloudinaryUrl: bgResult.url,
-              cloudinaryPublicId: bgResult.publicId
-            };
-          }
-
           // Convert eventId to ObjectId
           templateData.eventId = new mongoose.Types.ObjectId(templateData.eventId);
+          console.log('Processed template data:', templateData);
 
           const template = await BadgeTemplate.create(templateData);
+          console.log('Created template:', template);
           return res.status(201).json(template);
         } catch (error) {
-          // Clean up any uploaded images if template creation fails
-          if (templateData.logo?.cloudinaryPublicId) {
-            await deleteFromCloudinary(templateData.logo.cloudinaryPublicId);
-          }
-          if (templateData.photo?.cloudinaryPublicId) {
-            await deleteFromCloudinary(templateData.photo.cloudinaryPublicId);
-          }
-          if (templateData.background?.cloudinaryPublicId) {
-            await deleteFromCloudinary(templateData.background.cloudinaryPublicId);
-          }
+          console.error('Error creating template:', error);
           throw error;
         }
 
@@ -101,25 +60,9 @@ export default async function handler(
           return res.status(404).json({ error: 'Template not found' });
         }
 
-        // Delete images from Cloudinary
-        try {
-          if (templateToDelete.logo.cloudinaryPublicId) {
-            await deleteFromCloudinary(templateToDelete.logo.cloudinaryPublicId);
-          }
-          if (templateToDelete.photo.cloudinaryPublicId) {
-            await deleteFromCloudinary(templateToDelete.photo.cloudinaryPublicId);
-          }
-          if (templateToDelete.background?.cloudinaryPublicId) {
-            await deleteFromCloudinary(templateToDelete.background.cloudinaryPublicId);
-          }
-        } catch (cloudinaryError) {
-          console.error('Error deleting images from Cloudinary:', cloudinaryError);
-          // Continue with template deletion even if Cloudinary deletion fails
-        }
-
         // Delete the template
         await BadgeTemplate.findByIdAndDelete(id);
-        res.status(200).json({ message: 'Template and associated images deleted successfully' });
+        res.status(200).json({ message: 'Template deleted successfully' });
         break;
 
       default:
