@@ -172,15 +172,18 @@ export default function RegistrationReport() {
         try {
           const dateToUse = date || record.eventEndDate;
           if (!dateToUse) return '-';
-          const dateObj = new Date(dateToUse);
+          // Parse DD-MM-YY to Date
+          const [day, month, year] = dateToUse.split('-');
+          if (!day || !month || !year) return '-';
+          // Assume 20xx for years < 50, 19xx for years >= 50
+          const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+          const dateObj = new Date(`${fullYear}-${month}-${day}`);
           if (isNaN(dateObj.getTime())) return '-';
           return dateObj.toLocaleDateString('en-GB', {
             day: '2-digit',
             month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          }).replace(',', '');
+            year: 'numeric'
+          });
         } catch (error) {
           console.error('Error formatting date:', error);
           return '-';
