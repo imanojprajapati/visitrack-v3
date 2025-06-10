@@ -37,7 +37,7 @@ interface FormattedVisitor {
   status: VisitorStatus;
   checkInTime: string;
   checkOutTime?: string;
-  formData?: Record<string, { label: string; value: any }>;
+  additionalData?: Record<string, { label: string; value: any }>;
   createdAt: string;
   updatedAt: string;
 }
@@ -177,13 +177,173 @@ export default async function handler(
             query['additionalData.source.value'] = { $regex: source as string, $options: 'i' };
           }
           
-          // Date range filter for registration date
+          // Date range filter for event date
           if (startDate && endDate) {
             try {
               const start = new Date(startDate as string);
+              start.setHours(0, 0, 0, 0);
               const end = new Date(endDate as string);
               end.setHours(23, 59, 59, 999);
-              query.createdAt = { $gte: start, $lte: end };
+              
+              console.log('Filtering by event date range:', {
+                startDate: start.toISOString(),
+                endDate: end.toISOString(),
+                startDateParam: startDate,
+                endDateParam: endDate
+              });
+              
+              // Build match conditions for aggregation
+              const matchConditions: any = {
+                // Filter events that occur within the specified date range
+                // Event start date should be <= end date of filter range
+                // Event end date should be >= start date of filter range
+                $and: [
+                  { 'eventData.startDate': { $lte: end } },
+                  { 'eventData.endDate': { $gte: start } }
+                ]
+              };
+              
+              // Add other filters to the aggregation match
+              if (eventId) {
+                matchConditions.eventId = new mongoose.Types.ObjectId(eventId as string);
+              }
+              if (name) {
+                matchConditions.$or = [
+                  { name: { $regex: name as string, $options: 'i' } },
+                  { 'additionalData.name.value': { $regex: name as string, $options: 'i' } }
+                ];
+              }
+              if (email) {
+                matchConditions.$or = [
+                  { email: { $regex: email as string, $options: 'i' } },
+                  { 'additionalData.email.value': { $regex: email as string, $options: 'i' } }
+                ];
+              }
+              if (phone) {
+                matchConditions.$or = [
+                  { phone: { $regex: phone as string, $options: 'i' } },
+                  { 'additionalData.phone.value': { $regex: phone as string, $options: 'i' } }
+                ];
+              }
+              if (company) {
+                matchConditions.$or = [
+                  { company: { $regex: company as string, $options: 'i' } },
+                  { 'additionalData.company.value': { $regex: company as string, $options: 'i' } }
+                ];
+              }
+              if (location) {
+                matchConditions.eventLocation = { $regex: location as string, $options: 'i' };
+              }
+              if (status) {
+                matchConditions.status = status as string;
+              }
+              if (city) {
+                matchConditions['additionalData.city.value'] = { $regex: city as string, $options: 'i' };
+              }
+              if (state) {
+                matchConditions['additionalData.state.value'] = { $regex: state as string, $options: 'i' };
+              }
+              if (country) {
+                matchConditions['additionalData.country.value'] = { $regex: country as string, $options: 'i' };
+              }
+              if (pincode) {
+                matchConditions.$or = [
+                  { 'additionalData.pinCode.value': { $regex: pincode as string, $options: 'i' } },
+                  { 'additionalData.pincode.value': { $regex: pincode as string, $options: 'i' } }
+                ];
+              }
+              if (source) {
+                matchConditions['additionalData.source.value'] = { $regex: source as string, $options: 'i' };
+              }
+              
+              // Filter by event date range using aggregation pipeline
+              const visitors = await Visitor.aggregate([
+                {
+                  $lookup: {
+                    from: 'events',
+                    localField: 'eventId',
+                    foreignField: '_id',
+                    as: 'eventData'
+                  }
+                },
+                {
+                  $unwind: '$eventData'
+                },
+                {
+                  $match: matchConditions
+                },
+                {
+                  $lookup: {
+                    from: 'events',
+                    localField: 'eventId',
+                    foreignField: '_id',
+                    as: 'eventId'
+                  }
+                },
+                {
+                  $unwind: '$eventId'
+                },
+                {
+                  $sort: { createdAt: -1 }
+                }
+              ]);
+
+              console.log(`Found ${visitors.length} visitors for events in date range`);
+              
+              // Debug: Check first visitor's additionalData
+              if (visitors.length > 0) {
+                console.log('First visitor additionalData:', JSON.stringify(visitors[0].additionalData, null, 2));
+              }
+
+              // Format the aggregated results
+              const formattedVisitors = visitors.map(visitor => {
+                try {
+                  const formatted: FormattedVisitor = {
+                    _id: visitor._id.toString(),
+                    name: visitor.name,
+                    email: visitor.email,
+                    phone: visitor.phone,
+                    company: visitor.company,
+                    age: visitor.age,
+                    eventId: visitor.eventId ? {
+                      _id: visitor.eventId._id.toString(),
+                      title: visitor.eventId.title,
+                      location: visitor.eventId.location,
+                      startDate: new Date(visitor.eventId.startDate).toISOString(),
+                      endDate: new Date(visitor.eventId.endDate).toISOString()
+                    } : null,
+                    eventName: visitor.eventId?.title || '',
+                    eventLocation: visitor.eventId?.location || '',
+                    eventStartDate: visitor.eventId?.startDate ? new Date(visitor.eventId.startDate).toISOString() : '',
+                    eventEndDate: visitor.eventId?.endDate ? new Date(visitor.eventId.endDate).toISOString() : '',
+                    status: visitor.status,
+                    checkInTime: new Date(visitor.checkInTime || visitor.createdAt).toISOString(),
+                    createdAt: new Date(visitor.createdAt).toISOString(),
+                    updatedAt: new Date(visitor.updatedAt).toISOString()
+                  };
+
+                  // Handle optional fields
+                  if (visitor.checkOutTime) {
+                    formatted.checkOutTime = new Date(visitor.checkOutTime).toISOString();
+                  }
+                  
+                  // Convert additionalData to the format expected by frontend
+                  if (visitor.additionalData) {
+                    formatted.additionalData = visitor.additionalData as Record<string, { label: string; value: any }>;
+                  } else {
+                    formatted.additionalData = {};
+                  }
+
+                  return formatted;
+                } catch (error) {
+                  console.error('Error formatting visitor:', error);
+                  throw new ApiError(500, 'Error formatting visitor data');
+                }
+              });
+
+              // Set cache control headers
+              res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=59');
+              return res.status(200).json(formattedVisitors);
             } catch (error) {
               throw new ApiError(400, 'Invalid date range format');
             }
@@ -237,7 +397,9 @@ export default async function handler(
                 formatted.checkOutTime = new Date(populatedVisitor.checkOutTime).toISOString();
               }
               if (populatedVisitor.additionalData) {
-                formatted.formData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
+                formatted.additionalData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
+              } else {
+                formatted.additionalData = {};
               }
 
               return formatted;
@@ -315,7 +477,9 @@ export default async function handler(
             formattedVisitor.checkOutTime = new Date(populatedVisitor.checkOutTime).toISOString();
           }
           if (populatedVisitor.additionalData) {
-            formattedVisitor.formData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
+            formattedVisitor.additionalData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
+          } else {
+            formattedVisitor.additionalData = {};
           }
 
           return res.status(201).json(formattedVisitor);

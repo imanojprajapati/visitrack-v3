@@ -104,6 +104,16 @@ export default function RegistrationReport() {
       const response = await fetch(`/api/visitors?${queryParams.toString()}`);
       if (!response.ok) throw new Error('Failed to fetch visitors');
       const data = await response.json();
+      
+      // Debug: Check first visitor's event date data
+      if (data.length > 0) {
+        console.log('First visitor event data:', {
+          eventStartDate: data[0].eventStartDate,
+          eventEndDate: data[0].eventEndDate,
+          eventName: data[0].eventName
+        });
+      }
+      
       setVisitors(data);
       setPagination(prev => ({
         ...prev,
@@ -251,21 +261,36 @@ export default function RegistrationReport() {
         try {
           const dateToUse = date || record.eventEndDate;
           if (!dateToUse) return '-';
-          // Parse DD-MM-YY to Date
+          
+          // Handle ISO date format (2024-01-15T00:00:00.000Z)
+          const dateObj = new Date(dateToUse);
+          if (!isNaN(dateObj.getTime())) {
+            return dateObj.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric'
+            });
+          }
+          
+          // Fallback: try to parse DD-MM-YY format
           const [day, month, year] = dateToUse.split('-');
-          if (!day || !month || !year) return '-';
-          // Assume 20xx for years < 50, 19xx for years >= 50
-          const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-          const dateObj = new Date(`${fullYear}-${month}-${day}`);
-          if (isNaN(dateObj.getTime())) return '-';
-          return dateObj.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-          });
+          if (day && month && year) {
+            const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+            const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
+            if (!isNaN(fallbackDateObj.getTime())) {
+              return fallbackDateObj.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+              });
+            }
+          }
+          
+          return dateToUse || '-';
         } catch (error) {
-          console.error('Error formatting date:', error);
-          return '-';
+          console.error('Error formatting event date:', error);
+          const dateToUse = date || record.eventEndDate;
+          return dateToUse || '-';
         }
       },
       width: 120,
@@ -346,16 +371,27 @@ export default function RegistrationReport() {
       try {
         const dateToUse = visitor.eventStartDate || visitor.eventEndDate;
         if (dateToUse) {
-          const [day, month, year] = dateToUse.split('-');
-          if (day && month && year) {
-            const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-            const dateObj = new Date(`${fullYear}-${month}-${day}`);
-            if (!isNaN(dateObj.getTime())) {
-              eventDate = dateObj.toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-              });
+          // Handle ISO date format (2024-01-15T00:00:00.000Z)
+          const dateObj = new Date(dateToUse);
+          if (!isNaN(dateObj.getTime())) {
+            eventDate = dateObj.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: 'short',
+              year: 'numeric'
+            });
+          } else {
+            // Fallback: try to parse DD-MM-YY format
+            const [day, month, year] = dateToUse.split('-');
+            if (day && month && year) {
+              const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+              const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
+              if (!isNaN(fallbackDateObj.getTime())) {
+                eventDate = fallbackDateObj.toLocaleDateString('en-GB', {
+                  day: '2-digit',
+                  month: 'short',
+                  year: 'numeric'
+                });
+              }
             }
           }
         }
@@ -601,12 +637,17 @@ export default function RegistrationReport() {
               </Select>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <RangePicker
-                onChange={handleDateRangeChange}
-                style={{ width: '100%' }}
-                placeholder={['Start Date', 'End Date']}
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div>
+                <RangePicker
+                  onChange={handleDateRangeChange}
+                  style={{ width: '100%' }}
+                  placeholder={['Event Start Date', 'Event End Date']}
+                  className="hover:border-blue-400 focus:border-blue-400"
+                />
+                <div className="text-xs text-gray-500 mt-1">
+                  Filter by when events occur (not registration date)
+                </div>
+              </div>
             </Col>
           </Row>
           
@@ -652,7 +693,7 @@ export default function RegistrationReport() {
                     onClose={() => handleDateRangeChange(null)}
                     className="text-xs"
                   >
-                    Date Range: {filters.dateRange[0]} to {filters.dateRange[1]}
+                    Event Occurrence: {filters.dateRange[0]} to {filters.dateRange[1]}
                   </Tag>
                 )}
               </div>
