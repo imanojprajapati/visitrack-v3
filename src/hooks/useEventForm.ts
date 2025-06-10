@@ -80,6 +80,14 @@ export function useEventForm() {
         return false;
       }
 
+      // Validate end date
+      console.log('Date validation:', { startDate, endDate });
+      if (endDate && endDate < startDate) {
+        console.log('Date validation failed:', { startDate, endDate });
+        messageApi?.error('End date must be after or equal to start date');
+        return false;
+      }
+
       // Validate times
       const startTime = dayjs(`2000-01-01 ${values.time}`);
       const endTime = dayjs(`2000-01-01 ${values.endTime}`);
@@ -87,10 +95,28 @@ export function useEventForm() {
         messageApi?.error('Please enter valid times in HH:mm format');
         return false;
       }
-      if (endTime.isBefore(startTime)) {
-        messageApi?.error('End time must be after start time');
+      // Only validate time order if dates are the same
+      if (startDate === endDate && endTime.isBefore(startTime)) {
+        messageApi?.error('End time must be after start time for same day events');
         return false;
       }
+
+      // Convert time formats from 12-hour to 24-hour format
+      const convertTo24HourFormat = (time12h: string): string => {
+        const [time, modifier] = time12h.split(' ');
+        let [hours, minutes] = time.split(':');
+        
+        if (hours === '12') {
+          hours = modifier === 'AM' ? '00' : '12';
+        } else if (modifier === 'PM') {
+          hours = (parseInt(hours, 10) + 12).toString();
+        }
+        
+        return `${hours.padStart(2, '0')}:${minutes}`;
+      };
+
+      const convertedStartTime = convertTo24HourFormat(values.time);
+      const convertedEndTime = convertTo24HourFormat(values.endTime);
 
       // Create properly typed event input
       const formattedData: CreateEventInput = {
@@ -98,8 +124,8 @@ export function useEventForm() {
         location: values.venue.trim(),
         startDate,
         endDate,
-        time: values.time,
-        endTime: values.endTime,
+        time: convertedStartTime,
+        endTime: convertedEndTime,
         status: values.status,
         capacity: Math.max(1, Number(values.capacity) || 0),
         description: values.description?.trim(),

@@ -71,6 +71,22 @@ export default async function handler(
 ) {
   const { eventId } = req.query;
 
+  // Helper function to convert 12-hour time format to 24-hour format
+  const convertTo24HourFormat = (time12h: string): string => {
+    const [time, modifier] = time12h.split(' ');
+    let [hours, minutes] = time.split(':');
+    
+    if (hours === '12') {
+      hours = '00';
+    }
+    
+    if (modifier === 'PM') {
+      hours = (parseInt(hours, 10) + 12).toString();
+    }
+    
+    return `${hours.padStart(2, '0')}:${minutes}`;
+  };
+
   if (!eventId || typeof eventId !== 'string') {
     console.error('Invalid event ID provided:', eventId);
     return res.status(400).json({ message: 'Invalid event ID' });
@@ -197,6 +213,7 @@ export default async function handler(
 
       case 'PUT':
         const updates = req.body;
+        console.log('Received update data:', updates);
 
         // Validate request body
         if (!updates || typeof updates !== 'object') {
@@ -208,16 +225,53 @@ export default async function handler(
         for (const field of dateFields) {
           if (updates[field]) {
             try {
-              const date = new Date(updates[field]);
+              let date;
+              // Handle different date formats
+              if (typeof updates[field] === 'object' && updates[field].$d) {
+                // Dayjs object
+                date = new Date(updates[field].$d);
+              } else if (typeof updates[field] === 'string') {
+                // ISO string
+                date = new Date(updates[field]);
+              } else if (updates[field] instanceof Date) {
+                // Already a Date object
+                date = updates[field];
+              } else {
+                // Try to parse as string
+                date = new Date(updates[field]);
+              }
+              
               if (isNaN(date.getTime())) {
+                console.error(`Invalid ${field} format:`, updates[field]);
                 return res.status(400).json({ message: `Invalid ${field} format` });
               }
               updates[field] = date;
             } catch (error) {
+              console.error(`Error converting ${field}:`, error);
               return res.status(400).json({ message: `Invalid ${field} format` });
             }
           }
         }
+
+        // Handle banner field - extract URL from fileList if needed
+        if (updates.banner && Array.isArray(updates.banner) && updates.banner.length > 0) {
+          const bannerFile = updates.banner[0];
+          if (bannerFile.response && bannerFile.response.url) {
+            updates.banner = bannerFile.response.url;
+          } else if (bannerFile.url) {
+            updates.banner = bannerFile.url;
+          }
+        }
+
+        // Convert time formats from 12-hour to 24-hour format
+        if (updates.time) {
+          updates.time = convertTo24HourFormat(updates.time);
+        }
+        if (updates.endTime) {
+          updates.endTime = convertTo24HourFormat(updates.endTime);
+        }
+
+        console.log('Processed updates:', updates);
 
         // Update event
         const updatedEvent = await Event.findByIdAndUpdate(

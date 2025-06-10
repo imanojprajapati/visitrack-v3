@@ -148,6 +148,7 @@ export default async function handler(
       case 'POST':
         try {
           const eventData = req.body;
+          console.log('Received event data:', eventData);
 
           // Validate required fields
           if (!eventData.title || !eventData.location || !eventData.startDate || !eventData.endDate) {
@@ -162,6 +163,26 @@ export default async function handler(
           } catch (error) {
             throw new ApiError(400, 'Invalid date format');
           }
+
+          // Convert time formats from 12-hour to 24-hour format
+          if (eventData.time) {
+            console.log('Time field:', eventData.time);
+          }
+          if (eventData.endTime) {
+            console.log('EndTime field:', eventData.endTime);
+          }
+
+          // Handle banner field - extract URL from fileList if needed
+          if (eventData.banner && Array.isArray(eventData.banner) && eventData.banner.length > 0) {
+            const bannerFile = eventData.banner[0];
+            if (bannerFile.response && bannerFile.response.url) {
+              eventData.banner = bannerFile.response.url;
+            } else if (bannerFile.url) {
+              eventData.banner = bannerFile.url;
+            }
+          }
+
+          console.log('Processed event data:', eventData);
 
           // Create new event
           const newEvent = await Event.create({

@@ -189,9 +189,9 @@ eventSchema.pre('save', function(next) {
     return;
   }
 
-  // Ensure end date is after start date
+  // Ensure end date is after or equal to start date
   if (this.endDate < this.startDate) {
-    next(new Error('End date must be after start date'));
+    next(new Error('End date must be after or equal to start date'));
     return;
   }
 

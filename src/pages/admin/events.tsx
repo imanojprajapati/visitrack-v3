@@ -49,7 +49,7 @@ export interface FormValues {
 
 export default function EventManagement() {
   const { messageApi } = useAppContext();
-  const { form, handleSubmit, handleImageUpload } = useEventForm();
+  const { form, handleSubmit, handleImageUpload, isSubmitting } = useEventForm();
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
@@ -137,8 +137,21 @@ export default function EventManagement() {
     form.resetFields();
     setModalVisible(false);
     setIsViewMode(false);
+    setSelectedEvent(null);
     refreshEvents(false); // Refresh events after modal closes without showing message
   };
+
+  // Set form values when selectedEvent changes (for editing)
+  useEffect(() => {
+    if (modalVisible && selectedEvent && !isViewMode) {
+      console.log('Setting form values for editing:', selectedEvent);
+      const initialValues = getInitialValues(selectedEvent);
+      console.log('Initial values:', initialValues);
+      if (initialValues) {
+        form.setFieldsValue(initialValues);
+      }
+    }
+  }, [modalVisible, selectedEvent, isViewMode, form]);
 
   const handleDeleteEvent = async (eventId: string) => {
     try {
@@ -256,6 +269,7 @@ export default function EventManagement() {
             type="text" 
             icon={<EditOutlined />}
             onClick={() => {
+              console.log('Edit button clicked for event:', record);
               setSelectedEvent(record);
               setIsViewMode(false);
               setModalVisible(true);
@@ -302,7 +316,7 @@ export default function EventManagement() {
       capacity: event.capacity,
       description: event.description,
       registrationDeadline: event.registrationDeadline ? dayjs(event.registrationDeadline) : undefined,
-      banner: fileList
+      banner: fileList as any // Type assertion to fix TypeScript error
     };
   };
 
@@ -583,14 +597,6 @@ export default function EventManagement() {
                     label="End Date"
                     rules={[
                       { required: true, message: 'Please select the event end date' },
-                      ({ getFieldValue }) => ({
-                        validator(_, value) {
-                          if (!value || !getFieldValue('date') || value.isAfter(getFieldValue('date'))) {
-                            return Promise.resolve();
-                          }
-                          return Promise.reject(new Error('End date must be after start date'));
-                        },
-                      }),
                     ]}
                   >
                     <DatePicker 
@@ -672,13 +678,22 @@ export default function EventManagement() {
                   listType="picture-card"
                   maxCount={1}
                   accept="image/*"
-                  fileList={form.getFieldValue('banner') ? [{
-                    uid: '-1',
-                    name: 'banner.jpg',
-                    status: 'done',
-                    url: form.getFieldValue('banner'),
-                    response: { url: form.getFieldValue('banner') }
-                  }] : []}
+                  fileList={(() => {
+                    const bannerValue = form.getFieldValue('banner');
+                    if (Array.isArray(bannerValue) && bannerValue.length > 0) {
+                      return bannerValue;
+                    }
+                    if (typeof bannerValue === 'string' && bannerValue) {
+                      return [{
+                        uid: '-1',
+                        name: 'banner.jpg',
+                        status: 'done',
+                        url: bannerValue,
+                        response: { url: bannerValue }
+                      }];
+                    }
+                    return [];
+                  })()}
                   showUploadList={{
                     showPreviewIcon: true,
                     showRemoveIcon: true,
@@ -705,17 +720,21 @@ export default function EventManagement() {
                     handleImageUpload(info);
                   }}
                 >
-                  {(!form.getFieldValue('banner') || form.getFieldValue('banner').length === 0) && (
-                    <div>
-                      <PlusOutlined />
-                      <div style={{ marginTop: 8 }}>Upload</div>
-                    </div>
-                  )}
+                  {(() => {
+                    const bannerValue = form.getFieldValue('banner');
+                    const hasBanner = Array.isArray(bannerValue) ? bannerValue.length > 0 : !!bannerValue;
+                    return !hasBanner && (
+                      <div>
+                        <PlusOutlined />
+                        <div style={{ marginTop: 8 }}>Upload</div>
+                      </div>
+                    );
+                  })()}
                 </Upload>
               </Form.Item>
               <Form.Item>
                 <Space wrap>
-                  <Button type="primary" htmlType="submit">
+                  <Button type="primary" htmlType="submit" loading={isSubmitting}>
                     {selectedEvent ? 'Update Event' : 'Create Event'}
                   </Button>
                   <Button onClick={() => {
