@@ -64,6 +64,8 @@ const QRScanner: React.FC = () => {
     pageSize: 10,
     total: 0,
   });
+  // Print loading state for individual buttons
+  const [printingVisitors, setPrintingVisitors] = useState<Set<string>>(new Set());
 
   // Initialize QR scanner when modal opens
   useEffect(() => {
@@ -432,9 +434,48 @@ const QRScanner: React.FC = () => {
   };
 
   const handlePrint = async (visitor: VisitorEntry) => {
-    if (badgeRef.current) {
-      // TODO: Implement badge printing logic
-      message.success('Badge printed successfully!');
+    try {
+      // Set loading state for this specific visitor
+      setPrintingVisitors(prev => new Set(prev).add(visitor.visitorId));
+      
+      // Call the API to generate and download the badge PDF
+      const response = await fetch('/api/visitors/print-badge', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          visitorId: visitor.visitorId
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to generate badge');
+      }
+
+      // Download the PDF
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `badge-${visitor.visitorId}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      message.success('Badge downloaded successfully!');
+    } catch (error) {
+      console.error('Error generating badge:', error);
+      message.error(error instanceof Error ? error.message : 'Failed to generate badge');
+    } finally {
+      // Clear loading state for this specific visitor
+      setPrintingVisitors(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(visitor.visitorId);
+        return newSet;
+      });
     }
   };
 
@@ -662,6 +703,7 @@ const QRScanner: React.FC = () => {
             type="primary"
             icon={<PrinterOutlined />}
             onClick={() => handlePrint(record)}
+            loading={printingVisitors.has(record.visitorId)}
           >
             Print Badge
           </Button>

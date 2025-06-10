@@ -238,19 +238,39 @@ export default function RegistrationReport() {
       ...allAdditionalKeys.map(key => visitor.additionalData?.[key]?.value || ''),
       visitor.eventName,
       visitor.eventLocation,
-      visitor.eventStartDate ? new Date(visitor.eventStartDate).toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      }) : '-',
+      visitor.eventStartDate ? (() => {
+        try {
+          const [day, month, year] = visitor.eventStartDate.split('-');
+          if (!day || !month || !year) return '-';
+          const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+          const dateObj = new Date(`${fullYear}-${month}-${day}`);
+          if (isNaN(dateObj.getTime())) return '-';
+          return dateObj.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+        } catch (error) {
+          return '-';
+        }
+      })() : '-',
       visitor.status,
-      visitor.createdAt ? new Date(visitor.createdAt).toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      }).replace(',', '') : '-'
+      visitor.createdAt ? (() => {
+        try {
+          const [day, month, year] = visitor.createdAt.split('-');
+          if (!day || !month || !year) return '-';
+          const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+          const dateObj = new Date(`${fullYear}-${month}-${day}`);
+          if (isNaN(dateObj.getTime())) return '-';
+          return dateObj.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+        } catch (error) {
+          return '-';
+        }
+      })() : '-'
     ]);
     const csvContent = [
       headers.join(','),
