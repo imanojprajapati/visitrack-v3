@@ -20,7 +20,7 @@ interface FormattedEvent {
   endDate: string;
 }
 
-type VisitorStatus = 'registered' | 'checked_in' | 'checked_out' | 'cancelled' | 'Visited';
+type VisitorStatus = 'registered' | 'Visited';
 
 interface FormattedVisitor {
   _id: string;
@@ -86,7 +86,23 @@ export default async function handler(
     switch (req.method) {
       case 'GET':
         try {
-          const { eventId, date } = req.query;
+          const { 
+            eventId, 
+            date, 
+            name, 
+            email, 
+            phone, 
+            company,
+            city, 
+            state, 
+            country, 
+            pincode,
+            source,
+            location,
+            status,
+            startDate,
+            endDate
+          } = req.query;
 
           // Validate eventId if provided
           if (eventId && !mongoose.Types.ObjectId.isValid(eventId as string)) {
@@ -95,9 +111,85 @@ export default async function handler(
 
           // Build query
           const query: any = {};
+          
+          // Basic filters
           if (eventId) {
             query.eventId = new mongoose.Types.ObjectId(eventId as string);
           }
+          
+          if (name) {
+            query.$or = [
+              { name: { $regex: name as string, $options: 'i' } },
+              { 'additionalData.name.value': { $regex: name as string, $options: 'i' } }
+            ];
+          }
+          
+          if (email) {
+            query.$or = [
+              { email: { $regex: email as string, $options: 'i' } },
+              { 'additionalData.email.value': { $regex: email as string, $options: 'i' } }
+            ];
+          }
+          
+          if (phone) {
+            query.$or = [
+              { phone: { $regex: phone as string, $options: 'i' } },
+              { 'additionalData.phone.value': { $regex: phone as string, $options: 'i' } }
+            ];
+          }
+          
+          if (company) {
+            query.$or = [
+              { company: { $regex: company as string, $options: 'i' } },
+              { 'additionalData.company.value': { $regex: company as string, $options: 'i' } }
+            ];
+          }
+          
+          if (location) {
+            query.eventLocation = { $regex: location as string, $options: 'i' };
+          }
+          
+          if (status) {
+            query.status = status as string;
+          }
+          
+          // Additional data filters (from form fields)
+          if (city) {
+            query['additionalData.city.value'] = { $regex: city as string, $options: 'i' };
+          }
+          
+          if (state) {
+            query['additionalData.state.value'] = { $regex: state as string, $options: 'i' };
+          }
+          
+          if (country) {
+            query['additionalData.country.value'] = { $regex: country as string, $options: 'i' };
+          }
+          
+          if (pincode) {
+            query.$or = [
+              { 'additionalData.pinCode.value': { $regex: pincode as string, $options: 'i' } },
+              { 'additionalData.pincode.value': { $regex: pincode as string, $options: 'i' } }
+            ];
+          }
+          
+          if (source) {
+            query['additionalData.source.value'] = { $regex: source as string, $options: 'i' };
+          }
+          
+          // Date range filter for registration date
+          if (startDate && endDate) {
+            try {
+              const start = new Date(startDate as string);
+              const end = new Date(endDate as string);
+              end.setHours(23, 59, 59, 999);
+              query.createdAt = { $gte: start, $lte: end };
+            } catch (error) {
+              throw new ApiError(400, 'Invalid date range format');
+            }
+          }
+          
+          // Single date filter (for backward compatibility)
           if (date) {
             try {
               const startDate = new Date(date as string);
@@ -113,7 +205,7 @@ export default async function handler(
           // Fetch visitors with populated event data
           const visitors = await Visitor.find(query)
             .populate<{ eventId: IEvent }>('eventId', 'title location startDate endDate')
-            .sort({ checkInTime: -1 })
+            .sort({ createdAt: -1 })
             .lean()
             .exec();
 

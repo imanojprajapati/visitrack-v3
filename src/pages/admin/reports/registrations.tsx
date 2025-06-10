@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Input, Select, Space, Button, DatePicker, message, Row, Col, Typography } from 'antd';
+import { Table, Card, Input, Select, Space, Button, DatePicker, message, Row, Col, Typography, Tag } from 'antd';
 import { SearchOutlined, ReloadOutlined, DownloadOutlined, FilterOutlined } from '@ant-design/icons';
 import { Event } from '../../../types/event';
 
@@ -58,6 +58,17 @@ export default function RegistrationReport() {
     };
   }, []);
 
+  // Auto-apply filters when they change (with debounce)
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        fetchVisitors();
+      }
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [filters, mounted]);
+
   const fetchEvents = async () => {
     try {
       const response = await fetch('/api/events');
@@ -74,13 +85,17 @@ export default function RegistrationReport() {
     setLoading(true);
     try {
       const queryParams = new URLSearchParams();
+      
+      // Add all filters to query parameters
       Object.entries(filters).forEach(([key, value]) => {
         if (value && key !== 'dateRange') {
-          if (typeof value === 'string') {
-            queryParams.append(key, value);
+          if (typeof value === 'string' && value.trim() !== '') {
+            queryParams.append(key, value.trim());
           }
         }
       });
+      
+      // Handle date range filter
       if (filters.dateRange) {
         queryParams.append('startDate', filters.dateRange[0]);
         queryParams.append('endDate', filters.dateRange[1]);
@@ -92,6 +107,7 @@ export default function RegistrationReport() {
       setVisitors(data);
       setPagination(prev => ({
         ...prev,
+        current: 1, // Reset to first page when filtering
         total: data.length,
       }));
     } catch (error) {
@@ -103,11 +119,11 @@ export default function RegistrationReport() {
   };
 
   const handleFilterChange = (key: string, value: string | null) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+    setFilters(prev => ({ ...prev, [key]: value || '' }));
   };
 
   const handleDateRangeChange = (dates: any) => {
-    if (dates) {
+    if (dates && dates[0] && dates[1]) {
       setFilters(prev => ({
         ...prev,
         dateRange: [dates[0].format('YYYY-MM-DD'), dates[1].format('YYYY-MM-DD')]
@@ -133,7 +149,8 @@ export default function RegistrationReport() {
       status: '',
       dateRange: null,
     });
-    fetchVisitors();
+    // Fetch all visitors after reset
+    setTimeout(() => fetchVisitors(), 100);
   };
 
   // Calculate paginated data
@@ -260,9 +277,8 @@ export default function RegistrationReport() {
       render: (status: string) => (
         <span className={`capitalize ${
           status === 'registered' ? 'text-green-600' :
-          status === 'checked_in' ? 'text-blue-600' :
-          status === 'checked_out' ? 'text-gray-600' :
-          'text-red-600'
+          status === 'Visited' ? 'text-red-600' :
+          'text-black-600'
         }`}>
           {status.replace('_', ' ')}
         </span>
@@ -442,8 +458,9 @@ export default function RegistrationReport() {
                     type="primary"
                     onClick={fetchVisitors}
                     icon={<SearchOutlined />}
+                    loading={loading}
                   >
-                    Apply Filters
+                    Refresh
                   </Button>
                 </Space>
               </div>
@@ -536,6 +553,7 @@ export default function RegistrationReport() {
                 style={{ width: '100%' }}
                 className="hover:border-blue-400 focus:border-blue-400"
               >
+                <Select.Option value="Website">Website</Select.Option>
                 <Select.Option value="manual">Manual</Select.Option>
                 <Select.Option value="scan">Scan</Select.Option>
               </Select>
@@ -559,7 +577,10 @@ export default function RegistrationReport() {
                 className="hover:border-blue-400 focus:border-blue-400"
               >
                 <Select.Option value="registered">Registered</Select.Option>
-                <Select.Option value="visited">Visited</Select.Option>
+                <Select.Option value="checked_in">Checked In</Select.Option>
+                <Select.Option value="checked_out">Checked Out</Select.Option>
+                <Select.Option value="Visited">Visited</Select.Option>
+                <Select.Option value="cancelled">Cancelled</Select.Option>
               </Select>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
@@ -588,6 +609,55 @@ export default function RegistrationReport() {
               />
             </Col>
           </Row>
+          
+          {/* Active Filters Summary */}
+          {Object.entries(filters).some(([key, value]) => value && key !== 'dateRange') && (
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <FilterOutlined className="text-blue-600 mr-2" />
+                  <Text strong className="text-blue-800">Active Filters:</Text>
+                </div>
+                <Button 
+                  size="small" 
+                  type="link" 
+                  onClick={handleReset}
+                  className="text-blue-600 hover:text-blue-800"
+                >
+                  Clear All
+                </Button>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {Object.entries(filters).map(([key, value]) => {
+                  if (value && key !== 'dateRange') {
+                    const label = key.charAt(0).toUpperCase() + key.slice(1);
+                    return (
+                      <Tag 
+                        key={key} 
+                        color="blue" 
+                        closable 
+                        onClose={() => handleFilterChange(key, '')}
+                        className="text-xs"
+                      >
+                        {label}: {value}
+                      </Tag>
+                    );
+                  }
+                  return null;
+                })}
+                {filters.dateRange && (
+                  <Tag 
+                    color="blue" 
+                    closable 
+                    onClose={() => handleDateRangeChange(null)}
+                    className="text-xs"
+                  >
+                    Date Range: {filters.dateRange[0]} to {filters.dateRange[1]}
+                  </Tag>
+                )}
+              </div>
+            </div>
+          )}
         </Card>
       )}
 
