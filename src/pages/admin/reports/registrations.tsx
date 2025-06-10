@@ -153,16 +153,78 @@ export default function RegistrationReport() {
   }));
 
   const columns = [
-    ...additionalDataColumns,
     {
-      title: 'Event',
-      dataIndex: 'eventName',
-      key: 'eventName',
+      title: 'Full Name',
+      dataIndex: 'name',
+      key: 'name',
+      render: (name: string, record: Visitor) => name || record.additionalData?.name?.value || '-',
+      width: 150,
+    },
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+      render: (email: string, record: Visitor) => email || record.additionalData?.email?.value || '-',
+      width: 200,
+    },
+    {
+      title: 'Phone Number',
+      dataIndex: 'phone',
+      key: 'phone',
+      render: (phone: string, record: Visitor) => phone || record.additionalData?.phone?.value || '-',
+      width: 130,
+    },
+    {
+      title: 'Company',
+      dataIndex: 'company',
+      key: 'company',
+      render: (company: string, record: Visitor) => 
+        company || record.additionalData?.company?.value || '-',
+      width: 150,
+    },
+    {
+      title: 'City',
+      key: 'city',
+      render: (_: any, record: Visitor) => record.additionalData?.city?.value || '-',
+      width: 100,
+    },
+    {
+      title: 'State',
+      key: 'state',
+      render: (_: any, record: Visitor) => record.additionalData?.state?.value || '-',
+      width: 100,
+    },
+    {
+      title: 'Country',
+      key: 'country',
+      render: (_: any, record: Visitor) => record.additionalData?.country?.value || '-',
+      width: 100,
+    },
+    {
+      title: 'Pincode',
+      key: 'pincode',
+      render: (_: any, record: Visitor) => record.additionalData?.pinCode?.value || record.additionalData?.pincode?.value || '-',
+      width: 100,
+    },
+    {
+      title: 'Source',
+      key: 'source',
+      render: (_: any, record: Visitor) => record.additionalData?.source?.value || '-',
+      width: 100,
     },
     {
       title: 'Location',
       dataIndex: 'eventLocation',
       key: 'eventLocation',
+      render: (location: string) => location || '-',
+      width: 150,
+    },
+    {
+      title: 'Event',
+      dataIndex: 'eventName',
+      key: 'eventName',
+      render: (eventName: string) => eventName || '-',
+      width: 150,
     },
     {
       title: 'Event Date',
@@ -181,7 +243,7 @@ export default function RegistrationReport() {
           if (isNaN(dateObj.getTime())) return '-';
           return dateObj.toLocaleDateString('en-GB', {
             day: '2-digit',
-            month: '2-digit',
+            month: 'short',
             year: 'numeric'
           });
         } catch (error) {
@@ -189,6 +251,7 @@ export default function RegistrationReport() {
           return '-';
         }
       },
+      width: 120,
     },
     {
       title: 'Status',
@@ -204,6 +267,7 @@ export default function RegistrationReport() {
           {status.replace('_', ' ')}
         </span>
       ),
+      width: 120,
     },
     {
       title: 'Registration Date',
@@ -212,78 +276,127 @@ export default function RegistrationReport() {
       render: (date: string) => {
         try {
           if (!date) return '-';
-          const dateObj = new Date(date);
-          if (isNaN(dateObj.getTime())) return '-';
-          return dateObj.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-          }).replace(',', '');
+          // Parse DD-MM-YY format and convert to readable format
+          const [day, month, year] = date.split('-');
+          if (day && month && year) {
+            const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+            const dateObj = new Date(`${fullYear}-${month}-${day}`);
+            if (!isNaN(dateObj.getTime())) {
+              return dateObj.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+              });
+            }
+          }
+          return date || '-';
         } catch (error) {
-          console.error('Error formatting date:', error);
-          return '-';
+          console.error('Error formatting registration date:', error);
+          return date || '-';
         }
       },
+      width: 140,
     },
   ];
 
   const handleExport = () => {
     const headers = [
-      ...allAdditionalKeys.map(key => visitors[0]?.additionalData?.[key]?.label || key),
-      'Event', 'Location', 'Date', 'Status', 'Registration Date'
+      'Full Name',
+      'Email',
+      'Phone Number',
+      'Company',
+      'City',
+      'State',
+      'Country',
+      'Pincode',
+      'Source',
+      'Location',
+      'Event',
+      'Event Date',
+      'Status',
+      'Registration Date'
     ];
-    const csvData = visitors.map(visitor => [
-      ...allAdditionalKeys.map(key => visitor.additionalData?.[key]?.value || ''),
-      visitor.eventName,
-      visitor.eventLocation,
-      visitor.eventStartDate ? (() => {
-        try {
-          const [day, month, year] = visitor.eventStartDate.split('-');
-          if (!day || !month || !year) return '-';
-          const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-          const dateObj = new Date(`${fullYear}-${month}-${day}`);
-          if (isNaN(dateObj.getTime())) return '-';
-          return dateObj.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-          });
-        } catch (error) {
-          return '-';
+
+    const csvData = visitors.map(visitor => {
+      // Format event date
+      let eventDate = '-';
+      try {
+        const dateToUse = visitor.eventStartDate || visitor.eventEndDate;
+        if (dateToUse) {
+          const [day, month, year] = dateToUse.split('-');
+          if (day && month && year) {
+            const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+            const dateObj = new Date(`${fullYear}-${month}-${day}`);
+            if (!isNaN(dateObj.getTime())) {
+              eventDate = dateObj.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+              });
+            }
+          }
         }
-      })() : '-',
-      visitor.status,
-      visitor.createdAt ? (() => {
-        try {
+      } catch (error) {
+        console.error('Error formatting event date:', error);
+        eventDate = visitor.eventStartDate || '-';
+      }
+
+      // Format registration date
+      let registrationDate = '-';
+      try {
+        if (visitor.createdAt) {
           const [day, month, year] = visitor.createdAt.split('-');
-          if (!day || !month || !year) return '-';
-          const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-          const dateObj = new Date(`${fullYear}-${month}-${day}`);
-          if (isNaN(dateObj.getTime())) return '-';
-          return dateObj.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-          });
-        } catch (error) {
-          return '-';
+          if (day && month && year) {
+            const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+            const dateObj = new Date(`${fullYear}-${month}-${day}`);
+            if (!isNaN(dateObj.getTime())) {
+              registrationDate = dateObj.toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+              });
+            }
+          }
         }
-      })() : '-'
-    ]);
+      } catch (error) {
+        console.error('Error formatting registration date:', error);
+        registrationDate = visitor.createdAt || '-';
+      }
+
+      return [
+        visitor.name || visitor.additionalData?.name?.value || '',
+        visitor.email || visitor.additionalData?.email?.value || '',
+        visitor.phone || visitor.additionalData?.phone?.value || '',
+        visitor.company || visitor.additionalData?.company?.value || '',
+        visitor.additionalData?.city?.value || '',
+        visitor.additionalData?.state?.value || '',
+        visitor.additionalData?.country?.value || '',
+        visitor.additionalData?.pinCode?.value || visitor.additionalData?.pincode?.value || '',
+        visitor.additionalData?.source?.value || '',
+        visitor.eventLocation || '',
+        visitor.eventName || '',
+        eventDate,
+        visitor.status.replace('_', ' '),
+        registrationDate
+      ];
+    });
+
     const csvContent = [
       headers.join(','),
-      ...csvData.map(row => row.join(','))
+      ...csvData.map(row => row.map(cell => 
+        typeof cell === 'string' ? `"${cell.replace(/"/g, '""')}"` : cell
+      ).join(','))
     ].join('\n');
+
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `visitor-report-${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `registration-report-${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    message.success('Export completed successfully');
   };
 
   if (!mounted) {
