@@ -3,7 +3,7 @@ import { EventForm } from '../types/form';
 
 interface IFormField {
   id: string;
-  type: 'text' | 'email' | 'number' | 'tel' | 'date' | 'select' | 'textarea';
+  type: 'text' | 'email' | 'number' | 'tel' | 'phone' | 'date' | 'select' | 'textarea';
   label: string;
   required: boolean;
   placeholder?: string;
@@ -37,7 +37,7 @@ const formFieldSchema = new mongoose.Schema<IFormField>({
   },
   type: {
     type: String,
-    enum: ['text', 'email', 'number', 'tel', 'date', 'select', 'textarea'],
+    enum: ['text', 'email', 'number', 'tel', 'phone', 'date', 'select', 'textarea'],
     required: true
   },
   label: {
@@ -186,5 +186,10 @@ formSchema.pre('save', function(next) {
   next();
 });
 
-const Form: Model<IForm> = mongoose.models.Form || mongoose.model<IForm>('Form', formSchema);
+// Force model recompilation to clear cached schema
+if (mongoose.models.Form) {
+  delete mongoose.models.Form;
+}
+
+const Form: Model<IForm> = mongoose.model<IForm>('Form', formSchema);
 export default Form; 

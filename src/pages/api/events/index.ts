@@ -79,7 +79,7 @@ export default async function handler(
     switch (req.method) {
       case 'GET':
         try {
-          const { status } = req.query;
+          const { status, admin } = req.query;
           const query: any = {};
 
           // Handle status filter
@@ -90,13 +90,18 @@ export default async function handler(
             query.status = status;
           }
 
+          // Filter out events where end date has passed (only for public pages, not admin)
+          if ((status === 'upcoming' || !status) && !admin) {
+            query.endDate = { $gte: new Date() };
+          }
+
           // Add error handling for the query
           if (status && !['upcoming', 'published', 'draft', 'cancelled'].includes(status as string)) {
             throw new ApiError(400, 'Invalid status filter');
           }
 
           const events = await Event.find(query)
-            .sort({ startDate: 1 })
+            .sort({ startDate: 1 }) // Sort by start date: nearest to latest (6/25/25 to 12/12/25)
             .lean()
             .exec();
 

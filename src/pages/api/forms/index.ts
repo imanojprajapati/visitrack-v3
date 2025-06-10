@@ -33,6 +33,9 @@ export default async function handler(
 
     try {
       const { eventId, title, fields } = req.body;
+      
+      console.log('Creating form with fields:', fields);
+      console.log('Field types:', fields.map((f: any) => f.type));
 
       // Validate required fields
       if (!eventId || !title || !fields || !Array.isArray(fields)) {

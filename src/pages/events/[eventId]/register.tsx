@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Image from 'next/image';
-import { Card, Input, Button, message, Steps, Form, Typography, Space, Divider, Result, Spin, Alert } from 'antd';
+import { Card, Input, Button, message, Steps, Form, Typography, Space, Divider, Result, Spin, Alert, Modal } from 'antd';
 import { MailOutlined, SafetyOutlined, UserOutlined, QrcodeOutlined, DownloadOutlined } from '@ant-design/icons';
 import { QRCodeSVG } from 'qrcode.react';
 import { jsPDF } from 'jspdf';
@@ -102,6 +102,23 @@ export default function EventRegistration() {
 
       if (!eventData) {
         throw new Error('Event not found');
+      }
+
+      // Check if registration deadline has passed
+      if (eventData.registrationDeadline) {
+        const now = new Date();
+        const registrationDeadline = new Date(eventData.registrationDeadline);
+        
+        if (now > registrationDeadline) {
+          Modal.info({
+            title: 'Registration Closed',
+            content: 'You are able to register for this event at the event location and event date with pay to entry badge.',
+            onOk() {
+              router.push('/events');
+            },
+          });
+          return;
+        }
       }
 
       // Validate event data

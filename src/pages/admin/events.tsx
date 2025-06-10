@@ -69,7 +69,7 @@ export default function EventManagement() {
     try {
       setIsRefreshing(true);
       setError(null);
-      const response = await fetch('/api/events');
+      const response = await fetch('/api/events?admin=true');
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.message || 'Failed to fetch events');

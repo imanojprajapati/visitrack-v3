@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import VideoBackground from '../components/VideoBackground';
 import { Event } from '../types/event';
+import { message, Modal } from 'antd';
 
 interface Feature {
   title: string;
@@ -103,6 +104,30 @@ const Home = () => {
     }
   };
 
+  const handleRegisterClick = (event: Event) => {
+    const now = new Date();
+    const registrationDeadline = event.registrationDeadline ? new Date(event.registrationDeadline) : null;
+    
+    // Check if registration deadline has passed
+    if (registrationDeadline && now > registrationDeadline) {
+      Modal.info({
+        title: 'Registration Closed',
+        content: 'You are able to register for this event at the event location and event date with pay to entry badge.',
+        okText: 'OK',
+      });
+      return;
+    }
+    
+    // If registration is still open, proceed to registration page
+    window.location.href = `/events/${event._id}/register`;
+  };
+
+  const isRegistrationClosed = (event: Event) => {
+    const now = new Date();
+    const registrationDeadline = event.registrationDeadline ? new Date(event.registrationDeadline) : null;
+    return registrationDeadline && now > registrationDeadline;
+  };
+
   if (!mounted) {
     return null;
   }
@@ -182,12 +207,26 @@ const Home = () => {
                   <p className="text-gray-500 text-sm mb-4 line-clamp-2">
                     {event.description}
                   </p>
-                  <Link
-                    href={`/events/${event._id}/register`}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA]"
-                  >
-                    Register Now
-                  </Link>
+                  {event.registrationDeadline && (
+                    <p className="text-gray-500 text-sm mb-2">
+                      Registration Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}
+                    </p>
+                  )}
+                  {isRegistrationClosed(event) ? (
+                    <button
+                      onClick={() => handleRegisterClick(event)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
+                    >
+                      Registration Closed
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => handleRegisterClick(event)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA] cursor-pointer"
+                    >
+                      Register Now
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
