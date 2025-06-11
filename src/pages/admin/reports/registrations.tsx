@@ -14,12 +14,26 @@ interface Visitor {
   email: string;
   phone: string;
   company?: string;
+  age?: number;
+  city?: string;
+  state?: string;
+  country?: string;
+  pincode?: string;
+  source?: string;
+  location?: string;
+  qrCode: string;
   eventName: string;
   eventLocation: string;
   eventStartDate: string;
   eventEndDate: string;
+  eventStartTime: string;
+  eventEndTime: string;
   status: string;
+  scanTime?: Date;
+  checkInTime?: string;
+  checkOutTime?: string;
   createdAt: string;
+  updatedAt: string;
   additionalData: Record<string, { label: string; value: any }>;
 }
 
@@ -180,6 +194,11 @@ export default function RegistrationReport() {
     key,
     render: (_: any, record: Visitor) => record.additionalData?.[key]?.value || '-',
   }));
+
+  // Debug: Log the additional data columns
+  console.log('Table Debug - Additional data keys:', allAdditionalKeys);
+  console.log('Table Debug - Additional data columns:', additionalDataColumns);
+  console.log('Table Debug - Total visitors with additional data:', visitors.filter(v => v.additionalData && Object.keys(v.additionalData).length > 0).length);
 
   const columns = [
     {
@@ -350,24 +369,78 @@ export default function RegistrationReport() {
   ];
 
   const handleExport = () => {
+    // Define the basic database fields that are already included in the export
+    const basicFields = [
+      'name', 'email', 'phone', 'company', 'age', 'city', 'state', 
+      'country', 'pincode', 'source', 'location', 'qrCode', 'eventName', 
+      'eventLocation', 'eventStartDate', 'eventEndDate', 'eventStartTime', 
+      'eventEndTime', 'status', 'scanTime', 'checkInTime', 'checkOutTime', 
+      'createdAt', 'updatedAt', 'registrationDate'
+    ];
+
+    // Collect all unique additional data keys and their labels from all visitors
+    // but exclude those that are already covered by basic fields
+    const additionalDataMap = new Map<string, string>();
+    
+    visitors.forEach(visitor => {
+      if (visitor.additionalData) {
+        Object.entries(visitor.additionalData).forEach(([key, data]) => {
+          if (data && data.label) {
+            // Only include additional data fields that are not already in basic fields
+            if (!basicFields.includes(key)) {
+              additionalDataMap.set(key, data.label);
+            }
+          }
+        });
+      }
+    });
+    
+    const allAdditionalKeys = Array.from(additionalDataMap.keys());
+    
+    // Enhanced Debug: Log the additional data collection
+    console.log('Export Debug - Total visitors:', visitors.length);
+    console.log('Export Debug - Basic fields:', basicFields);
+    console.log('Export Debug - Additional data keys found (excluding duplicates):', allAdditionalKeys);
+    console.log('Export Debug - Additional data map:', Object.fromEntries(additionalDataMap));
+    
+    // Sample all visitors' additional data for debugging
+    visitors.forEach((visitor, index) => {
+      console.log(`Export Debug - Visitor ${index + 1} (${visitor.name}) additional data:`, visitor.additionalData);
+    });
+    
+    // Create headers including all database fields and unique additional data fields
     const headers = [
       'Full Name',
-      'Email',
+      'Email', 
       'Phone Number',
       'Company',
+      'Age',
       'City',
       'State',
       'Country',
       'Pincode',
       'Source',
-      'Location',
+      'QR Code',
       'Event',
-      'Event Date',
+      'Event Location',
+      'Event Start Date',
+      'Event End Date',
+      'Registration Date',
+      'Event Start Time',
+      'Event End Time',
       'Status',
-      'Registration Date'
+      'Scan Time',
+      'Check In Time',
+      'Check Out Time',
+      'Last Updated',
+      // Add only unique additional data fields that are not already covered
+      ...allAdditionalKeys.map(key => additionalDataMap.get(key) || key)
     ];
 
-    const csvData = visitors.map(visitor => {
+    console.log('Export Debug - Total headers:', headers.length);
+    console.log('Export Debug - Headers:', headers);
+
+    const csvData = visitors.map((visitor, index) => {
       // Format event date
       let eventDate = '-';
       try {
@@ -430,22 +503,97 @@ export default function RegistrationReport() {
         registrationDate = visitor.createdAt || '-';
       }
 
-      return [
+      // Format scan time
+      let scanTime = '-';
+      try {
+        if (visitor.scanTime) {
+          const dateObj = new Date(visitor.scanTime);
+          if (!isNaN(dateObj.getTime())) {
+            scanTime = dateObj.toLocaleString('en-GB');
+          }
+        }
+      } catch (error) {
+        console.error('Error formatting scan time:', error);
+      }
+
+      // Format last updated date
+      let lastUpdated = '-';
+      try {
+        if (visitor.updatedAt) {
+          // Handle ISO date format
+          const dateObj = new Date(visitor.updatedAt);
+          if (!isNaN(dateObj.getTime())) {
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const year = dateObj.getFullYear();
+            lastUpdated = `${day}/${month}/${year}`;
+          } else {
+            // Fallback: try to parse DD-MM-YY format
+            const [day, month, year] = visitor.updatedAt.split('-');
+            if (day && month && year) {
+              const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+              const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
+              if (!isNaN(fallbackDateObj.getTime())) {
+                lastUpdated = `${day}/${month}/${fullYear}`;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error formatting last updated date:', error);
+        lastUpdated = visitor.updatedAt || '-';
+      }
+
+      // Base row data with all database fields
+      const baseRow = [
         visitor.name || visitor.additionalData?.name?.value || '',
         visitor.email || visitor.additionalData?.email?.value || '',
         visitor.phone || visitor.additionalData?.phone?.value || '',
         visitor.company || visitor.additionalData?.company?.value || '',
-        visitor.additionalData?.city?.value || '',
-        visitor.additionalData?.state?.value || '',
-        visitor.additionalData?.country?.value || '',
-        visitor.additionalData?.pinCode?.value || visitor.additionalData?.pincode?.value || '',
-        visitor.additionalData?.source?.value || '',
-        visitor.eventLocation || '',
+        visitor.age || visitor.additionalData?.age?.value || '',
+        visitor.city || visitor.additionalData?.city?.value || '',
+        visitor.state || visitor.additionalData?.state?.value || '',
+        visitor.country || visitor.additionalData?.country?.value || '',
+        visitor.pincode || visitor.additionalData?.pincode?.value || '',
+        visitor.source || visitor.additionalData?.source?.value || '',
+        visitor.qrCode || '',
         visitor.eventName || '',
-        eventDate,
+        visitor.eventLocation || '',
+        visitor.eventStartDate || '',
+        visitor.eventEndDate || '',
+        registrationDate,
+        visitor.eventStartTime || '',
+        visitor.eventEndTime || '',
         visitor.status.replace('_', ' '),
-        registrationDate
+        scanTime,
+        visitor.checkInTime || '',
+        visitor.checkOutTime || '',
+        lastUpdated
       ];
+
+      // Add only unique additional data values (excluding those already in basic fields)
+      const additionalDataValues = allAdditionalKeys.map(key => {
+        const value = visitor.additionalData?.[key]?.value || '';
+        return value;
+      });
+
+      const finalRow = [...baseRow, ...additionalDataValues];
+      
+      // Debug: Log the row data for first few visitors
+      if (index < 3) {
+        console.log(`Export Debug - Row ${index + 1} (${visitor.name}) data:`, {
+          baseRowLength: baseRow.length,
+          additionalDataLength: additionalDataValues.length,
+          finalRowLength: finalRow.length,
+          additionalDataValues: additionalDataValues,
+          expectedHeadersLength: headers.length,
+          registrationDate: registrationDate,
+          visitorCreatedAt: visitor.createdAt,
+          visitorAdditionalData: visitor.additionalData
+        });
+      }
+
+      return finalRow;
     });
 
     const csvContent = [
@@ -454,6 +602,9 @@ export default function RegistrationReport() {
         typeof cell === 'string' ? `"${cell.replace(/"/g, '""')}"` : cell
       ).join(','))
     ].join('\n');
+
+    console.log('Export Debug - CSV content preview (first 500 chars):', csvContent.substring(0, 500));
+    console.log('Export Debug - CSV content length:', csvContent.length);
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
