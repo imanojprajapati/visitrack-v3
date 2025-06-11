@@ -37,23 +37,11 @@ Content-Type: application/json
   "success": true,
   "message": "Visitor checked in successfully",
   "visitor": {
-    "_id": "507f1f77bcf86cd799439011",
+    "id": "507f1f77bcf86cd799439011",
     "name": "John Doe",
-    "email": "john@example.com",
-    "phone": "+1234567890",
+    "event": "Tech Conference 2024",
     "company": "Tech Corp",
-    "eventName": "Tech Conference 2024",
-    "eventLocation": "Convention Center",
-    "eventStartDate": "15-01-24",
-    "eventEndDate": "16-01-24",
-    "eventStartTime": "09:00",
-    "eventEndTime": "17:00",
-    "status": "Visited",
-    "checkInTime": "15-01-24 10:30",
-    "additionalData": {
-      "city": { "label": "City", "value": "New York" },
-      "state": { "label": "State", "value": "NY" }
-    }
+    "city": "Convention Center"
   },
   "scanRecord": {
     "_id": "507f1f77bcf86cd799439012",
@@ -76,20 +64,11 @@ Content-Type: application/json
   "success": false,
   "message": "Visitor is already checked in",
   "visitor": {
-    "_id": "507f1f77bcf86cd799439011",
+    "id": "507f1f77bcf86cd799439011",
     "name": "John Doe",
-    "email": "john@example.com",
-    "phone": "+1234567890",
+    "event": "Tech Conference 2024",
     "company": "Tech Corp",
-    "eventName": "Tech Conference 2024",
-    "eventLocation": "Convention Center",
-    "eventStartDate": "15-01-24",
-    "eventEndDate": "16-01-24",
-    "eventStartTime": "09:00",
-    "eventEndTime": "17:00",
-    "status": "Visited",
-    "checkInTime": "15-01-24 10:30",
-    "additionalData": {}
+    "city": "Convention Center"
   }
 }
 ```
@@ -125,7 +104,7 @@ Content-Type: application/json
 4. **Status Check**: API checks if the visitor is already checked in
 5. **Status Update**: If not checked in, updates visitor status to "Visited"
 6. **Scan Record**: Creates a record in the qrscans collection
-7. **Response**: Returns visitor details and scan record
+7. **Response**: Returns simplified visitor details and scan record
 
 ## Electron App Integration Example
 
@@ -150,8 +129,9 @@ const scanQRCode = async (qrData) => {
     if (data.success) {
       // Visitor checked in successfully
       console.log(`Welcome ${data.visitor.name}!`);
-      console.log(`Event: ${data.visitor.eventName}`);
-      console.log(`Check-in time: ${data.visitor.checkInTime}`);
+      console.log(`Event: ${data.visitor.event}`);
+      console.log(`Company: ${data.visitor.company}`);
+      console.log(`City: ${data.visitor.city}`);
       
       // Display success message in your Electron app
       showSuccessMessage(`Welcome ${data.visitor.name}!`);
