@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Table, Card, Input, Select, Space, Button, DatePicker, message, Row, Col, Typography, Tag } from 'antd';
-import { SearchOutlined, ReloadOutlined, DownloadOutlined, FilterOutlined } from '@ant-design/icons';
+import { SearchOutlined, ReloadOutlined, DownloadOutlined, FilterOutlined, ImportOutlined } from '@ant-design/icons';
 import { Event } from '../../../types/event';
+import ImportRegistrationsModal from '../../../components/ImportRegistrationsModal';
 
 const { RangePicker } = DatePicker;
 const { Title, Text } = Typography;
@@ -27,6 +28,7 @@ export default function RegistrationReport() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -464,6 +466,12 @@ export default function RegistrationReport() {
     message.success('Export completed successfully');
   };
 
+  const handleImportSuccess = () => {
+    setShowImportModal(false);
+    fetchVisitors(); // Refresh the data after import
+    message.success('Registrations imported successfully!');
+  };
+
   if (!mounted) {
     return null;
   }
@@ -721,6 +729,13 @@ export default function RegistrationReport() {
               Filter
             </Button>
             <Button
+              icon={<ImportOutlined />}
+              onClick={() => setShowImportModal(true)}
+              type="default"
+            >
+              Import
+            </Button>
+            <Button
               icon={<DownloadOutlined />}
               onClick={handleExport}
               type="default"
@@ -788,6 +803,14 @@ export default function RegistrationReport() {
           </div>
         </div>
       </Card>
+
+      {/* Import Modal */}
+      <ImportRegistrationsModal
+        visible={showImportModal}
+        onCancel={() => setShowImportModal(false)}
+        onSuccess={handleImportSuccess}
+        events={events}
+      />
 
       <style jsx global>{`
         .visitor-table {

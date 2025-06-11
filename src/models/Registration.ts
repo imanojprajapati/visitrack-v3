@@ -4,7 +4,7 @@ export interface IRegistration extends Document {
   eventId: mongoose.Types.ObjectId;
   formId: mongoose.Types.ObjectId;
   formData: Record<string, any>;
-  status: 'registered' | 'checked_in' | 'checked_out' | 'cancelled';
+  status: 'registered' | 'checked_in' | 'checked_out' | 'cancelled' | 'visited';
   checkInTime?: Date;
   checkOutTime?: Date;
   createdAt: Date;
@@ -28,7 +28,7 @@ const registrationSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['registered', 'checked_in', 'checked_out', 'cancelled'],
+    enum: ['registered', 'checked_in', 'checked_out', 'cancelled', 'visited'],
     default: 'registered'
   },
   checkInTime: {

@@ -9,6 +9,12 @@ export interface IVisitor extends Document {
   phone: string;                           // Visitor's phone
   company: string;                         // Visitor's company
   age?: number;                            // Visitor's age
+  city?: string;                           // Visitor's city
+  state?: string;                          // Visitor's state
+  country?: string;                        // Visitor's country
+  pincode?: string;                        // Visitor's pincode
+  source?: string;                         // Visitor's source
+  location?: string;                       // Visitor's location
   qrCode: string;                          // QR code for visitor check-in
   eventName: string;                       // Event name (denormalized for easy querying)
   eventLocation: string;                   // Event location (denormalized)
@@ -100,6 +106,24 @@ const visitorSchema = new mongoose.Schema<IVisitor>({
   },
   age: {
     type: Number,
+  },
+  city: {
+    type: String,
+  },
+  state: {
+    type: String,
+  },
+  country: {
+    type: String,
+  },
+  pincode: {
+    type: String,
+  },
+  source: {
+    type: String,
+  },
+  location: {
+    type: String,
   },
   qrCode: {
     type: String,
