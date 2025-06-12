@@ -90,7 +90,14 @@ const formatDate = (dateStr: any) => {
     if (parts.length === 3) {
       const day = parts[0].padStart(2, '0');
       const month = parts[1].padStart(2, '0');
-      const year = parts[2].length === 2 ? (Number(parts[2]) < 50 ? '20' + parts[2] : '19' + parts[2]) : parts[2];
+      let year = parts[2];
+      
+      // Convert 2-digit year to 4-digit year
+      if (year.length === 2) {
+        const yearNum = Number(year);
+        year = yearNum < 50 ? '20' + year : '19' + year;
+      }
+      
       return `${day}-${month}-${year}`;
     }
   }
@@ -121,8 +128,8 @@ const formatDate = (dateStr: any) => {
 const formatTime = (timeStr: string) => {
   if (!timeStr) {
     const now = new Date();
-    const hours = String(now.getUTCHours()).padStart(2, '0');
-    const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
     return `${hours}:${minutes}`;
   }
   return timeStr;
@@ -184,14 +191,14 @@ export default async function handler(
       qrCode: 'QR-TEST',
       eventName: 'Test Event',
       eventLocation: 'Test Location',
-      eventStartDate: '15-01-24',
-      eventEndDate: '15-01-24',
+      eventStartDate: '15-01-2024',
+      eventEndDate: '15-01-2024',
       eventStartTime: '09:00',
       eventEndTime: '17:00',
       status: 'registered',
       additionalData: {},
-      createdAt: '15-01-24',
-      updatedAt: '15-01-24'
+      createdAt: '15-01-2024',
+      updatedAt: '15-01-2024'
     });
     
     // Validate the test visitor (don't save it)

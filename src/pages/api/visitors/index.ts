@@ -317,14 +317,25 @@ export default async function handler(
                     eventStartDate: visitor.eventId?.startDate ? formatDateToDDMMYYYY(parseDateString(visitor.eventId.startDate)) : '',
                     eventEndDate: visitor.eventId?.endDate ? formatDateToDDMMYYYY(parseDateString(visitor.eventId.endDate)) : '',
                     status: visitor.status,
-                    checkInTime: parseDateString(visitor.checkInTime || visitor.createdAt).toISOString(),
-                    createdAt: parseDateString(visitor.createdAt).toISOString(),
-                    updatedAt: parseDateString(visitor.updatedAt).toISOString()
+                    checkInTime: (() => {
+                      const parsed = parseDateString(visitor.checkInTime || visitor.createdAt);
+                      return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
+                    })(),
+                    createdAt: (() => {
+                      const parsed = parseDateString(visitor.createdAt);
+                      return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
+                    })(),
+                    updatedAt: (() => {
+                      const parsed = parseDateString(visitor.updatedAt);
+                      return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
+                    })(),
+                    additionalData: {}
                   };
 
                   // Handle optional fields
                   if (visitor.checkOutTime) {
-                    formatted.checkOutTime = parseDateString(visitor.checkOutTime).toISOString();
+                    const parsed = parseDateString(visitor.checkOutTime);
+                    formatted.checkOutTime = parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
                   }
                   
                   // Convert additionalData to the format expected by frontend
@@ -391,15 +402,25 @@ export default async function handler(
                 eventLocation: populatedVisitor.eventLocation,
                 eventStartDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventStartDate)),
                 eventEndDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventEndDate)),
-                checkInTime: parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
-                createdAt: parseDateString(populatedVisitor.createdAt).toISOString(),
-                updatedAt: parseDateString(populatedVisitor.updatedAt).toISOString(),
+                checkInTime: (() => {
+                  const parsed = parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt);
+                  return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
+                })(),
+                createdAt: (() => {
+                  const parsed = parseDateString(populatedVisitor.createdAt);
+                  return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
+                })(),
+                updatedAt: (() => {
+                  const parsed = parseDateString(populatedVisitor.updatedAt);
+                  return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
+                })(),
                 additionalData: {}
               };
 
               // Handle optional fields
               if (populatedVisitor.checkOutTime) {
-                formatted.checkOutTime = parseDateString(populatedVisitor.checkOutTime).toISOString();
+                const parsed = parseDateString(populatedVisitor.checkOutTime);
+                formatted.checkOutTime = parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
               }
               if (populatedVisitor.additionalData) {
                 formatted.additionalData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
@@ -476,15 +497,25 @@ export default async function handler(
             eventLocation: populatedVisitor.eventLocation,
             eventStartDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventStartDate)),
             eventEndDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventEndDate)),
-            checkInTime: parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
-            createdAt: parseDateString(populatedVisitor.createdAt).toISOString(),
-            updatedAt: parseDateString(populatedVisitor.updatedAt).toISOString(),
+            checkInTime: (() => {
+              const parsed = parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt);
+              return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
+            })(),
+            createdAt: (() => {
+              const parsed = parseDateString(populatedVisitor.createdAt);
+              return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
+            })(),
+            updatedAt: (() => {
+              const parsed = parseDateString(populatedVisitor.updatedAt);
+              return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
+            })(),
             additionalData: {}
           };
 
           // Handle optional fields
           if (populatedVisitor.checkOutTime) {
-            formattedVisitor.checkOutTime = parseDateString(populatedVisitor.checkOutTime).toISOString();
+            const parsed = parseDateString(populatedVisitor.checkOutTime);
+            formattedVisitor.checkOutTime = parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
           }
           if (populatedVisitor.additionalData) {
             formattedVisitor.additionalData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
@@ -515,43 +546,42 @@ export default async function handler(
   }
 }
 
-// Helper function to parse DD-MM-YY or DD-MM-YYYY format to Date object
-const parseDateString = (dateStr: string): Date => {
+// Helper function to parse DD-MM-YY or DD-MM-YYYY format to Date object or return string as-is
+const parseDateString = (dateStr: string): Date | string => {
   if (!dateStr) return new Date();
   
   // Debug: Log the input date string
   console.log('parseDateString input:', dateStr, 'type:', typeof dateStr);
   
-  // Check if it's in DD-MM-YYYY format first
+  // Check if it's in DD-MM-YYYY format first - return as-is for string operations
   const ddMMYYYYRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/;
   if (ddMMYYYYRegex.test(dateStr)) {
+    // For DD-MM-YYYY, we'll handle it as a string in formatDateToDDMMYYYY
+    // Just return a Date object for compatibility, but it won't be used for DD-MM-YYYY
     const parts = dateStr.split('-');
-    const day = parseInt(parts[0], 10);  // First part is day
-    const month = parseInt(parts[1], 10) - 1; // Second part is month (0-indexed)
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
     const year = parseInt(parts[2], 10);
-    
-    // Create date with correct order: year, month, day
     const date = new Date(year, month, day);
     console.log(`parseDateString: DD-MM-YYYY format - ${dateStr} -> day: ${day}, month: ${month + 1}, year: ${year} -> ${date.toISOString()}`);
     return date;
   }
   
-  // Check if it's in DD-MM-YY format
+  // Check if it's in DD-MM-YY format - convert to DD-MM-YYYY as string
   const ddMMYYRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/;
   if (ddMMYYRegex.test(dateStr)) {
     const parts = dateStr.split('-');
-    const day = parseInt(parts[0], 10);  // First part is day
-    const month = parseInt(parts[1], 10) - 1; // Second part is month (0-indexed)
+    const day = parts[0];
+    const month = parts[1];
     const yearStr = parts[2];
     
     // Convert 2-digit year to 4-digit year
     const yearNum = parseInt(yearStr, 10);
-    const year = yearNum < 50 ? 2000 + yearNum : 1900 + yearNum;
+    const year = yearNum < 50 ? '20' + yearStr : '19' + yearStr;
     
-    // Create date with correct order: year, month, day
-    const date = new Date(year, month, day);
-    console.log(`parseDateString: DD-MM-YY format - ${dateStr} -> day: ${day}, month: ${month + 1}, year: ${year} -> ${date.toISOString()}`);
-    return date;
+    const convertedDate = `${day}-${month}-${year}`;
+    console.log(`parseDateString: DD-MM-YY format - ${dateStr} -> ${convertedDate}`);
+    return convertedDate;
   }
   
   // Check if it's already in ISO format
@@ -566,9 +596,31 @@ const parseDateString = (dateStr: string): Date => {
 };
 
 // Helper function to format date to DD-MM-YYYY format
-const formatDateToDDMMYYYY = (date: Date): string => {
-  const day = date.getDate().toString().padStart(2, '0');
-  const month = (date.getMonth() + 1).toString().padStart(2, '0');
-  const year = date.getFullYear().toString();
-  return `${day}-${month}-${year}`;
+const formatDateToDDMMYYYY = (date: Date | string): string => {
+  // If it's already a string in DD-MM-YYYY format, return it
+  if (typeof date === 'string' && /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(date)) {
+    return date;
+  }
+  
+  // If it's a Date object, format it
+  if (date instanceof Date) {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear().toString();
+    return `${day}-${month}-${year}`;
+  }
+  
+  // If it's a string but not in DD-MM-YYYY format, try to parse it
+  if (typeof date === 'string') {
+    const parsedDate = new Date(date);
+    if (!isNaN(parsedDate.getTime())) {
+      const day = parsedDate.getDate().toString().padStart(2, '0');
+      const month = (parsedDate.getMonth() + 1).toString().padStart(2, '0');
+      const year = parsedDate.getFullYear().toString();
+      return `${day}-${month}-${year}`;
+    }
+  }
+  
+  // Fallback
+  return '';
 }; 
