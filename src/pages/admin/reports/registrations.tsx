@@ -50,6 +50,7 @@ export default function RegistrationReport() {
     status: '',
     dateRange: null as [string, string] | null,
   });
+  const [exportLoading, setExportLoading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -182,28 +183,42 @@ export default function RegistrationReport() {
   }));
 
   // Helper function to parse DD-MM-YYYY format to Date object
-  const parseDateString = (dateStr: string): Date => {
+  const parseDateString = (dateStr: string): Date | string => {
     if (!dateStr) return new Date();
+    
+    // Check if it's in DD-MM-YYYY format first - return as-is to avoid timezone issues
+    const ddMMYYYYRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/;
+    if (ddMMYYYYRegex.test(dateStr)) {
+      // For DD-MM-YYYY, return the string as-is to avoid timezone conversion
+      console.log(`parseDateString: DD-MM-YYYY format - returning as-is: ${dateStr}`);
+      return dateStr;
+    }
+    
+    // Check if it's in DD-MM-YY format - convert to DD-MM-YYYY as string
+    const ddMMYYRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/;
+    if (ddMMYYRegex.test(dateStr)) {
+      const parts = dateStr.split('-');
+      const day = parts[0];
+      const month = parts[1];
+      const yearStr = parts[2];
+      
+      // Convert 2-digit year to 4-digit year
+      const yearNum = parseInt(yearStr, 10);
+      const year = yearNum < 50 ? '20' + yearStr : '19' + yearStr;
+      
+      const convertedDate = `${day}-${month}-${year}`;
+      console.log(`parseDateString: DD-MM-YY format - ${dateStr} -> ${convertedDate}`);
+      return convertedDate;
+    }
     
     // Check if it's already in ISO format
     const isoDate = new Date(dateStr);
     if (!isNaN(isoDate.getTime())) {
+      console.log('parseDateString: ISO format detected, returning:', isoDate.toISOString());
       return isoDate;
     }
     
-    // Parse DD-MM-YYYY format
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0], 10);  // First part is day
-      const month = parseInt(parts[1], 10) - 1; // Second part is month (0-indexed)
-      const year = parseInt(parts[2], 10);
-      
-      // Create date with correct order: year, month, day
-      const date = new Date(year, month, day);
-      console.log(`parseDateString: DD-MM-YYYY format - ${dateStr} -> day: ${day}, month: ${month + 1}, year: ${year} -> ${date.toISOString()}`);
-      return date;
-    }
-    
+    console.log('parseDateString: No valid format detected, returning current date');
     return new Date();
   };
 
@@ -381,88 +396,64 @@ export default function RegistrationReport() {
     },
   ];
 
-  const handleExport = () => {
-    const headers = [
-      'Full Name',
-      'Email',
-      'Phone Number',
-      'Company',
-      'City',
-      'State',
-      'Country',
-      'Pincode',
-      'Source',
-      'Location',
-      'Event',
-      'Event Date',
-      'Status',
-      'Registration Date'
-    ];
-
-    const csvData = visitors.map(visitor => {
-      // Format event date
-      let eventDate = '-';
-      try {
-        const dateToUse = visitor.eventStartDate || visitor.eventEndDate;
-        if (dateToUse) {
-          const parsedDate = parseDateString(dateToUse);
-          const day = String(parsedDate.getDate()).padStart(2, '0');
-          const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-          const year = parsedDate.getFullYear();
-          eventDate = `${day}/${month}/${year}`;
-        }
-      } catch (error) {
-        console.error('Error formatting event date:', error);
+  const handleExport = async () => {
+    try {
+      setExportLoading(true);
+      
+      // Build query parameters based on current filters
+      const params = new URLSearchParams();
+      
+      // Add search filters
+      if (filters.name) params.append('name', filters.name);
+      if (filters.email) params.append('email', filters.email);
+      if (filters.phone) params.append('phone', filters.phone);
+      if (filters.company) params.append('company', filters.company);
+      if (filters.city) params.append('city', filters.city);
+      if (filters.state) params.append('state', filters.state);
+      if (filters.country) params.append('country', filters.country);
+      if (filters.pincode) params.append('pincode', filters.pincode);
+      if (filters.source) params.append('source', filters.source);
+      if (filters.location) params.append('location', filters.location);
+      if (filters.status) params.append('status', filters.status);
+      
+      // Add date range filter
+      if (filters.dateRange && filters.dateRange.length === 2) {
+        const [startDate, endDate] = filters.dateRange;
+        params.append('startDate', startDate);
+        params.append('endDate', endDate);
       }
-
-      // Format registration date
-      let registrationDate = '-';
-      try {
-        if (visitor.createdAt) {
-          const parsedDate = parseDateString(visitor.createdAt);
-          const day = String(parsedDate.getDate()).padStart(2, '0');
-          const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
-          const year = parsedDate.getFullYear();
-          registrationDate = `${day}/${month}/${year}`;
-        }
-      } catch (error) {
-        console.error('Error formatting registration date:', error);
+      
+      // Add format parameter (default to xlsx for better formatting)
+      params.append('format', 'xlsx');
+      
+      // Call the API endpoint
+      const response = await fetch(`/api/visitors/export?${params.toString()}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Export failed');
       }
-
-      return [
-        visitor.name || visitor.additionalData?.name?.value || '',
-        visitor.email || visitor.additionalData?.email?.value || '',
-        visitor.phone || visitor.additionalData?.phone?.value || '',
-        visitor.company || visitor.additionalData?.company?.value || '',
-        visitor.additionalData?.city?.value || '',
-        visitor.additionalData?.state?.value || '',
-        visitor.additionalData?.country?.value || '',
-        visitor.additionalData?.pinCode?.value || visitor.additionalData?.pincode?.value || '',
-        visitor.additionalData?.source?.value || '',
-        visitor.eventLocation || '',
-        visitor.eventName || '',
-        eventDate,
-        visitor.status.replace('_', ' '),
-        registrationDate
-      ];
-    });
-
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.map(cell => 
-        typeof cell === 'string' ? `"${cell.replace(/"/g, '""')}"` : cell
-      ).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `registration-report-${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    message.success('Export completed successfully');
+      
+      // Get the file blob
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `registration-report-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      message.success('Export completed successfully');
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      message.error(error instanceof Error ? error.message : 'Failed to export data');
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const handleImportSuccess = () => {
@@ -738,8 +729,9 @@ export default function RegistrationReport() {
               icon={<DownloadOutlined />}
               onClick={handleExport}
               type="default"
+              loading={exportLoading}
             >
-              Export CSV
+              Export XLSX
             </Button>
           </Space>
         </div>

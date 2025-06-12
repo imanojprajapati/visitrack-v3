@@ -553,18 +553,12 @@ const parseDateString = (dateStr: string): Date | string => {
   // Debug: Log the input date string
   console.log('parseDateString input:', dateStr, 'type:', typeof dateStr);
   
-  // Check if it's in DD-MM-YYYY format first - return as-is for string operations
+  // Check if it's in DD-MM-YYYY format first - return as-is to avoid timezone issues
   const ddMMYYYYRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/;
   if (ddMMYYYYRegex.test(dateStr)) {
-    // For DD-MM-YYYY, we'll handle it as a string in formatDateToDDMMYYYY
-    // Just return a Date object for compatibility, but it won't be used for DD-MM-YYYY
-    const parts = dateStr.split('-');
-    const day = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const year = parseInt(parts[2], 10);
-    const date = new Date(year, month, day);
-    console.log(`parseDateString: DD-MM-YYYY format - ${dateStr} -> day: ${day}, month: ${month + 1}, year: ${year} -> ${date.toISOString()}`);
-    return date;
+    // For DD-MM-YYYY, return the string as-is to avoid timezone conversion
+    console.log(`parseDateString: DD-MM-YYYY format - returning as-is: ${dateStr}`);
+    return dateStr;
   }
   
   // Check if it's in DD-MM-YY format - convert to DD-MM-YYYY as string

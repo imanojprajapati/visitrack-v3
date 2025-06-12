@@ -47,9 +47,9 @@ export default async function handler(
       }
     }
 
-    // Fetch visitors
+    // Fetch visitors with all fields
     const visitors = await Visitor.find(query)
-      .populate('eventId', 'title location startDate endDate')
+      .populate('eventId', 'title location startDate endDate registrationDeadline description')
       .sort({ createdAt: -1 })
       .lean()
       .exec();
@@ -58,58 +58,108 @@ export default async function handler(
       return res.status(404).json({ error: 'No visitors found' });
     }
 
-    // Define main table columns (these will be the primary columns)
-    const mainColumns = [
-      'name', 'email', 'phone', 'company', 'city', 'state', 'country', 
-      'pincode', 'source', 'location', 'eventName', 'eventLocation', 
-      'eventStartDate', 'eventEndDate', 'eventStartTime', 'eventEndTime', 
-      'status', 'checkInTime', 'checkOutTime', 'createdAt', 'updatedAt'
-    ];
+    // Define comprehensive column mapping
+    const columnMapping = {
+      // Basic visitor information
+      'name': 'Full Name',
+      'email': 'Email Address',
+      'phone': 'Phone Number',
+      'company': 'Company/Organization',
+      'age': 'Age',
+      'city': 'City',
+      'state': 'State/Province',
+      'country': 'Country',
+      'pincode': 'Pincode/ZIP Code',
+      'source': 'Source',
+      'location': 'Location',
+      
+      // Event information
+      'eventName': 'Event Name',
+      'eventLocation': 'Event Location',
+      'eventStartDate': 'Event Start Date',
+      'eventEndDate': 'Event End Date',
+      'eventStartTime': 'Event Start Time',
+      'eventEndTime': 'Event End Time',
+      
+      // Status and tracking
+      'status': 'Status',
+      'qrCode': 'QR Code',
+      'checkInTime': 'Check-in Time',
+      'checkOutTime': 'Check-out Time',
+      'scanTime': 'Scan Time',
+      
+      // Timestamps
+      'createdAt': 'Registration Date',
+      'updatedAt': 'Last Updated',
+      
+      // IDs (for reference)
+      'registrationId': 'Registration ID',
+      'eventId': 'Event ID',
+      'formId': 'Form ID',
+      '_id': 'Visitor ID'
+    };
 
     // Process visitors for export
     const exportData = visitors.map(visitor => {
       const row: any = {};
 
-      // Add main table columns first
-      row.name = visitor.name || '';
-      row.email = visitor.email || '';
-      row.phone = visitor.phone || '';
-      row.company = visitor.company || '';
-      row.city = visitor.city || '';
-      row.state = visitor.state || '';
-      row.country = visitor.country || '';
-      row.pincode = visitor.pincode || '';
-      row.source = visitor.source || '';
-      row.location = visitor.location || '';
-      row.eventName = visitor.eventName || '';
-      row.eventLocation = visitor.eventLocation || '';
-      row.eventStartDate = visitor.eventStartDate || '';
-      row.eventEndDate = visitor.eventEndDate || '';
-      row.eventStartTime = visitor.eventStartTime || '';
-      row.eventEndTime = visitor.eventEndTime || '';
-      row.status = visitor.status || '';
-      row.checkInTime = visitor.checkInTime || '';
-      row.checkOutTime = visitor.checkOutTime || '';
-      row.createdAt = visitor.createdAt || '';
-      row.updatedAt = visitor.updatedAt || '';
-      row.registrationId = visitor.registrationId || '';
-      row.formId = visitor.formId || '';
-      row.qrCode = visitor.qrCode || '';
+      // Add all basic fields with proper column names
+      Object.entries(columnMapping).forEach(([field, columnName]) => {
+        if (visitor[field as keyof typeof visitor] !== undefined) {
+          const value = visitor[field as keyof typeof visitor];
+          
+          // Handle special cases
+          if (field === 'eventId' && typeof value === 'object' && value !== null) {
+            // Event object - extract relevant fields
+            row['Event Title'] = (value as any).title || '';
+            row['Event Location'] = (value as any).location || '';
+            row['Event Start Date'] = (value as any).startDate || '';
+            row['Event End Date'] = (value as any).endDate || '';
+            row['Event Registration Deadline'] = (value as any).registrationDeadline || '';
+            row['Event Description'] = (value as any).description || '';
+          } else if (field === '_id') {
+            row[columnName] = value?.toString() || '';
+          } else if (field === 'registrationId' || field === 'formId') {
+            row[columnName] = value?.toString() || '';
+          } else if (field === 'scanTime' && value instanceof Date) {
+            row[columnName] = value.toISOString();
+          } else {
+            row[columnName] = value || '';
+          }
+        }
+      });
 
-      // Add additional data fields (only if they're not already in main columns)
+      // Add additional data fields with proper labeling
       if (visitor.additionalData) {
         Object.entries(visitor.additionalData).forEach(([key, fieldData]) => {
-          // Skip if this field is already in main columns to avoid duplication
-          if (!mainColumns.includes(key)) {
-            // If fieldData is an object with label and value, extract the value
-            if (typeof fieldData === 'object' && fieldData !== null && 'value' in fieldData) {
-              row[`additional_${key}`] = fieldData.value || '';
-            } else {
-              row[`additional_${key}`] = fieldData || '';
-            }
+          let columnName = key;
+          let value = fieldData;
+
+          // If fieldData is an object with label and value, use the label
+          if (typeof fieldData === 'object' && fieldData !== null && 'label' in fieldData && 'value' in fieldData) {
+            columnName = (fieldData as any).label || key;
+            value = (fieldData as any).value;
+          }
+
+          // Avoid conflicts with existing columns
+          if (!row.hasOwnProperty(columnName)) {
+            row[columnName] = value || '';
+          } else {
+            // If column name conflicts, prefix with "Additional"
+            row[`Additional ${columnName}`] = value || '';
           }
         });
       }
+
+      // Add any missing fields that might be in the schema but not in mapping
+      Object.keys(visitor).forEach(key => {
+        if (!columnMapping.hasOwnProperty(key) && key !== 'additionalData') {
+          const value = visitor[key as keyof typeof visitor];
+          if (value !== undefined) {
+            row[key] = value || '';
+          }
+        }
+      });
 
       return row;
     });
@@ -119,12 +169,20 @@ export default async function handler(
     const worksheet = XLSX.utils.json_to_sheet(exportData);
 
     // Auto-size columns
-    const maxWidth = Object.keys(exportData[0] || {}).reduce((max, key) => {
-      const length = Math.max(key.length, ...exportData.map(row => String(row[key] || '').length));
-      return Math.max(max, Math.min(length, 50)); // Cap at 50 characters
-    }, 10);
+    const columnWidths: { [key: string]: number } = {};
+    
+    // Calculate column widths
+    Object.keys(exportData[0] || {}).forEach(key => {
+      const maxLength = Math.max(
+        key.length,
+        ...exportData.map(row => String(row[key] || '').length)
+      );
+      columnWidths[key] = Math.min(Math.max(maxLength + 2, 10), 50); // Min 10, max 50
+    });
 
-    worksheet['!cols'] = [{ width: maxWidth }];
+    worksheet['!cols'] = Object.keys(columnWidths).map(key => ({
+      width: columnWidths[key]
+    }));
 
     // Add worksheet to workbook
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Visitors');

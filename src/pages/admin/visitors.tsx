@@ -88,6 +88,7 @@ export default function VisitorsPage() {
     pageSize: 10,
     total: 0,
   });
+  const [exportLoading, setExportLoading] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -332,77 +333,57 @@ export default function VisitorsPage() {
     return filteredVisitors.slice(startIndex, endIndex);
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
-      const headers = [
-        'Name',
-        'Email',
-        'Phone',
-        'Company',
-        'Event',
-        'Location',
-        'Status',
-        'Registration Date',
-        'Check-in Time',
-        'Check-out Time',
-        ...Object.keys(visitors[0]?.additionalData || {}).map(key => 
-          visitors[0]?.additionalData?.[key]?.label || key
-        )
-      ];
-
-      const csvData = filteredVisitors.map(visitor => [
-        visitor.name || visitor.additionalData?.name?.value || '',
-        visitor.email || visitor.additionalData?.email?.value || '',
-        visitor.phone || visitor.additionalData?.phone?.value || '',
-        visitor.company || visitor.additionalData?.company?.value || '',
-        visitor.eventName || '',
-        visitor.eventLocation || '',
-        formatStatus(visitor.status),
-        visitor.createdAt ? new Date(visitor.createdAt).toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }).replace(',', '') : '',
-        visitor.checkInTime ? new Date(visitor.checkInTime).toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }).replace(',', '') : '',
-        visitor.checkOutTime ? new Date(visitor.checkOutTime).toLocaleDateString('en-GB', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
-        }).replace(',', '') : '',
-        ...Object.keys(visitor.additionalData || {}).map(key => 
-          visitor.additionalData?.[key]?.value || ''
-        )
-      ]);
-
-      const csvContent = [
-        headers.join(','),
-        ...csvData.map(row => row.map(cell => 
-          typeof cell === 'string' ? `"${cell.replace(/"/g, '""')}"` : cell
-        ).join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      setExportLoading(true);
+      
+      // Build query parameters based on current filters
+      const params = new URLSearchParams();
+      
+      if (form.getFieldValue('eventId')) {
+        params.append('eventId', form.getFieldValue('eventId'));
+      }
+      
+      if (form.getFieldValue('status')) {
+        params.append('status', form.getFieldValue('status'));
+      }
+      
+      if (form.getFieldValue('dateRange')) {
+        const [startDate, endDate] = form.getFieldValue('dateRange');
+        params.append('startDate', startDate.format('YYYY-MM-DD'));
+        params.append('endDate', endDate.format('YYYY-MM-DD'));
+      }
+      
+      // Add format parameter (default to xlsx for better formatting)
+      params.append('format', 'xlsx');
+      
+      // Call the API endpoint
+      const response = await fetch(`/api/visitors/export?${params.toString()}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Export failed');
+      }
+      
+      // Get the file blob
+      const blob = await response.blob();
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `visitors-export-${new Date().toISOString().split('T')[0]}.csv`);
+      link.href = url;
+      link.download = `visitors-export-${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
       message.success('Export completed successfully');
     } catch (error) {
       console.error('Error exporting data:', error);
-      message.error('Failed to export data');
+      message.error(error instanceof Error ? error.message : 'Failed to export data');
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -566,7 +547,13 @@ export default function VisitorsPage() {
           title={<h1 className="text-xl sm:text-2xl font-bold">Visitor Management</h1>}
           extra={
             <Space className="flex-wrap">
-              <Button icon={<ExportOutlined />} onClick={handleExport} className="w-full sm:w-auto">
+              <Button 
+                icon={<ExportOutlined />} 
+                onClick={handleExport} 
+                loading={exportLoading}
+                disabled={exportLoading}
+                className="w-full sm:w-auto"
+              >
                 Export
               </Button>
               <Button icon={<ImportOutlined />} onClick={handleImport} className="w-full sm:w-auto">
