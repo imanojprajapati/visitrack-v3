@@ -711,14 +711,25 @@ export default function EventRegistration() {
         return dateString;
       }
       
+      // If it's already a string in DD-MM-YY format, convert to DD-MM-YYYY
+      if (typeof dateString === 'string' && /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/.test(dateString)) {
+        const [day, month, year] = dateString.split('-');
+        const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+        return `${day}-${month}-${fullYear}`;
+      }
+      
       // If it's a Date object or other format, convert to DD-MM-YYYY
       const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return 'Invalid date';
+      }
       const day = String(date.getDate()).padStart(2, '0');
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const year = String(date.getFullYear());
       return `${day}-${month}-${year}`;
     } catch (error) {
-      console.error('Error formatting date:', error);
+      console.error('Error formatting date:', error, 'Input:', dateString);
       return 'Invalid date';
     }
   };
@@ -741,12 +752,16 @@ export default function EventRegistration() {
       
       // If it's a Date object or other format, convert to DD-MM-YYYY
       const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date:', dateString);
+        return 'Invalid date';
+      }
       const day = String(date.getDate()).padStart(2, '0');
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const year = String(date.getFullYear());
       return `${day}-${month}-${year}`;
     } catch (error) {
-      console.error('Error formatting date:', error);
+      console.error('Error formatting date:', error, 'Input:', dateString);
       return 'Invalid date';
     }
   };

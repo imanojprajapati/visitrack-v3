@@ -51,24 +51,25 @@ const formatDate = (date: Date | string): string => {
   return `${day}-${month}-${year}`;
 };
 
-// Helper function to convert DD-MM-YYYY to DD-MM-YY format
-const convertToDDMMYY = (dateStr: string): string => {
-  // If already in DD-MM-YY format, return as is
-  if (/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/.test(dateStr)) {
+// Helper function to convert to DD-MM-YYYY format
+const convertToDDMMYYYY = (dateStr: string): string => {
+  // If already in DD-MM-YYYY format, return as is
+  if (/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(dateStr)) {
     return dateStr;
   }
   
-  // If in DD-MM-YYYY format, convert to DD-MM-YY
-  if (/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(dateStr)) {
+  // If in DD-MM-YY format, convert to DD-MM-YYYY
+  if (/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/.test(dateStr)) {
     const [day, month, year] = dateStr.split('-');
-    return `${day}-${month}-${year.slice(-2)}`;
+    const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+    return `${day}-${month}-${fullYear}`;
   }
   
-  // If it's a Date object or other format, convert to DD-MM-YY
+  // If it's a Date object or other format, convert to DD-MM-YYYY
   const date = new Date(dateStr);
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = String(date.getFullYear() % 100).padStart(2, '0');
+  const year = String(date.getFullYear());
   return `${day}-${month}-${year}`;
 };
 
@@ -241,9 +242,9 @@ export default async function handler(
         throw new Error('Failed to generate QR code for visitor');
       }
 
-      // Format dates to DD-MM-YY format for Visitor model
+      // Format dates to DD-MM-YYYY format for Visitor model
       const now = new Date();
-      const formattedDate = convertToDDMMYY(now.toISOString());
+      const formattedDate = convertToDDMMYYYY(now.toISOString());
 
       // Create visitor record with all required event details
       const visitor = await Visitor.create([{
@@ -258,8 +259,8 @@ export default async function handler(
         qrCode,
         eventName: event.title,
         eventLocation: event.location,
-        eventStartDate: convertToDDMMYY(event.startDate),
-        eventEndDate: convertToDDMMYY(event.endDate),
+        eventStartDate: convertToDDMMYYYY(event.startDate),
+        eventEndDate: convertToDDMMYYYY(event.endDate),
         eventStartTime: convertTo24HourFormat(event.time),
         eventEndTime: event.endTime ? convertTo24HourFormat(event.endTime) : convertTo24HourFormat(event.time), // Use start time as fallback
         status: 'registered',

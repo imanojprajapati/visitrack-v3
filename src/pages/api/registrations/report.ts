@@ -13,6 +13,25 @@ interface FormData {
   [key: string]: FormField;
 }
 
+// Helper function to format date to DD-MM-YYYY
+const formatDateToDDMMYYYY = (date: Date | string): string => {
+  if (!date) return '';
+  
+  let dateObj: Date;
+  if (typeof date === 'string') {
+    dateObj = new Date(date);
+  } else {
+    dateObj = date;
+  }
+  
+  if (isNaN(dateObj.getTime())) return '';
+  
+  const day = String(dateObj.getDate()).padStart(2, '0');
+  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const year = String(dateObj.getFullYear());
+  return `${day}-${month}-${year}`;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -109,8 +128,8 @@ export default async function handler(
         source: getFieldValue('source') || 'Website',
         eventName: event?.title || 'Unknown Event',
         eventLocation: event?.location || 'Unknown Location',
-        eventStartDate: event?.startDate || '',
-        eventEndDate: event?.endDate || '',
+        eventStartDate: event?.startDate ? formatDateToDDMMYYYY(event.startDate) : '',
+        eventEndDate: event?.endDate ? formatDateToDDMMYYYY(event.endDate) : '',
         status: registration.status,
         submittedAt: registration.submittedAt,
       };

@@ -41,6 +41,12 @@ export default async function handler(
           templateData.eventId = new mongoose.Types.ObjectId(templateData.eventId);
           console.log('Processed template data:', templateData);
 
+          // Check if a badge template already exists for this event
+          const existingTemplate = await BadgeTemplate.findOne({ eventId: templateData.eventId });
+          if (existingTemplate) {
+            throw new ApiError(409, 'A badge template already exists for this event. You can only create one badge template per event.');
+          }
+
           const template = await BadgeTemplate.create(templateData);
           console.log('Created template:', template);
           return res.status(201).json(template);

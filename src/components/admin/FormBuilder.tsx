@@ -97,7 +97,9 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
         if (!response.ok) throw new Error('Failed to fetch events');
         const data = await response.json();
         console.log('Fetched events for form builder:', data);
-        setEvents(data);
+        // Handle new API response format with events and pagination
+        const eventsData = data.events || data;
+        setEvents(eventsData);
       } catch (error) {
         console.error('Error fetching events:', error);
         messageApi?.error('Failed to load events');

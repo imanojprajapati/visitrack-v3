@@ -52,6 +52,9 @@ const columnMap: Record<string, string> = {
   'event_date': 'eventDate',
   'start date': 'eventDate',
   'startdate': 'eventDate',
+  'event start': 'eventDate',
+  'eventstart': 'eventDate',
+  'start': 'eventDate',
   
   // Event end date variations
   'event end date': 'eventEndDate',
@@ -59,10 +62,16 @@ const columnMap: Record<string, string> = {
   'eventend date': 'eventEndDate',
   'end date': 'eventEndDate',
   'enddate': 'eventEndDate',
+  'event end': 'eventEndDate',
+  'eventend': 'eventEndDate',
+  'end': 'eventEndDate',
   
   // Registration date variations
   'registration date': 'registrationDate',
   'registrationdate': 'registrationDate',
+  'registration': 'registrationDate',
+  'reg date': 'registrationDate',
+  'regdate': 'registrationDate',
   
   // Other common variations
   'eventname': 'eventName',
@@ -80,8 +89,21 @@ function normalizeRowKeys(row: any): any {
     if (key && key.trim()) { // Only process non-empty keys
       const lowerKey = key.trim().toLowerCase();
       const mappedKey = columnMap[lowerKey] || key.trim();
-      // Ensure value is properly handled (convert null/undefined to empty string)
-      normalized[mappedKey] = value !== null && value !== undefined ? value : '';
+      
+      // Check if this is a date field
+      const dateFields = ['eventdate', 'eventenddate', 'registrationdate', 'event_date', 'start_date', 'end_date', 'registration_date'];
+      const isDateField = dateFields.some(dateField => 
+        lowerKey.includes(dateField) || dateField.includes(lowerKey)
+      );
+      
+      // Convert date fields to DD-MM-YYYY format
+      if (isDateField && value) {
+        normalized[mappedKey] = convertToDDMMYYYY(value);
+        console.log(`Date field "${key}" converted:`, value, '->', normalized[mappedKey]);
+      } else {
+        // Ensure value is properly handled (convert null/undefined to empty string)
+        normalized[mappedKey] = value !== null && value !== undefined ? value : '';
+      }
       
       console.log(`Key mapping: "${key}" -> "${lowerKey}" -> "${mappedKey}" =`, normalized[mappedKey]);
     }
@@ -205,7 +227,8 @@ export const parseExcel = (file: File): Promise<ImportResult> => {
           type: 'array',
           cellDates: true,
           cellNF: false,
-          cellText: false
+          cellText: false,
+          dateNF: 'dd-mm-yyyy' // Specify date format
         });
         
         console.log('Workbook sheets:', workbook.SheetNames);
@@ -419,4 +442,51 @@ export const downloadSampleCSV = (): void => {
   link.click();
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
-}; 
+};
+
+// Helper to convert various date formats to DD-MM-YYYY
+function convertToDDMMYYYY(value: any): string {
+  if (!value) return '';
+  
+  // If it's already a string in DD-MM-YYYY format
+  if (typeof value === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(value)) {
+    return value;
+  }
+  
+  // If it's a JavaScript Date object
+  if (value instanceof Date) {
+    const day = String(value.getUTCDate()).padStart(2, '0');
+    const month = String(value.getUTCMonth() + 1).padStart(2, '0');
+    const year = value.getUTCFullYear();
+    return `${day}-${month}-${year}`;
+  }
+  
+  // If it's an Excel serial number
+  if (typeof value === 'number' && value > 30000 && value < 60000) {
+    const utc_days = Math.floor(value - 25569);
+    const utc_value = utc_days * 86400;
+    const date_info = new Date(utc_value * 1000);
+    const day = String(date_info.getUTCDate()).padStart(2, '0');
+    const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
+    const year = date_info.getUTCFullYear();
+    return `${day}-${month}-${year}`;
+  }
+  
+  // If it's an ISO date string
+  if (typeof value === 'string' && value.includes('T')) {
+    try {
+      const date = new Date(value);
+      if (!isNaN(date.getTime())) {
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const year = date.getUTCFullYear();
+        return `${day}-${month}-${year}`;
+      }
+    } catch (error) {
+      console.log('Failed to parse ISO date string:', value);
+    }
+  }
+  
+  // Return as string if no conversion possible
+  return String(value);
+} 

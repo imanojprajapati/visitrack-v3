@@ -61,6 +61,74 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  await connectToDatabase();
+
+  if (req.method === 'GET') {
+    try {
+      const { 
+        eventId, 
+        status, 
+        category, 
+        organizer, 
+        admin,
+        limit = '50',
+        page = '1'
+      } = req.query;
+
+      let query: any = {};
+
+      // If admin parameter is not provided, only show upcoming events
+      if (!admin) {
+        query.status = 'upcoming';
+      } else if (status) {
+        // If admin is provided and status is specified, use that status
+        query.status = status;
+      }
+
+      if (eventId) {
+        query._id = eventId;
+      }
+
+      if (category) {
+        query.category = category;
+      }
+
+      if (organizer) {
+        query.organizer = organizer;
+      }
+
+      const limitNum = parseInt(limit as string, 10);
+      const pageNum = parseInt(page as string, 10);
+      const skip = (pageNum - 1) * limitNum;
+
+      const events = await Event.find(query)
+        .sort({ startDate: 1 }) // Sort by start date ascending
+        .limit(limitNum)
+        .skip(skip)
+        .lean();
+
+      const total = await Event.countDocuments(query);
+
+      // For admin requests, return with pagination. For public requests, return just the events array
+      if (admin) {
+        return res.status(200).json({
+          events,
+          pagination: {
+            total,
+            page: pageNum,
+            limit: limitNum,
+            pages: Math.ceil(total / limitNum)
+          }
+        });
+      } else {
+        return res.status(200).json(events);
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+      return res.status(500).json({ error: 'Failed to fetch events' });
+    }
+  }
+
   try {
     // Add retry logic for database connection
     let retries = 3;
@@ -248,9 +316,17 @@ export default async function handler(
           // Convert time formats from 12-hour to 24-hour format
           if (eventData.time) {
             console.log('Time field:', eventData.time);
+            // Validate time format
+            if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(eventData.time)) {
+              throw new ApiError(400, 'Start time must be in HH:MM format');
+            }
           }
           if (eventData.endTime) {
             console.log('EndTime field:', eventData.endTime);
+            // Validate end time format
+            if (!/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(eventData.endTime)) {
+              throw new ApiError(400, 'End time must be in HH:MM format');
+            }
           }
 
           // Handle banner field - extract URL from fileList if needed

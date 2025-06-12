@@ -99,7 +99,13 @@ const Home = () => {
       const data = await response.json();
       console.log('Fetched events:', data);
       console.log('Number of events:', data.length);
-      setEvents(data);
+      // Handle new API response format with events and pagination
+      const eventsData = data.events || data;
+      // Filter out draft events for public display
+      const filteredEvents = Array.isArray(eventsData) 
+        ? eventsData.filter(event => event.status !== 'draft')
+        : [];
+      setEvents(filteredEvents);
     } catch (err) {
       console.error('Error fetching events:', err);
       setError('Failed to load upcoming events');
@@ -111,6 +117,16 @@ const Home = () => {
   const handleRegisterClick = (event: Event) => {
     const now = new Date();
     let registrationDeadline = null;
+    
+    // Check if event is cancelled
+    if (event.status === 'cancelled') {
+      Modal.info({
+        title: 'Event Cancelled',
+        content: 'This event has been cancelled. Registration is not available.',
+        okText: 'OK',
+      });
+      return;
+    }
     
     // Parse registration deadline if it exists
     if (event.registrationDeadline) {
@@ -187,7 +203,24 @@ const Home = () => {
       }
     });
     
-    return { upcoming, ongoing, past };
+    // Sort each category by start date (ascending order)
+    const sortByDate = (a: Event, b: Event) => {
+      try {
+        const [aDay, aMonth, aYear] = a.startDate.split('-').map(Number);
+        const [bDay, bMonth, bYear] = b.startDate.split('-').map(Number);
+        const aDate = new Date(aYear, aMonth - 1, aDay);
+        const bDate = new Date(bYear, bMonth - 1, bDay);
+        return aDate.getTime() - bDate.getTime();
+      } catch (error) {
+        return 0;
+      }
+    };
+    
+    return { 
+      upcoming: upcoming.sort(sortByDate), 
+      ongoing: ongoing.sort(sortByDate), 
+      past: past.sort(sortByDate) 
+    };
   };
 
   const { upcoming, ongoing, past } = categorizeEvents(events);
@@ -281,7 +314,14 @@ const Home = () => {
                             Registration Deadline: {event.registrationDeadline}
                           </p>
                         )}
-                        {isRegistrationClosed(event) ? (
+                        {event.status === 'cancelled' ? (
+                          <button
+                            onClick={() => handleRegisterClick(event)}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-500 hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 cursor-pointer"
+                          >
+                            Event Cancelled
+                          </button>
+                        ) : isRegistrationClosed(event) ? (
                           <button
                             onClick={() => handleRegisterClick(event)}
                             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"

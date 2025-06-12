@@ -6,8 +6,8 @@ export interface Visitor {
   eventId: string;
   eventName?: string;
   eventLocation?: string;
-  eventStartDate?: string;
-  eventEndDate?: string;
+  eventStartDate?: string; // DD-MM-YYYY format
+  eventEndDate?: string; // DD-MM-YYYY format
   name: string;
   email: string;
   phone?: string;
@@ -16,10 +16,10 @@ export interface Visitor {
     label: string;
     value: string | number | boolean | Date;
   }>;
-  createdAt: string;
-  updatedAt: string;
+  createdAt: string; // DD-MM-YYYY format
+  updatedAt: string; // DD-MM-YYYY format
   status: 'registered' | 'checked-in' | 'checked-out';
-  checkInTime?: string;
-  checkOutTime?: string;
+  checkInTime?: string; // DD-MM-YYYY HH:mm format
+  checkOutTime?: string; // DD-MM-YYYY HH:mm format
   source?: string;
 } 

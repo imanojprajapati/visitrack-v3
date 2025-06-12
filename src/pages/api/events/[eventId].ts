@@ -74,9 +74,36 @@ const formatDate = (date: Date | string): string => {
     if (/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(date)) {
       return date;
     }
+    // If it's an invalid date string, return current date
+    if (date === 'Invalid Date' || date === 'NaN-NaN-NaN') {
+      const now = new Date();
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = String(now.getFullYear());
+      return `${day}-${month}-${year}`;
+    }
     // Otherwise parse it as a date
-    date = new Date(date);
+    const parsedDate = new Date(date);
+    if (isNaN(parsedDate.getTime())) {
+      // If parsing fails, return current date
+      const now = new Date();
+      const day = String(now.getDate()).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = String(now.getFullYear());
+      return `${day}-${month}-${year}`;
+    }
+    date = parsedDate;
   }
+  
+  if (date instanceof Date && isNaN(date.getTime())) {
+    // If it's an invalid Date object, return current date
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear());
+    return `${day}-${month}-${year}`;
+  }
+  
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const year = String(date.getFullYear());

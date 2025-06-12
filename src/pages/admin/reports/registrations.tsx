@@ -292,16 +292,33 @@ export default function RegistrationReport() {
           
           if (!dateToUse) return '-';
           
-          // Use the parseDateString function for consistent parsing
-          const parsedDate = parseDateString(dateToUse);
-          const formatted = parsedDate.toLocaleDateString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric'
-          });
+          // If the date is already in DD-MM-YYYY format, return it as is
+          if (/^\d{2}-\d{2}-\d{4}$/.test(dateToUse)) {
+            return dateToUse;
+          }
           
-          console.log('Event Date render - parsed and formatted:', { dateToUse, formatted });
-          return formatted;
+          // If it's in ISO format, convert to DD-MM-YYYY
+          const dateObj = new Date(dateToUse);
+          if (!isNaN(dateObj.getTime())) {
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const year = String(dateObj.getFullYear());
+            const formatted = `${day}-${month}-${year}`;
+            console.log('Event Date render - converted from ISO:', { dateToUse, formatted });
+            return formatted;
+          }
+          
+          // If it's already in DD-MM-YY format, convert to DD-MM-YYYY
+          if (/^\d{1,2}-\d{1,2}-\d{2}$/.test(dateToUse)) {
+            const [day, month, year] = dateToUse.split('-');
+            const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
+            const formatted = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${fullYear}`;
+            console.log('Event Date render - converted from DD-MM-YY:', { dateToUse, formatted });
+            return formatted;
+          }
+          
+          console.log('Event Date render - no valid format detected:', dateToUse);
+          return dateToUse || '-';
         } catch (error) {
           console.error('Error formatting event date:', error);
           const dateToUse = date || record.eventEndDate;
@@ -333,23 +350,25 @@ export default function RegistrationReport() {
         try {
           if (!date) return '-';
           
+          // If the date is already in DD-MM-YYYY format, return it as is
+          if (/^\d{2}-\d{2}-\d{4}$/.test(date)) {
+            return date;
+          }
+          
           // Handle ISO date format (2025-06-05T18:30:00.000Z)
           const dateObj = new Date(date);
           if (!isNaN(dateObj.getTime())) {
             const day = String(dateObj.getDate()).padStart(2, '0');
             const month = String(dateObj.getMonth() + 1).padStart(2, '0');
             const year = dateObj.getFullYear();
-            return `${day}/${month}/${year}`;
+            return `${day}-${month}-${year}`;
           }
           
           // Handle DD-MM-YY format
           if (/^\d{1,2}-\d{1,2}-\d{2}$/.test(date)) {
             const [day, month, year] = date.split('-');
             const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-            const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
-            if (!isNaN(fallbackDateObj.getTime())) {
-              return `${day}/${month}/${fullYear}`;
-            }
+            return `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${fullYear}`;
           }
           
           return date || '-';
@@ -358,7 +377,7 @@ export default function RegistrationReport() {
           return date || '-';
         }
       },
-      width: 140,
+      width: 150,
     },
   ];
 

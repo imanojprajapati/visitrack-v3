@@ -42,22 +42,51 @@ interface ImportRegistrationsModalProps {
 function excelSerialToDate(serial: any) {
   console.log('Converting date value:', serial, 'Type:', typeof serial);
   
-  if (typeof serial === 'number' && serial > 30000 && serial < 60000) { // crude range check for Excel dates
+  // Handle JavaScript Date objects (from Excel with cellDates: true)
+  if (serial instanceof Date) {
+    // Use UTC methods to avoid timezone issues
+    const day = String(serial.getUTCDate()).padStart(2, '0');
+    const month = String(serial.getUTCMonth() + 1).padStart(2, '0');
+    const year = serial.getUTCFullYear();
+    const result = `${day}-${month}-${year}`;
+    console.log('Converted Date object to DD-MM-YYYY:', serial, '->', result);
+    return result;
+  }
+  
+  // Handle Excel serial numbers (numbers between 30000-60000)
+  if (typeof serial === 'number' && serial > 30000 && serial < 60000) {
     const utc_days = Math.floor(serial - 25569);
     const utc_value = utc_days * 86400; // seconds
     const date_info = new Date(utc_value * 1000);
-    const day = String(date_info.getDate()).padStart(2, '0');
-    const month = String(date_info.getMonth() + 1).padStart(2, '0');
-    const year = date_info.getFullYear();
+    const day = String(date_info.getUTCDate()).padStart(2, '0');
+    const month = String(date_info.getUTCMonth() + 1).padStart(2, '0');
+    const year = date_info.getUTCFullYear();
     const result = `${day}-${month}-${year}`;
     console.log('Converted Excel serial to date:', serial, '->', result);
     return result;
   }
   
-  // Also handle string dates that might be in DD-MM-YYYY format
+  // Handle string dates that might be in DD-MM-YYYY format
   if (typeof serial === 'string' && serial.includes('-')) {
     console.log('Date is already in string format:', serial);
     return serial;
+  }
+  
+  // Handle ISO date strings
+  if (typeof serial === 'string' && serial.includes('T')) {
+    try {
+      const date = new Date(serial);
+      if (!isNaN(date.getTime())) {
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const year = date.getUTCFullYear();
+        const result = `${day}-${month}-${year}`;
+        console.log('Converted ISO date string to DD-MM-YYYY:', serial, '->', result);
+        return result;
+      }
+    } catch (error) {
+      console.log('Failed to parse ISO date string:', serial);
+    }
   }
   
   console.log('No conversion needed for:', serial);
@@ -75,8 +104,16 @@ function processPreviewRow(row: any) {
     'start date', 'startdate',
     'end date', 'enddate',
     'date', 'event_date', 'start_date', 'end_date',
+    'event start', 'event end', 'eventstart', 'eventend',
+    'registration', 'reg date', 'regdate',
     // Normalized variations (after column mapping)
-    'eventdate', 'eventenddate', 'registrationdate'
+    'eventdate', 'eventenddate', 'registrationdate',
+    // Additional variations
+    'event_date', 'start_date', 'end_date', 'registration_date',
+    'eventdate', 'startdate', 'enddate', 'registrationdate',
+    'event start date', 'event end date', 'registration date',
+    'event start', 'event end', 'registration',
+    'start', 'end', 'reg date', 'regdate'
   ];
   
   const processed: any = { ...row };
@@ -91,7 +128,17 @@ function processPreviewRow(row: any) {
     
     // Check if this key matches any of our date field patterns
     const isDateField = dateFields.some(dateField => {
-      const matches = lowerKey.includes(dateField) || dateField.includes(lowerKey);
+      // More flexible matching - check if key contains date-related words
+      const keyWords = lowerKey.split(/[\s_-]+/);
+      const dateWords = dateField.split(/[\s_-]+/);
+      
+      // Check if any date word is contained in the key
+      const matches = dateWords.some(dateWord => 
+        keyWords.some(keyWord => 
+          keyWord.includes(dateWord) || dateWord.includes(keyWord)
+        )
+      );
+      
       if (matches) {
         console.log(`  ✓ MATCH FOUND: "${lowerKey}" matches "${dateField}"`);
       }

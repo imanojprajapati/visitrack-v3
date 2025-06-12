@@ -309,13 +309,13 @@ export default async function handler(
                       _id: visitor.eventId._id.toString(),
                       title: visitor.eventId.title,
                       location: visitor.eventId.location,
-                      startDate: parseDateString(visitor.eventId.startDate).toISOString(),
-                      endDate: parseDateString(visitor.eventId.endDate).toISOString()
+                      startDate: formatDateToDDMMYYYY(parseDateString(visitor.eventId.startDate)),
+                      endDate: formatDateToDDMMYYYY(parseDateString(visitor.eventId.endDate))
                     } : null,
                     eventName: visitor.eventId?.title || '',
                     eventLocation: visitor.eventId?.location || '',
-                    eventStartDate: visitor.eventId?.startDate ? parseDateString(visitor.eventId.startDate).toISOString() : '',
-                    eventEndDate: visitor.eventId?.endDate ? parseDateString(visitor.eventId.endDate).toISOString() : '',
+                    eventStartDate: visitor.eventId?.startDate ? formatDateToDDMMYYYY(parseDateString(visitor.eventId.startDate)) : '',
+                    eventEndDate: visitor.eventId?.endDate ? formatDateToDDMMYYYY(parseDateString(visitor.eventId.endDate)) : '',
                     status: visitor.status,
                     checkInTime: parseDateString(visitor.checkInTime || visitor.createdAt).toISOString(),
                     createdAt: parseDateString(visitor.createdAt).toISOString(),
@@ -384,13 +384,13 @@ export default async function handler(
                   _id: populatedVisitor.eventId._id.toString(),
                   title: populatedVisitor.eventId.title,
                   location: populatedVisitor.eventId.location,
-                  startDate: parseDateString(populatedVisitor.eventId.startDate).toISOString(),
-                  endDate: parseDateString(populatedVisitor.eventId.endDate).toISOString()
+                  startDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventId.startDate)),
+                  endDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventId.endDate))
                 } : null,
                 eventName: populatedVisitor.eventName,
                 eventLocation: populatedVisitor.eventLocation,
-                eventStartDate: parseDateString(populatedVisitor.eventStartDate).toISOString(),
-                eventEndDate: parseDateString(populatedVisitor.eventEndDate).toISOString(),
+                eventStartDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventStartDate)),
+                eventEndDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventEndDate)),
                 checkInTime: parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
                 createdAt: parseDateString(populatedVisitor.createdAt).toISOString(),
                 updatedAt: parseDateString(populatedVisitor.updatedAt).toISOString(),
@@ -469,13 +469,13 @@ export default async function handler(
               _id: populatedVisitor.eventId._id.toString(),
               title: populatedVisitor.eventId.title,
               location: populatedVisitor.eventId.location,
-              startDate: parseDateString(populatedVisitor.eventId.startDate).toISOString(),
-              endDate: parseDateString(populatedVisitor.eventId.endDate).toISOString()
+              startDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventId.startDate)),
+              endDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventId.endDate))
             } : null,
             eventName: populatedVisitor.eventName,
             eventLocation: populatedVisitor.eventLocation,
-            eventStartDate: parseDateString(populatedVisitor.eventStartDate).toISOString(),
-            eventEndDate: parseDateString(populatedVisitor.eventEndDate).toISOString(),
+            eventStartDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventStartDate)),
+            eventEndDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventEndDate)),
             checkInTime: parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
             createdAt: parseDateString(populatedVisitor.createdAt).toISOString(),
             updatedAt: parseDateString(populatedVisitor.updatedAt).toISOString(),
@@ -522,6 +522,38 @@ const parseDateString = (dateStr: string): Date => {
   // Debug: Log the input date string
   console.log('parseDateString input:', dateStr, 'type:', typeof dateStr);
   
+  // Check if it's in DD-MM-YYYY format first
+  const ddMMYYYYRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/;
+  if (ddMMYYYYRegex.test(dateStr)) {
+    const parts = dateStr.split('-');
+    const day = parseInt(parts[0], 10);  // First part is day
+    const month = parseInt(parts[1], 10) - 1; // Second part is month (0-indexed)
+    const year = parseInt(parts[2], 10);
+    
+    // Create date with correct order: year, month, day
+    const date = new Date(year, month, day);
+    console.log(`parseDateString: DD-MM-YYYY format - ${dateStr} -> day: ${day}, month: ${month + 1}, year: ${year} -> ${date.toISOString()}`);
+    return date;
+  }
+  
+  // Check if it's in DD-MM-YY format
+  const ddMMYYRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/;
+  if (ddMMYYRegex.test(dateStr)) {
+    const parts = dateStr.split('-');
+    const day = parseInt(parts[0], 10);  // First part is day
+    const month = parseInt(parts[1], 10) - 1; // Second part is month (0-indexed)
+    const yearStr = parts[2];
+    
+    // Convert 2-digit year to 4-digit year
+    const yearNum = parseInt(yearStr, 10);
+    const year = yearNum < 50 ? 2000 + yearNum : 1900 + yearNum;
+    
+    // Create date with correct order: year, month, day
+    const date = new Date(year, month, day);
+    console.log(`parseDateString: DD-MM-YY format - ${dateStr} -> day: ${day}, month: ${month + 1}, year: ${year} -> ${date.toISOString()}`);
+    return date;
+  }
+  
   // Check if it's already in ISO format
   const isoDate = new Date(dateStr);
   if (!isNaN(isoDate.getTime())) {
@@ -529,32 +561,14 @@ const parseDateString = (dateStr: string): Date => {
     return isoDate;
   }
   
-  // Parse DD-MM-YY format (2-digit year)
-  const parts = dateStr.split('-');
-  if (parts.length === 3) {
-    const day = parseInt(parts[0], 10);  // First part is day
-    const month = parseInt(parts[1], 10) - 1; // Second part is month (0-indexed)
-    const yearStr = parts[2];
-    
-    let year: number;
-    if (yearStr.length === 2) {
-      // DD-MM-YY format: convert to 4-digit year
-      const yearNum = parseInt(yearStr, 10);
-      year = yearNum < 50 ? 2000 + yearNum : 1900 + yearNum;
-    } else if (yearStr.length === 4) {
-      // DD-MM-YYYY format
-      year = parseInt(yearStr, 10);
-    } else {
-      console.log('parseDateString: Invalid year format, returning current date');
-      return new Date();
-    }
-    
-    // Create date with correct order: year, month, day
-    const date = new Date(year, month, day);
-    console.log(`parseDateString: DD-MM-YY/YYYY format - ${dateStr} -> day: ${day}, month: ${month + 1}, year: ${year} -> ${date.toISOString()}`);
-    return date;
-  }
-  
   console.log('parseDateString: No valid format detected, returning current date');
   return new Date();
+};
+
+// Helper function to format date to DD-MM-YYYY format
+const formatDateToDDMMYYYY = (date: Date): string => {
+  const day = date.getDate().toString().padStart(2, '0');
+  const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const year = date.getFullYear().toString();
+  return `${day}-${month}-${year}`;
 }; 

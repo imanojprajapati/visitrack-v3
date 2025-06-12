@@ -130,7 +130,9 @@ const BadgeManagement: React.FC = () => {
       const response = await fetch('/api/events?admin=true');
       if (response.ok) {
         const data = await response.json();
-        setEvents(data);
+        // Handle new API response format with events and pagination
+        const eventsData = data.events || data;
+        setEvents(eventsData);
       }
     } catch (error) {
       console.error('Error fetching events:', error);
@@ -279,6 +281,34 @@ const BadgeManagement: React.FC = () => {
 
       console.log('Template data to save:', templateData);
 
+      // If we don't have an _id, check if a template already exists for this event
+      if (!templateData._id) {
+        try {
+          const existingTemplatesResponse = await fetch(`/api/badge-templates?eventId=${templateData.eventId}`);
+          if (existingTemplatesResponse.ok) {
+            const existingTemplates = await existingTemplatesResponse.json();
+            if (existingTemplates && existingTemplates.length > 0) {
+              const existingTemplate = existingTemplates[0];
+              // Ask user if they want to update the existing template
+              const shouldUpdate = window.confirm(
+                `A badge template already exists for this event. Would you like to update the existing template "${existingTemplate.name}"?`
+              );
+              
+              if (shouldUpdate) {
+                // Update the existing template
+                templateData._id = existingTemplate._id;
+              } else {
+                message.info('Template creation cancelled');
+                return;
+              }
+            }
+          }
+        } catch (error) {
+          console.log('Error checking existing templates:', error);
+          // Continue with creation if check fails
+        }
+      }
+
       const method = templateData._id ? 'PUT' : 'POST';
       const url = templateData._id 
         ? `/api/badge-templates/${templateData._id}`
@@ -295,6 +325,15 @@ const BadgeManagement: React.FC = () => {
       if (!response.ok) {
         const errorData = await response.json();
         console.error('Save template error response:', errorData);
+        
+        // Handle specific error cases
+        if (response.status === 409) {
+          message.error('A badge template already exists for this event. Please edit the existing template instead.');
+          // Fetch templates to refresh the list
+          fetchTemplates();
+          return;
+        }
+        
         throw new Error(errorData.message || 'Failed to save template');
       }
 
@@ -588,6 +627,29 @@ const BadgeManagement: React.FC = () => {
     },
   ];
 
+  const handleEventChange = async (eventId: string) => {
+    setSelectedEvent(eventId);
+    
+    // Check if a template already exists for this event
+    if (eventId) {
+      try {
+        const response = await fetch(`/api/badge-templates?eventId=${eventId}`);
+        if (response.ok) {
+          const existingTemplates = await response.json();
+          if (existingTemplates && existingTemplates.length > 0) {
+            const existingTemplate = existingTemplates[0];
+            message.info(`A badge template "${existingTemplate.name}" already exists for this event. You can edit it or create a new one.`);
+            
+            // Optionally, you can auto-load the existing template
+            // handleEdit(existingTemplate);
+          }
+        }
+      } catch (error) {
+        console.log('Error checking existing templates:', error);
+      }
+    }
+  };
+
   if (!mounted) {
     return null;
   }
@@ -633,7 +695,7 @@ const BadgeManagement: React.FC = () => {
                   <Select
                     placeholder="Select event"
                     loading={loading}
-                    onChange={(value) => setSelectedEvent(value)}
+                    onChange={(value) => handleEventChange(value)}
                   >
                     {events.map((event) => (
                       <Option key={event._id} value={event._id}>

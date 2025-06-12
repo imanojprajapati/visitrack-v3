@@ -76,8 +76,19 @@ export default function EventManagement() {
       }
       const data = await response.json();
       
+      // Handle new API response format with events and pagination
+      const eventsData = data.events || data;
+      
+      // Ensure eventsData is an array before sorting
+      if (!Array.isArray(eventsData)) {
+        console.error('Events data is not an array:', eventsData);
+        setEvents([]);
+        setPagination(prev => ({ ...prev, total: 0 }));
+        return;
+      }
+      
       // Sort events by date (newest first)
-      const sortedEvents = data.sort((a: Event, b: Event) => 
+      const sortedEvents = eventsData.sort((a: Event, b: Event) => 
         new Date(b.startDate).getTime() - new Date(a.startDate).getTime()
       );
       
@@ -306,17 +317,34 @@ export default function EventManagement() {
       url: event.banner,
     }] : undefined;
 
+    // Helper function to parse DD-MM-YYYY format to dayjs
+    const parseDate = (dateStr: string | undefined) => {
+      if (!dateStr) return undefined;
+      // If it's already in YYYY-MM-DD format, parse directly
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        return dayjs(dateStr);
+      }
+      // If it's in DD-MM-YYYY format, convert to YYYY-MM-DD
+      if (/^\d{2}-\d{2}-\d{4}$/.test(dateStr)) {
+        const [day, month, year] = dateStr.split('-');
+        return dayjs(`${year}-${month}-${day}`);
+      }
+      // Try to parse as is
+      const parsed = dayjs(dateStr);
+      return parsed.isValid() ? parsed : undefined;
+    };
+
     return {
       title: event.title,
       venue: event.venue || event.location, // Use venue if available, fallback to location
-      date: event.startDate ? dayjs(event.startDate) : undefined,
-      endDate: event.endDate ? dayjs(event.endDate) : undefined,
+      date: parseDate(event.startDate),
+      endDate: parseDate(event.endDate),
       time: event.time,
       endTime: event.endTime,
       status: event.status,
       capacity: event.capacity,
       description: event.description,
-      registrationDeadline: event.registrationDeadline ? dayjs(event.registrationDeadline) : undefined,
+      registrationDeadline: parseDate(event.registrationDeadline),
       banner: fileList as any // Type assertion to fix TypeScript error
     };
   };

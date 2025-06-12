@@ -18,40 +18,40 @@ export interface IVisitor extends Document {
   qrCode: string;                          // QR code for visitor check-in
   eventName: string;                       // Event name (denormalized for easy querying)
   eventLocation: string;                   // Event location (denormalized)
-  eventStartDate: string;                  // Event start date in DD-MM-YY format
-  eventEndDate: string;                    // Event end date in DD-MM-YY format
+  eventStartDate: string;                  // Event start date in DD-MM-YYYY format
+  eventEndDate: string;                    // Event end date in DD-MM-YYYY format
   eventStartTime: string;                  // Event start time in HH:mm format
   eventEndTime: string;                    // Event end time in HH:mm format
   status: 'registered' | 'checked_in' | 'checked_out' | 'Visited';
   scanTime?: Date;
-  checkInTime?: string;                    // When visitor checked in (DD-MM-YY HH:mm)
-  checkOutTime?: string;                   // When visitor checked out (DD-MM-YY HH:mm)
+  checkInTime?: string;                    // When visitor checked in (DD-MM-YYYY HH:mm)
+  checkOutTime?: string;                   // When visitor checked out (DD-MM-YYYY HH:mm)
   additionalData: Record<string, any>;     // Any additional form fields
-  createdAt: string;                       // Registration date in DD-MM-YY format
-  updatedAt: string;                       // Last update date in DD-MM-YY format
+  createdAt: string;                       // Registration date in DD-MM-YYYY format
+  updatedAt: string;                       // Last update date in DD-MM-YYYY format
 }
 
-// Helper function to format date to DD-MM-YY
+// Helper function to format date to DD-MM-YYYY
 const formatDate = (date: Date): string => {
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = String(date.getFullYear() % 100).padStart(2, '0');
+  const year = String(date.getFullYear());
   return `${day}-${month}-${year}`;
 };
 
-// Helper function to format date to DD-MM-YY HH:mm
+// Helper function to format date to DD-MM-YYYY HH:mm
 const formatDateTime = (date: Date): string => {
   const day = String(date.getDate()).padStart(2, '0');
   const month = String(date.getMonth() + 1).padStart(2, '0');
-  const year = String(date.getFullYear() % 100).padStart(2, '0');
+  const year = String(date.getFullYear());
   const hours = String(date.getHours()).padStart(2, '0');
   const minutes = String(date.getMinutes()).padStart(2, '0');
   return `${day}-${month}-${year} ${hours}:${minutes}`;
 };
 
 // Date string validation regex
-const dateRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/;
-const dateTimeRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2} ([01][0-9]|2[0-3]):[0-5][0-9]$/;
+const dateRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/;
+const dateTimeRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4} ([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
 // Time string validation regex
 const timeRegex = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
@@ -146,7 +146,7 @@ const visitorSchema = new mongoose.Schema<IVisitor>({
       validator: function(v: string) {
         return dateRegex.test(v);
       },
-      message: 'Event start date must be in DD-MM-YY format'
+      message: 'Event start date must be in DD-MM-YYYY format'
     }
   },
   eventEndDate: {
@@ -156,7 +156,7 @@ const visitorSchema = new mongoose.Schema<IVisitor>({
       validator: function(v: string) {
         return dateRegex.test(v);
       },
-      message: 'Event end date must be in DD-MM-YY format'
+      message: 'Event end date must be in DD-MM-YYYY format'
     }
   },
   eventStartTime: {
@@ -194,7 +194,7 @@ const visitorSchema = new mongoose.Schema<IVisitor>({
         if (!v) return true;
         return dateTimeRegex.test(v);
       },
-      message: 'Check-in time must be in DD-MM-YY HH:mm format'
+      message: 'Check-in time must be in DD-MM-YYYY HH:mm format'
     }
   },
   checkOutTime: {
@@ -204,7 +204,7 @@ const visitorSchema = new mongoose.Schema<IVisitor>({
         if (!v) return true;
         return dateTimeRegex.test(v);
       },
-      message: 'Check-out time must be in DD-MM-YY HH:mm format'
+      message: 'Check-out time must be in DD-MM-YYYY HH:mm format'
     }
   },
   additionalData: {
@@ -218,7 +218,7 @@ const visitorSchema = new mongoose.Schema<IVisitor>({
       validator: function(v: string) {
         return dateRegex.test(v);
       },
-      message: 'Created date must be in DD-MM-YY format'
+      message: 'Created date must be in DD-MM-YYYY format'
     }
   },
   updatedAt: {
@@ -228,7 +228,7 @@ const visitorSchema = new mongoose.Schema<IVisitor>({
       validator: function(v: string) {
         return dateRegex.test(v);
       },
-      message: 'Updated date must be in DD-MM-YY format'
+      message: 'Updated date must be in DD-MM-YYYY format'
     }
   }
 }, {

@@ -71,6 +71,79 @@ const convertDateFields = (obj: any): any => {
   return converted;
 };
 
+// Helper function to format date to DD-MM-YYYY
+const formatDate = (dateStr: any) => {
+  if (!dateStr) {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear());
+    return `${day}-${month}-${year}`;
+  }
+  
+  // Convert to string if it's not already
+  const dateString = String(dateStr);
+  
+  // Handle DD-MM-YYYY format and return as is
+  if (typeof dateString === 'string' && dateString.includes('-')) {
+    const parts = dateString.split('-');
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, '0');
+      const month = parts[1].padStart(2, '0');
+      const year = parts[2].length === 2 ? (Number(parts[2]) < 50 ? '20' + parts[2] : '19' + parts[2]) : parts[2];
+      return `${day}-${month}-${year}`;
+    }
+  }
+  
+  // If it's already in DD-MM-YYYY format, return as is
+  if (typeof dateString === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
+    return dateString;
+  }
+  
+  // Try to parse as a JavaScript Date object
+  const date = new Date(dateString);
+  if (!isNaN(date.getTime())) {
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear());
+    return `${day}-${month}-${year}`;
+  }
+  
+  // Default fallback
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = String(now.getFullYear());
+  return `${day}-${month}-${year}`;
+};
+
+// Helper function to format time to HH:mm
+const formatTime = (timeStr: string) => {
+  if (!timeStr) {
+    const now = new Date();
+    const hours = String(now.getUTCHours()).padStart(2, '0');
+    const minutes = String(now.getUTCMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
+  return timeStr;
+};
+
+// Helper function to handle missing string values
+const handleMissingString = (value: any): string => {
+  if (!value || value === '' || value === null || value === undefined) {
+    return '-';
+  }
+  return String(value);
+};
+
+// Helper function to handle missing status values
+const handleMissingStatus = (value: any): string => {
+  if (!value || value === '' || value === null || value === undefined) {
+    return 'Visited';
+  }
+  return String(value);
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -80,6 +153,57 @@ export default async function handler(
   }
 
   await connectToDatabase();
+
+  // Test MongoDB connection
+  try {
+    console.log('Testing MongoDB connection...');
+    const db = mongoose.connection;
+    if (db.readyState !== 1) {
+      throw new Error(`Database not connected. Ready state: ${db.readyState}`);
+    }
+    console.log('MongoDB connection test passed');
+  } catch (error) {
+    console.error('MongoDB connection test failed:', error);
+    return res.status(500).json({ 
+      error: 'Database connection failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+
+  // Test Visitor model connection
+  try {
+    console.log('Testing Visitor model connection...');
+    const testVisitor = new Visitor({
+      registrationId: new mongoose.Types.ObjectId(),
+      eventId: new mongoose.Types.ObjectId(),
+      formId: new mongoose.Types.ObjectId(),
+      name: 'Test Visitor',
+      email: 'test@example.com',
+      phone: '1234567890',
+      company: 'Test Company',
+      qrCode: 'QR-TEST',
+      eventName: 'Test Event',
+      eventLocation: 'Test Location',
+      eventStartDate: '15-01-24',
+      eventEndDate: '15-01-24',
+      eventStartTime: '09:00',
+      eventEndTime: '17:00',
+      status: 'registered',
+      additionalData: {},
+      createdAt: '15-01-24',
+      updatedAt: '15-01-24'
+    });
+    
+    // Validate the test visitor (don't save it)
+    await testVisitor.validate();
+    console.log('Visitor model validation test passed');
+  } catch (error) {
+    console.error('Visitor model validation test failed:', error);
+    return res.status(500).json({ 
+      error: 'Visitor model validation failed',
+      message: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 
   try {
     const form = formidable({
@@ -345,33 +469,6 @@ export default async function handler(
           return labelMap[fieldName] || fieldName;
         };
 
-        // Helper function to format date to DD-MM-YY
-        const formatDate = (dateStr: string) => {
-          if (!dateStr) {
-            const now = new Date();
-            const day = String(now.getDate()).padStart(2, '0');
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const year = String(now.getFullYear() % 100).padStart(2, '0');
-            return `${day}-${month}-${year}`;
-          }
-          const parts = dateStr.split('-');
-          if (parts.length === 3 && parts[2].length === 4) {
-            return `${parts[0]}-${parts[1]}-${parts[2].slice(2)}`;
-          }
-          return dateStr;
-        };
-
-        // Helper function to format time to HH:mm
-        const formatTime = (timeStr: string) => {
-          if (!timeStr) {
-            const now = new Date();
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            return `${hours}:${minutes}`;
-          }
-          return timeStr;
-        };
-
         const mainKeys = [
           'name','email','phone','company','eventName','eventDate','eventEndDate','status','registrationDate'
         ];
@@ -379,7 +476,7 @@ export default async function handler(
         
         // Add all fields to additionalData with label-value format
         Object.keys(v).forEach((key: string) => {
-          if (v[key]) {
+          if (v[key] && v[key] !== 'N/A' && v[key] !== '') {
             additionalData[key] = {
               label: getFieldLabel(key),
               value: v[key]
@@ -387,31 +484,57 @@ export default async function handler(
           }
         });
 
+        // Also add the main fields to additionalData for consistency
+        const mainFields = {
+          name: { label: 'Full Name', value: v.name },
+          email: { label: 'Email', value: v.email },
+          phone: { label: 'Phone Number', value: v.phone },
+          company: { label: 'Company', value: v.company },
+          city: { label: 'City', value: v.city },
+          state: { label: 'State', value: v.state },
+          country: { label: 'Country', value: v.country },
+          pincode: { label: 'Pincode', value: v.pincode },
+          source: { label: 'Source', value: v.source },
+          location: { label: 'Location', value: v.location },
+          eventName: { label: 'Event', value: v.eventName },
+          eventDate: { label: 'Event Date', value: v.eventDate },
+          eventEndDate: { label: 'Event End Date', value: v.eventEndDate },
+          status: { label: 'Status', value: v.status },
+          registrationDate: { label: 'Registration Date', value: v.registrationDate }
+        };
+
+        // Add main fields to additionalData if they have values
+        Object.entries(mainFields).forEach(([key, fieldData]) => {
+          if (fieldData.value && fieldData.value !== 'N/A' && fieldData.value !== '') {
+            additionalData[key] = fieldData;
+          }
+        });
+
         const visitorDoc = {
           registrationId: registration._id,
           eventId: eventId,
           formId: new mongoose.Types.ObjectId(), // Create new ObjectId for formId
-          name: v.name || 'N/A',
-          email: v.email || 'N/A',
-          phone: v.phone || 'N/A',
-          company: v.company || 'N/A',
-          city: v.city || 'N/A',
-          state: v.state || 'N/A',
-          country: v.country || 'N/A',
-          pincode: v.pincode || 'N/A',
-          source: v.source || 'N/A',
-          location: v.location || 'N/A',
+          name: handleMissingString(v.name),
+          email: handleMissingString(v.email),
+          phone: handleMissingString(v.phone),
+          company: handleMissingString(v.company),
+          city: handleMissingString(v.city),
+          state: handleMissingString(v.state),
+          country: handleMissingString(v.country),
+          pincode: handleMissingString(v.pincode),
+          source: handleMissingString(v.source),
+          location: handleMissingString(v.location),
           qrCode,
           eventName: eventName,
-          eventLocation: v.location || v.city || 'N/A', // Use location first, then city as fallback
-          eventStartDate: formatDate(v.eventDate || ''),
-          eventEndDate: formatDate(v.eventEndDate || ''),
-          eventStartTime: formatTime(v.eventStartTime || ''),
-          eventEndTime: formatTime(v.eventEndTime || ''),
-          status: mapVisitorStatus(v.status),
+          eventLocation: handleMissingString(v.location || v.city), // Use location first, then city as fallback
+          eventStartDate: formatDate(v.eventDate || '') || formatDate(''), // Ensure we have a valid date
+          eventEndDate: formatDate(v.eventEndDate || v.eventDate || '') || formatDate(''), // Ensure we have a valid date
+          eventStartTime: formatTime(v.eventStartTime || '09:00'), // Default to 9 AM if not provided
+          eventEndTime: formatTime(v.eventEndTime || '17:00'), // Default to 5 PM if not provided
+          status: handleMissingStatus(v.status),
           additionalData: additionalData,
-          createdAt: formatDate(v.registrationDate || ''),
-          updatedAt: formatDate(v.registrationDate || ''),
+          createdAt: formatDate(v.registrationDate || '') || formatDate(''), // Ensure we have a valid date
+          updatedAt: formatDate(v.registrationDate || '') || formatDate(''), // Ensure we have a valid date
         };
 
         // Debug: Log the final visitor document
@@ -421,14 +544,56 @@ export default async function handler(
           phone: visitorDoc.phone,
           company: visitorDoc.company,
           eventLocation: visitorDoc.eventLocation,
+          eventStartDate: visitorDoc.eventStartDate,
+          eventEndDate: visitorDoc.eventEndDate,
+          eventStartTime: visitorDoc.eventStartTime,
+          eventEndTime: visitorDoc.eventEndTime,
           additionalData: visitorDoc.additionalData
         });
 
+        // Validate required fields before saving
+        const requiredFields = ['name', 'email', 'phone', 'company', 'eventStartDate', 'eventEndDate', 'eventStartTime', 'eventEndTime'];
+        const missingFields = requiredFields.filter(field => {
+          const value = visitorDoc[field as keyof typeof visitorDoc];
+          return !value || value === '-' || value === 'N/A';
+        });
+        
+        if (missingFields.length > 0) {
+          console.error(`Row ${i + 1} - Missing required fields:`, missingFields);
+          errors.push(`Row ${i + 1}: Missing required fields - ${missingFields.join(', ')}`);
+          continue; // Skip this row
+        }
+
         try {
-          await Visitor.create(visitorDoc);
+          console.log(`Row ${i + 1} - Attempting to create visitor with data:`, {
+            name: visitorDoc.name,
+            email: visitorDoc.email,
+            phone: visitorDoc.phone,
+            company: visitorDoc.company,
+            eventStartDate: visitorDoc.eventStartDate,
+            eventEndDate: visitorDoc.eventEndDate,
+            eventStartTime: visitorDoc.eventStartTime,
+            eventEndTime: visitorDoc.eventEndTime,
+            eventLocation: visitorDoc.eventLocation,
+            status: visitorDoc.status
+          });
+          
+          const savedVisitor = await Visitor.create(visitorDoc);
+          console.log(`Row ${i + 1} - Visitor created successfully:`, savedVisitor._id);
         } catch (err) {
-          console.error(`Error creating Visitor for row ${i + 1}:`, err, visitorDoc);
-          errors.push(`Row ${i + 1}: Visitor not saved. ${err instanceof Error ? err.message : err}`);
+          console.error(`Error creating Visitor for row ${i + 1}:`, err);
+          console.error(`Visitor document that failed:`, JSON.stringify(visitorDoc, null, 2));
+          
+          // Check if it's a validation error
+          if (err instanceof Error && err.name === 'ValidationError') {
+            const validationError = err as any;
+            const validationMessages = Object.keys(validationError.errors).map(key => 
+              `${key}: ${validationError.errors[key].message}`
+            );
+            errors.push(`Row ${i + 1}: Validation failed - ${validationMessages.join(', ')}`);
+          } else {
+            errors.push(`Row ${i + 1}: Visitor not saved. ${err instanceof Error ? err.message : String(err)}`);
+          }
         }
         // --- End Visitor ---
       } catch (error) {
@@ -456,4 +621,4 @@ export default async function handler(
       message: error instanceof Error ? error.message : 'Unknown error'
     });
   }
-} 
+}

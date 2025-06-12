@@ -54,6 +54,16 @@ export default async function handler(
         return res.status(404).json({ error: 'Event not found' });
       }
 
+      // Check if a form already exists for this event
+      const existingForm = await Form.findOne({ eventId }).session(session);
+      if (existingForm) {
+        await session.abortTransaction();
+        return res.status(409).json({ 
+          error: 'A form already exists for this event',
+          message: 'You can only create one form per event. Please edit the existing form instead.'
+        });
+      }
+
       // Create new form
       const form = await Form.create([{
         eventId,
