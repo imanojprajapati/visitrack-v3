@@ -57,7 +57,7 @@ export default async function handler(
     const [
       totalVisitors,
       visitedVisitors,
-      upcomingEvents,
+      allEvents,
       totalEvents,
       allVisitors,
       eventStatsData
@@ -68,10 +68,8 @@ export default async function handler(
       // Visited visitors
       Visitor.countDocuments({ ...query, status: 'Visited' }),
       
-      // Upcoming events (events starting today or in the future)
-      Event.countDocuments({
-        startDate: { $gte: new Date() }
-      }),
+      // Get all events for upcoming calculation
+      Event.find().lean(),
       
       // Total events
       Event.countDocuments(),
@@ -107,16 +105,42 @@ export default async function handler(
       ])
     ]);
 
+    // Calculate upcoming events
+    const currentDate = new Date();
+    currentDate.setHours(0, 0, 0, 0); // Reset time to start of day for fair comparison
+    
+    console.log('Current date for upcoming events:', currentDate.toISOString());
+    console.log('Total events found:', allEvents.length);
+    
+    const upcomingEvents = allEvents.filter(event => {
+      const eventStartDate = parseDateString(event.startDate);
+      if (!eventStartDate) {
+        console.log('Could not parse event start date:', event.startDate, 'for event:', event.title);
+        return false;
+      }
+      
+      // Reset time to start of day for comparison
+      const eventDate = new Date(eventStartDate);
+      eventDate.setHours(0, 0, 0, 0);
+      
+      const isUpcoming = eventDate >= currentDate;
+      console.log(`Event: ${event.title}, Start Date: ${event.startDate}, Parsed: ${eventDate.toISOString()}, Is Upcoming: ${isUpcoming}`);
+      
+      return isUpcoming;
+    }).length;
+    
+    console.log('Upcoming events count:', upcomingEvents);
+
     // Generate real monthly data for the last 12 months
     const monthlyRegistrations = [];
-    const currentDate = new Date();
+    const currentDateForMonthly = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
     console.log('Generating monthly data for', allVisitors.length, 'visitors');
     
     for (let i = 11; i >= 0; i--) {
-      const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const targetDate = new Date(currentDateForMonthly.getFullYear(), currentDateForMonthly.getMonth() - i, 1);
       const monthKey = monthNames[targetDate.getMonth()];
       const year = targetDate.getFullYear();
       
