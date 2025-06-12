@@ -29,22 +29,12 @@ interface FormattedVisitor {
   phone: string;
   company?: string;
   age?: number;
-  city?: string;
-  state?: string;
-  country?: string;
-  pincode?: string;
-  source?: string;
-  location?: string;
-  qrCode: string;
   eventId: FormattedEvent | null;
   eventName: string;
   eventLocation: string;
   eventStartDate: string;
   eventEndDate: string;
-  eventStartTime: string;
-  eventEndTime: string;
   status: VisitorStatus;
-  scanTime?: Date;
   checkInTime: string;
   checkOutTime?: string;
   additionalData?: Record<string, { label: string; value: any }>;
@@ -315,13 +305,6 @@ export default async function handler(
                     phone: visitor.phone,
                     company: visitor.company,
                     age: visitor.age,
-                    city: visitor.city,
-                    state: visitor.state,
-                    country: visitor.country,
-                    pincode: visitor.pincode,
-                    source: visitor.source,
-                    location: visitor.location,
-                    qrCode: visitor.qrCode,
                     eventId: visitor.eventId ? {
                       _id: visitor.eventId._id.toString(),
                       title: visitor.eventId.title,
@@ -333,10 +316,7 @@ export default async function handler(
                     eventLocation: visitor.eventId?.location || '',
                     eventStartDate: visitor.eventId?.startDate ? new Date(visitor.eventId.startDate).toISOString() : '',
                     eventEndDate: visitor.eventId?.endDate ? new Date(visitor.eventId.endDate).toISOString() : '',
-                    eventStartTime: visitor.eventStartTime || '',
-                    eventEndTime: visitor.eventEndTime || '',
                     status: visitor.status,
-                    scanTime: visitor.scanTime,
                     checkInTime: new Date(visitor.checkInTime || visitor.createdAt).toISOString(),
                     createdAt: new Date(visitor.createdAt).toISOString(),
                     updatedAt: new Date(visitor.updatedAt).toISOString()
@@ -350,10 +330,8 @@ export default async function handler(
                   // Convert additionalData to the format expected by frontend
                   if (visitor.additionalData) {
                     formatted.additionalData = visitor.additionalData as Record<string, { label: string; value: any }>;
-                    console.log(`Visitor ${formatted._id} additionalData:`, JSON.stringify(visitor.additionalData, null, 2));
                   } else {
                     formatted.additionalData = {};
-                    console.log(`Visitor ${formatted._id} has no additionalData`);
                   }
 
                   return formatted;
@@ -400,19 +378,8 @@ export default async function handler(
             try {
               const populatedVisitor = visitor as unknown as PopulatedVisitor;
               const formatted: FormattedVisitor = {
+                ...populatedVisitor,
                 _id: populatedVisitor._id.toString(),
-                name: populatedVisitor.name,
-                email: populatedVisitor.email,
-                phone: populatedVisitor.phone,
-                company: populatedVisitor.company,
-                age: populatedVisitor.age,
-                city: populatedVisitor.city,
-                state: populatedVisitor.state,
-                country: populatedVisitor.country,
-                pincode: populatedVisitor.pincode,
-                source: populatedVisitor.source,
-                location: populatedVisitor.location,
-                qrCode: populatedVisitor.qrCode,
                 eventId: populatedVisitor.eventId ? {
                   _id: populatedVisitor.eventId._id.toString(),
                   title: populatedVisitor.eventId.title,
@@ -420,14 +387,6 @@ export default async function handler(
                   startDate: new Date(populatedVisitor.eventId.startDate).toISOString(),
                   endDate: new Date(populatedVisitor.eventId.endDate).toISOString()
                 } : null,
-                eventName: populatedVisitor.eventName,
-                eventLocation: populatedVisitor.eventLocation,
-                eventStartDate: populatedVisitor.eventStartDate,
-                eventEndDate: populatedVisitor.eventEndDate,
-                eventStartTime: populatedVisitor.eventStartTime,
-                eventEndTime: populatedVisitor.eventEndTime,
-                status: populatedVisitor.status,
-                scanTime: populatedVisitor.scanTime,
                 checkInTime: new Date(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
                 createdAt: new Date(populatedVisitor.createdAt).toISOString(),
                 updatedAt: new Date(populatedVisitor.updatedAt).toISOString()
@@ -439,10 +398,8 @@ export default async function handler(
               }
               if (populatedVisitor.additionalData) {
                 formatted.additionalData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
-                console.log(`Visitor ${formatted._id} additionalData:`, JSON.stringify(populatedVisitor.additionalData, null, 2));
               } else {
                 formatted.additionalData = {};
-                console.log(`Visitor ${formatted._id} has no additionalData`);
               }
 
               return formatted;
@@ -501,19 +458,8 @@ export default async function handler(
           // Format response
           const populatedVisitor = newVisitor.toObject() as unknown as PopulatedVisitor;
           const formattedVisitor: FormattedVisitor = {
+            ...populatedVisitor,
             _id: populatedVisitor._id.toString(),
-            name: populatedVisitor.name,
-            email: populatedVisitor.email,
-            phone: populatedVisitor.phone,
-            company: populatedVisitor.company,
-            age: populatedVisitor.age,
-            city: populatedVisitor.city,
-            state: populatedVisitor.state,
-            country: populatedVisitor.country,
-            pincode: populatedVisitor.pincode,
-            source: populatedVisitor.source,
-            location: populatedVisitor.location,
-            qrCode: populatedVisitor.qrCode,
             eventId: populatedVisitor.eventId ? {
               _id: populatedVisitor.eventId._id.toString(),
               title: populatedVisitor.eventId.title,
@@ -521,14 +467,6 @@ export default async function handler(
               startDate: new Date(populatedVisitor.eventId.startDate).toISOString(),
               endDate: new Date(populatedVisitor.eventId.endDate).toISOString()
             } : null,
-            eventName: populatedVisitor.eventName,
-            eventLocation: populatedVisitor.eventLocation,
-            eventStartDate: populatedVisitor.eventStartDate,
-            eventEndDate: populatedVisitor.eventEndDate,
-            eventStartTime: populatedVisitor.eventStartTime,
-            eventEndTime: populatedVisitor.eventEndTime,
-            status: populatedVisitor.status,
-            scanTime: populatedVisitor.scanTime,
             checkInTime: new Date(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
             createdAt: new Date(populatedVisitor.createdAt).toISOString(),
             updatedAt: new Date(populatedVisitor.updatedAt).toISOString()
@@ -540,10 +478,8 @@ export default async function handler(
           }
           if (populatedVisitor.additionalData) {
             formattedVisitor.additionalData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
-            console.log(`Visitor ${formattedVisitor._id} additionalData:`, JSON.stringify(populatedVisitor.additionalData, null, 2));
           } else {
             formattedVisitor.additionalData = {};
-            console.log(`Visitor ${formattedVisitor._id} has no additionalData`);
           }
 
           return res.status(201).json(formattedVisitor);
