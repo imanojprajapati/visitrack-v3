@@ -95,6 +95,30 @@ export default function AdminDashboard() {
     fetchDashboardStats();
   };
 
+  // Debug: Log chart data when it changes
+  useEffect(() => {
+    if (stats) {
+      console.log('Chart data updated:', {
+        monthlyRegistrations: stats.monthlyRegistrations,
+        eventStats: stats.eventStats
+      });
+      
+      // Log first item of each dataset to understand structure
+      if (stats.monthlyRegistrations && stats.monthlyRegistrations.length > 0) {
+        console.log('First monthly registration item:', stats.monthlyRegistrations[0]);
+      }
+      if (stats.eventStats && stats.eventStats.length > 0) {
+        console.log('First event stat item:', stats.eventStats[0]);
+      }
+    }
+  }, [stats]);
+
+  // Helper function to truncate long event names for chart display
+  const truncateEventName = (name: string, maxLength: number = 20) => {
+    if (name.length <= maxLength) return name;
+    return name.substring(0, maxLength) + '...';
+  };
+
   if (loading && !stats) {
     return (
       <AdminLayout>
@@ -122,7 +146,7 @@ export default function AdminDashboard() {
             >
               {events.map(event => (
                 <Option key={event._id} value={event._id}>
-                  {event.title}
+                  {truncateEventName(event.title)}
                 </Option>
               ))}
             </Select>
@@ -207,7 +231,8 @@ export default function AdminDashboard() {
             <Row gutter={[16, 16]} className="mb-8">
               <Col xs={24} lg={12}>
                 <Card title="Monthly Registrations" className="h-96">
-                  {stats.monthlyRegistrations && stats.monthlyRegistrations.length > 0 ? (
+                  {stats.monthlyRegistrations && stats.monthlyRegistrations.length > 0 && 
+                   stats.monthlyRegistrations.some(item => item.count > 0) ? (
                     <div className="h-80">
                       <Line
                         data={stats.monthlyRegistrations}
@@ -215,33 +240,131 @@ export default function AdminDashboard() {
                         yField="count"
                         smooth
                         point={{
-                          size: 5,
-                          shape: 'diamond',
+                          size: 6,
+                          shape: 'circle',
+                          style: {
+                            fill: '#1890ff',
+                            stroke: '#fff',
+                            strokeWidth: 2,
+                          },
+                        }}
+                        line={{
+                          style: {
+                            stroke: '#1890ff',
+                            strokeWidth: 3,
+                          },
                         }}
                         color="#1890ff"
                         height={300}
                         xAxis={{
                           title: {
-                            text: 'Month'
-                          }
+                            text: 'Month',
+                            style: {
+                              fontSize: 12,
+                              fontWeight: 500,
+                            },
+                          },
+                          label: {
+                            style: {
+                              fontSize: 10,
+                            },
+                            autoRotate: true,
+                            autoHide: true,
+                            autoEllipsis: true,
+                          },
                         }}
                         yAxis={{
                           title: {
-                            text: 'Registrations'
-                          }
+                            text: 'Registrations',
+                            style: {
+                              fontSize: 12,
+                              fontWeight: 500,
+                            },
+                          },
+                          min: 0,
+                          label: {
+                            style: {
+                              fontSize: 10,
+                            },
+                          },
                         }}
+                        tooltip={{
+                          showCrosshairs: true,
+                          crosshairs: {
+                            type: 'xy',
+                            line: {
+                              style: {
+                                stroke: '#1890ff',
+                                strokeWidth: 1,
+                                strokeOpacity: 0.5,
+                                lineDash: [4, 4],
+                              },
+                            },
+                          },
+                          showMarkers: true,
+                          marker: {
+                            fill: '#1890ff',
+                            stroke: '#fff',
+                            strokeWidth: 2,
+                            r: 4,
+                          },
+                          formatter: (datum: any) => {
+                            return {
+                              name: 'Registrations',
+                              value: `${datum.count || 0} registrations`,
+                            };
+                          },
+                          domStyles: {
+                            'g2-tooltip': {
+                              backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                              color: '#fff',
+                              borderRadius: '8px',
+                              padding: '12px 16px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                            },
+                            'g2-tooltip-title': {
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              marginBottom: '4px',
+                            },
+                            'g2-tooltip-list': {
+                              margin: '0',
+                            },
+                            'g2-tooltip-list-item': {
+                              margin: '4px 0',
+                            },
+                          },
+                        }}
+                        animation={{
+                          appear: {
+                            animation: 'path-in',
+                            duration: 1000,
+                          },
+                        }}
+                        interactions={[
+                          {
+                            type: 'marker-active',
+                          },
+                        ]}
                       />
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-80 text-gray-500">
-                      No data available
+                      <div className="text-center">
+                        <div className="text-lg mb-2">No registration data available</div>
+                        <div className="text-sm">Registration data will appear here once visitors start registering</div>
+                      </div>
                     </div>
                   )}
                 </Card>
               </Col>
               <Col xs={24} lg={12}>
                 <Card title="Event Performance" className="h-96">
-                  {stats.eventStats && stats.eventStats.length > 0 ? (
+                  {stats.eventStats && stats.eventStats.length > 0 && 
+                   stats.eventStats.some(item => item.value > 0) ? (
                     <div className="h-80">
                       <Column
                         data={stats.eventStats.filter(item => item.value > 0)}
@@ -250,30 +373,116 @@ export default function AdminDashboard() {
                         seriesField="type"
                         isGroup={true}
                         columnStyle={{
-                          radius: [4, 4, 0, 0],
+                          radius: [6, 6, 0, 0],
                         }}
                         height={300}
-                        color={['#ff4d4f', '#1890ff']}
+                        color={['#ff4d4f', '#1890ff', '#52c41a', '#faad14']}
                         legend={{
-                          position: 'top'
+                          position: 'top',
+                          marker: {
+                            symbol: 'circle',
+                          },
+                          itemName: {
+                            style: {
+                              fontSize: 12,
+                              fontWeight: 500,
+                            },
+                          },
                         }}
                         xAxis={{
                           label: {
+                            style: {
+                              fontSize: 10,
+                            },
                             autoRotate: true,
                             autoHide: true,
                             autoEllipsis: true,
-                          }
+                          },
                         }}
                         yAxis={{
                           title: {
-                            text: 'Count'
-                          }
+                            text: 'Count',
+                            style: {
+                              fontSize: 12,
+                              fontWeight: 500,
+                            },
+                          },
+                          min: 0,
+                          label: {
+                            style: {
+                              fontSize: 10,
+                            },
+                          },
                         }}
+                        tooltip={{
+                          showCrosshairs: true,
+                          crosshairs: {
+                            type: 'xy',
+                            line: {
+                              style: {
+                                stroke: '#1890ff',
+                                strokeWidth: 1,
+                                strokeOpacity: 0.5,
+                                lineDash: [4, 4],
+                              },
+                            },
+                          },
+                          showMarkers: true,
+                          marker: {
+                            fill: '#1890ff',
+                            stroke: '#fff',
+                            strokeWidth: 2,
+                            r: 4,
+                          },
+                          formatter: (datum: any) => {
+                            return {
+                              name: datum.type || 'Unknown',
+                              value: `${datum.value || 0} ${(datum.type || 'unknown').toLowerCase()}`,
+                            };
+                          },
+                          domStyles: {
+                            'g2-tooltip': {
+                              backgroundColor: 'rgba(0, 0, 0, 0.85)',
+                              color: '#fff',
+                              borderRadius: '8px',
+                              padding: '12px 16px',
+                              fontSize: '13px',
+                              fontWeight: '500',
+                              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                              border: '1px solid rgba(255, 255, 255, 0.1)',
+                            },
+                            'g2-tooltip-title': {
+                              fontSize: '14px',
+                              fontWeight: '600',
+                              marginBottom: '4px',
+                            },
+                            'g2-tooltip-list': {
+                              margin: '0',
+                            },
+                            'g2-tooltip-list-item': {
+                              margin: '4px 0',
+                            },
+                          },
+                        }}
+                        animation={{
+                          appear: {
+                            animation: 'fade-in',
+                            duration: 1000,
+                          },
+                        }}
+                        interactions={[
+                          {
+                            type: 'element-active',
+                          },
+                        ]}
                       />
                     </div>
                   ) : (
                     <div className="flex items-center justify-center h-80 text-gray-500">
-                      No data available
+                      <div className="text-center">
+                        <div className="text-lg mb-2">No event data available</div>
+                        <div className="text-sm">Event performance data will appear here once events are created and visitors register</div>
+                      </div>
                     </div>
                   )}
                 </Card>

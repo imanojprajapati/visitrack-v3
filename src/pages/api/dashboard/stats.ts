@@ -4,6 +4,35 @@ import Visitor from '../../../models/Visitor';
 import Event from '../../../models/Event';
 import mongoose from 'mongoose';
 
+// Helper function to parse DD-MM-YYYY or DD-MM-YY format to Date
+const parseDateString = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+  
+  // Check if it's in DD-MM-YYYY format
+  const ddMMYYYYRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/;
+  if (ddMMYYYYRegex.test(dateStr)) {
+    const [day, month, year] = dateStr.split('-');
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  }
+  
+  // Check if it's in DD-MM-YY format
+  const ddMMYYRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/;
+  if (ddMMYYRegex.test(dateStr)) {
+    const [day, month, yearStr] = dateStr.split('-');
+    const yearNum = parseInt(yearStr, 10);
+    const year = yearNum < 50 ? 2000 + yearNum : 1900 + yearNum;
+    return new Date(year, parseInt(month) - 1, parseInt(day));
+  }
+  
+  // Try ISO format
+  const isoDate = new Date(dateStr);
+  if (!isNaN(isoDate.getTime())) {
+    return isoDate;
+  }
+  
+  return null;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -23,10 +52,6 @@ export default async function handler(
     if (eventId) {
       query.eventId = new mongoose.Types.ObjectId(eventId as string);
     }
-    
-    // Note: createdAt is stored as string in DD-MM-YY format, so we can't filter by date range
-    // If date filtering is needed, we would need to use scanTime or other date fields
-    // For now, we'll skip date filtering to avoid errors
 
     // Get basic statistics
     const [
@@ -34,7 +59,7 @@ export default async function handler(
       visitedVisitors,
       upcomingEvents,
       totalEvents,
-      monthlyData,
+      allVisitors,
       eventStatsData
     ] = await Promise.all([
       // Total visitors
@@ -51,25 +76,8 @@ export default async function handler(
       // Total events
       Event.countDocuments(),
       
-      // Monthly registrations (last 12 months) - simplified approach
-      Visitor.aggregate([
-        { $match: query },
-        {
-          $group: {
-            _id: null,
-            totalCount: { $sum: 1 },
-            recentCount: {
-              $sum: {
-                $cond: [
-                  { $ne: ['$scanTime', null] },
-                  1,
-                  0
-                ]
-              }
-            }
-          }
-        }
-      ]),
+      // Get all visitors for monthly analysis
+      Visitor.find(query).lean(),
       
       // Event statistics
       Visitor.aggregate([
@@ -99,34 +107,56 @@ export default async function handler(
       ])
     ]);
 
+    // Generate real monthly data for the last 12 months
+    const monthlyRegistrations = [];
+    const currentDate = new Date();
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    console.log('Generating monthly data for', allVisitors.length, 'visitors');
+    
+    for (let i = 11; i >= 0; i--) {
+      const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+      const monthKey = monthNames[targetDate.getMonth()];
+      const year = targetDate.getFullYear();
+      
+      // Count registrations for this month
+      let monthCount = 0;
+      
+      for (const visitor of allVisitors) {
+        const registrationDate = parseDateString(visitor.createdAt);
+        if (registrationDate) {
+          const visitorYear = registrationDate.getFullYear();
+          const visitorMonth = registrationDate.getMonth();
+          
+          if (visitorYear === year && visitorMonth === targetDate.getMonth()) {
+            monthCount++;
+          }
+        }
+      }
+      
+      const monthData = {
+        month: `${monthKey} ${year}`,
+        count: monthCount
+      };
+      
+      monthlyRegistrations.push(monthData);
+      console.log('Month data:', monthData);
+    }
+
     // Transform data for charts
     const eventStats = eventStatsData.flatMap(event => [
       {
-        event: event._id,
+        event: event._id.length > 20 ? event._id.substring(0, 20) + '...' : event._id,
         type: 'Registrations',
         value: event.registrations
       },
       {
-        event: event._id,
+        event: event._id.length > 20 ? event._id.substring(0, 20) + '...' : event._id,
         type: 'Visited',
         value: event.visits
       }
     ]);
-
-    const monthlyRegistrations = (monthlyData && monthlyData.length > 0) ? [
-      { month: 'Jan', count: Math.floor(monthlyData[0].totalCount * 0.1) },
-      { month: 'Feb', count: Math.floor(monthlyData[0].totalCount * 0.15) },
-      { month: 'Mar', count: Math.floor(monthlyData[0].totalCount * 0.2) },
-      { month: 'Apr', count: Math.floor(monthlyData[0].totalCount * 0.25) },
-      { month: 'May', count: Math.floor(monthlyData[0].totalCount * 0.3) },
-      { month: 'Jun', count: Math.floor(monthlyData[0].totalCount * 0.35) },
-      { month: 'Jul', count: Math.floor(monthlyData[0].totalCount * 0.4) },
-      { month: 'Aug', count: Math.floor(monthlyData[0].totalCount * 0.45) },
-      { month: 'Sep', count: Math.floor(monthlyData[0].totalCount * 0.5) },
-      { month: 'Oct', count: Math.floor(monthlyData[0].totalCount * 0.55) },
-      { month: 'Nov', count: Math.floor(monthlyData[0].totalCount * 0.6) },
-      { month: 'Dec', count: monthlyData[0].totalCount }
-    ] : [];
 
     // Prepare response
     const dashboardStats = {

@@ -159,18 +159,16 @@ const Contact = () => {
             <div className="space-y-4">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Email</h3>
-                <p className="mt-2 text-gray-600">support@visitrack.com</p>
+                <p className="mt-2 text-gray-600">visitrackinfo@gmail.com</p>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Phone</h3>
-                <p className="mt-2 text-gray-600">+1 (555) 123-4567</p>
+                <p className="mt-2 text-gray-600">97277 72798</p>
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Address</h3>
                 <p className="mt-2 text-gray-600">
-                  123 Tech Street<br />
-                  San Francisco, CA 94107<br />
-                  United States
+                A-407, Ganesh Glory 11 Nr. <br/>Bsnl Office , SG highway Jagatpur, Road, <br/>Gota, Ahmedabad, Gujarat 382470
                 </p>
               </div>
             </div>
