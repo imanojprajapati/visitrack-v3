@@ -116,7 +116,13 @@ export default function FormsPage() {
       title: 'Created At',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      render: (date: string) => new Date(date).toLocaleDateString(),
+      render: (date: string) => {
+        try {
+          return new Date(date).toLocaleDateString();
+        } catch (error) {
+          return date; // Return as-is if parsing fails
+        }
+      },
       width: 150,
     },
     {

@@ -309,22 +309,22 @@ export default async function handler(
                       _id: visitor.eventId._id.toString(),
                       title: visitor.eventId.title,
                       location: visitor.eventId.location,
-                      startDate: new Date(visitor.eventId.startDate).toISOString(),
-                      endDate: new Date(visitor.eventId.endDate).toISOString()
+                      startDate: parseDateString(visitor.eventId.startDate).toISOString(),
+                      endDate: parseDateString(visitor.eventId.endDate).toISOString()
                     } : null,
                     eventName: visitor.eventId?.title || '',
                     eventLocation: visitor.eventId?.location || '',
-                    eventStartDate: visitor.eventId?.startDate ? new Date(visitor.eventId.startDate).toISOString() : '',
-                    eventEndDate: visitor.eventId?.endDate ? new Date(visitor.eventId.endDate).toISOString() : '',
+                    eventStartDate: visitor.eventId?.startDate ? parseDateString(visitor.eventId.startDate).toISOString() : '',
+                    eventEndDate: visitor.eventId?.endDate ? parseDateString(visitor.eventId.endDate).toISOString() : '',
                     status: visitor.status,
-                    checkInTime: new Date(visitor.checkInTime || visitor.createdAt).toISOString(),
-                    createdAt: new Date(visitor.createdAt).toISOString(),
-                    updatedAt: new Date(visitor.updatedAt).toISOString()
+                    checkInTime: parseDateString(visitor.checkInTime || visitor.createdAt).toISOString(),
+                    createdAt: parseDateString(visitor.createdAt).toISOString(),
+                    updatedAt: parseDateString(visitor.updatedAt).toISOString()
                   };
 
                   // Handle optional fields
                   if (visitor.checkOutTime) {
-                    formatted.checkOutTime = new Date(visitor.checkOutTime).toISOString();
+                    formatted.checkOutTime = parseDateString(visitor.checkOutTime).toISOString();
                   }
                   
                   // Convert additionalData to the format expected by frontend
@@ -384,17 +384,22 @@ export default async function handler(
                   _id: populatedVisitor.eventId._id.toString(),
                   title: populatedVisitor.eventId.title,
                   location: populatedVisitor.eventId.location,
-                  startDate: new Date(populatedVisitor.eventId.startDate).toISOString(),
-                  endDate: new Date(populatedVisitor.eventId.endDate).toISOString()
+                  startDate: parseDateString(populatedVisitor.eventId.startDate).toISOString(),
+                  endDate: parseDateString(populatedVisitor.eventId.endDate).toISOString()
                 } : null,
-                checkInTime: new Date(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
-                createdAt: new Date(populatedVisitor.createdAt).toISOString(),
-                updatedAt: new Date(populatedVisitor.updatedAt).toISOString()
+                eventName: populatedVisitor.eventName,
+                eventLocation: populatedVisitor.eventLocation,
+                eventStartDate: parseDateString(populatedVisitor.eventStartDate).toISOString(),
+                eventEndDate: parseDateString(populatedVisitor.eventEndDate).toISOString(),
+                checkInTime: parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
+                createdAt: parseDateString(populatedVisitor.createdAt).toISOString(),
+                updatedAt: parseDateString(populatedVisitor.updatedAt).toISOString(),
+                additionalData: {}
               };
 
               // Handle optional fields
               if (populatedVisitor.checkOutTime) {
-                formatted.checkOutTime = new Date(populatedVisitor.checkOutTime).toISOString();
+                formatted.checkOutTime = parseDateString(populatedVisitor.checkOutTime).toISOString();
               }
               if (populatedVisitor.additionalData) {
                 formatted.additionalData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
@@ -464,17 +469,22 @@ export default async function handler(
               _id: populatedVisitor.eventId._id.toString(),
               title: populatedVisitor.eventId.title,
               location: populatedVisitor.eventId.location,
-              startDate: new Date(populatedVisitor.eventId.startDate).toISOString(),
-              endDate: new Date(populatedVisitor.eventId.endDate).toISOString()
+              startDate: parseDateString(populatedVisitor.eventId.startDate).toISOString(),
+              endDate: parseDateString(populatedVisitor.eventId.endDate).toISOString()
             } : null,
-            checkInTime: new Date(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
-            createdAt: new Date(populatedVisitor.createdAt).toISOString(),
-            updatedAt: new Date(populatedVisitor.updatedAt).toISOString()
+            eventName: populatedVisitor.eventName,
+            eventLocation: populatedVisitor.eventLocation,
+            eventStartDate: parseDateString(populatedVisitor.eventStartDate).toISOString(),
+            eventEndDate: parseDateString(populatedVisitor.eventEndDate).toISOString(),
+            checkInTime: parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt).toISOString(),
+            createdAt: parseDateString(populatedVisitor.createdAt).toISOString(),
+            updatedAt: parseDateString(populatedVisitor.updatedAt).toISOString(),
+            additionalData: {}
           };
 
           // Handle optional fields
           if (populatedVisitor.checkOutTime) {
-            formattedVisitor.checkOutTime = new Date(populatedVisitor.checkOutTime).toISOString();
+            formattedVisitor.checkOutTime = parseDateString(populatedVisitor.checkOutTime).toISOString();
           }
           if (populatedVisitor.additionalData) {
             formattedVisitor.additionalData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
@@ -503,4 +513,48 @@ export default async function handler(
   } catch (error) {
     handleApiError(error, res);
   }
-} 
+}
+
+// Helper function to parse DD-MM-YY or DD-MM-YYYY format to Date object
+const parseDateString = (dateStr: string): Date => {
+  if (!dateStr) return new Date();
+  
+  // Debug: Log the input date string
+  console.log('parseDateString input:', dateStr, 'type:', typeof dateStr);
+  
+  // Check if it's already in ISO format
+  const isoDate = new Date(dateStr);
+  if (!isNaN(isoDate.getTime())) {
+    console.log('parseDateString: ISO format detected, returning:', isoDate.toISOString());
+    return isoDate;
+  }
+  
+  // Parse DD-MM-YY format (2-digit year)
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);  // First part is day
+    const month = parseInt(parts[1], 10) - 1; // Second part is month (0-indexed)
+    const yearStr = parts[2];
+    
+    let year: number;
+    if (yearStr.length === 2) {
+      // DD-MM-YY format: convert to 4-digit year
+      const yearNum = parseInt(yearStr, 10);
+      year = yearNum < 50 ? 2000 + yearNum : 1900 + yearNum;
+    } else if (yearStr.length === 4) {
+      // DD-MM-YYYY format
+      year = parseInt(yearStr, 10);
+    } else {
+      console.log('parseDateString: Invalid year format, returning current date');
+      return new Date();
+    }
+    
+    // Create date with correct order: year, month, day
+    const date = new Date(year, month, day);
+    console.log(`parseDateString: DD-MM-YY/YYYY format - ${dateStr} -> day: ${day}, month: ${month + 1}, year: ${year} -> ${date.toISOString()}`);
+    return date;
+  }
+  
+  console.log('parseDateString: No valid format detected, returning current date');
+  return new Date();
+}; 

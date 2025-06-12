@@ -529,7 +529,13 @@ export default function EventRegistration() {
                 <div><Text strong>{visitor.eventLocation}</Text></div>
               </div>
             )}
-            {visitor.eventStartDate && (
+            {visitor.eventStartDate && visitor.eventEndDate && (
+              <div>
+                <Text type="secondary">Event Date</Text>
+                <div><Text strong>{formatDate(visitor.eventStartDate)} - {formatDate(visitor.eventEndDate)}</Text></div>
+              </div>
+            )}
+            {visitor.eventStartDate && !visitor.eventEndDate && (
               <div>
                 <Text type="secondary">Event Date</Text>
                 <div><Text strong>{formatDate(visitor.eventStartDate)}</Text></div>
@@ -659,7 +665,9 @@ export default function EventRegistration() {
         ...visitor,
         visitorId: visitor._id,
         eventId: event._id,
-        eventDate: formatDate(visitor.eventStartDate),
+        eventStartDate: formatDate(visitor.eventStartDate),
+        eventEndDate: formatDate(visitor.eventEndDate),
+        eventDate: visitor.eventEndDate ? `${formatDate(visitor.eventStartDate)} - ${formatDate(visitor.eventEndDate)}` : formatDate(visitor.eventStartDate),
         registrationDate: formatDateTime(visitor.createdAt)
       };
 
@@ -698,12 +706,17 @@ export default function EventRegistration() {
   const formatDate = (dateString: string | Date | undefined): string => {
     if (!dateString) return 'N/A';
     try {
+      // If it's already a string in DD-MM-YYYY format, return it as is
+      if (typeof dateString === 'string' && /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(dateString)) {
+        return dateString;
+      }
+      
+      // If it's a Date object or other format, convert to DD-MM-YYYY
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = String(date.getFullYear());
+      return `${day}-${month}-${year}`;
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Invalid date';
@@ -714,14 +727,24 @@ export default function EventRegistration() {
   const formatDateTime = (dateString: string | Date | undefined): string => {
     if (!dateString) return 'N/A';
     try {
+      // If it's already a string in DD-MM-YY format, convert to DD-MM-YYYY for display
+      if (typeof dateString === 'string' && /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{2}$/.test(dateString)) {
+        const [day, month, year] = dateString.split('-');
+        const fullYear = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+        return `${day}-${month}-${fullYear}`;
+      }
+      
+      // If it's already a string in DD-MM-YYYY format, return it as is
+      if (typeof dateString === 'string' && /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(dateString)) {
+        return dateString;
+      }
+      
+      // If it's a Date object or other format, convert to DD-MM-YYYY
       const date = new Date(dateString);
-      return date.toLocaleString('en-GB', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = String(date.getFullYear());
+      return `${day}-${month}-${year}`;
     } catch (error) {
       console.error('Error formatting date:', error);
       return 'Invalid date';
@@ -1429,10 +1452,18 @@ export default function EventRegistration() {
                         <Text type="secondary">Location</Text>
                         <div><Text strong>{visitor.eventLocation}</Text></div>
                       </div>
-                      <div>
-                        <Text type="secondary">Event Date</Text>
-                        <div><Text strong>{formatDate(visitor.eventStartDate)}</Text></div>
-                      </div>
+                      {visitor.eventStartDate && visitor.eventEndDate && (
+                        <div>
+                          <Text type="secondary">Event Date</Text>
+                          <div><Text strong>{formatDate(visitor.eventStartDate)} - {formatDate(visitor.eventEndDate)}</Text></div>
+                        </div>
+                      )}
+                      {visitor.eventStartDate && !visitor.eventEndDate && (
+                        <div>
+                          <Text type="secondary">Event Date</Text>
+                          <div><Text strong>{formatDate(visitor.eventStartDate)}</Text></div>
+                        </div>
+                      )}
                       <div>
                         <Text type="secondary">Registration Date</Text>
                         <div><Text strong>{formatDateTime(visitor.createdAt)}</Text></div>
@@ -1496,12 +1527,16 @@ export default function EventRegistration() {
         <div className="absolute inset-0">
           <div className="relative w-full h-full">
             <Image
-              src="/images/event-banner.jpg"
+              src={event.banner || "/images/event-banner.jpg"}
               alt="Event Banner"
               fill
               style={{ objectFit: 'cover' }}
               className="opacity-90"
               priority
+              onError={(e) => {
+                // Fallback to default banner if event banner fails to load
+                e.currentTarget.src = "/images/event-banner.jpg";
+              }}
             />
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-75"></div>

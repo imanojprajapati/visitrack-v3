@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { connectToDatabase } from '../../../lib/mongodb';
 import Event, { IEvent } from '../../../models/Event';
 import Form from '../../../models/Form';
+import Visitor from '../../../models/Visitor';
+import Registration from '../../../models/Registration';
 import { EventForm, FormField } from '../../../types/form';
 import mongoose, { Document } from 'mongoose';
 
@@ -33,15 +35,15 @@ type MongoEvent = {
   title: string;
   description: string;
   location: string;
-  startDate: Date;
-  endDate: Date;
+  startDate: string;
+  endDate: string;
   time: string;
   endTime: string;
   status: string;
   capacity: number;
   visitors: number;
   formId?: mongoose.Types.ObjectId;
-  registrationDeadline?: Date;
+  registrationDeadline?: string;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -63,6 +65,22 @@ type FormattedEvent = {
   updatedAt: string;
   form?: EventForm;
   formId?: string;
+};
+
+// Helper function to format dates to DD-MM-YYYY format
+const formatDate = (date: Date | string): string => {
+  if (typeof date === 'string') {
+    // If it's already a string in DD-MM-YYYY format, return it
+    if (/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(date)) {
+      return date;
+    }
+    // Otherwise parse it as a date
+    date = new Date(date);
+  }
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear());
+  return `${day}-${month}-${year}`;
 };
 
 export default async function handler(
@@ -149,9 +167,9 @@ export default async function handler(
           const formattedEvent = {
             ...event,
             _id: event._id.toString(),
-            startDate: event.startDate.toISOString(),
-            endDate: event.endDate.toISOString(),
-            registrationDeadline: event.registrationDeadline?.toISOString(),
+            startDate: event.startDate, // Already in DD-MM-YYYY format
+            endDate: event.endDate, // Already in DD-MM-YYYY format
+            registrationDeadline: event.registrationDeadline, // Already in DD-MM-YYYY format
             createdAt: event.createdAt.toISOString(),
             updatedAt: event.updatedAt.toISOString(),
             formId: event.formId?.toString()
@@ -220,32 +238,12 @@ export default async function handler(
           return res.status(400).json({ message: 'Invalid request body' });
         }
 
-        // Validate and convert dates
+        // Validate and convert dates to DD-MM-YYYY format
         const dateFields = ['startDate', 'endDate', 'registrationDeadline'];
         for (const field of dateFields) {
           if (updates[field]) {
             try {
-              let date;
-              // Handle different date formats
-              if (typeof updates[field] === 'object' && updates[field].$d) {
-                // Dayjs object
-                date = new Date(updates[field].$d);
-              } else if (typeof updates[field] === 'string') {
-                // ISO string
-                date = new Date(updates[field]);
-              } else if (updates[field] instanceof Date) {
-                // Already a Date object
-                date = updates[field];
-              } else {
-                // Try to parse as string
-                date = new Date(updates[field]);
-              }
-              
-              if (isNaN(date.getTime())) {
-                console.error(`Invalid ${field} format:`, updates[field]);
-                return res.status(400).json({ message: `Invalid ${field} format` });
-              }
-              updates[field] = date;
+              updates[field] = formatDate(updates[field]);
             } catch (error) {
               console.error(`Error converting ${field}:`, error);
               return res.status(400).json({ message: `Invalid ${field} format` });
@@ -294,15 +292,72 @@ export default async function handler(
         const formattedUpdatedEvent = {
           ...updatedEvent,
           _id: updatedEvent._id.toString(),
-          startDate: updatedEvent.startDate.toISOString(),
-          endDate: updatedEvent.endDate.toISOString(),
-          registrationDeadline: updatedEvent.registrationDeadline?.toISOString(),
+          startDate: updatedEvent.startDate,
+          endDate: updatedEvent.endDate,
+          registrationDeadline: updatedEvent.registrationDeadline,
           createdAt: updatedEvent.createdAt.toISOString(),
           updatedAt: updatedEvent.updatedAt.toISOString(),
           formId: updatedEvent.formId?.toString()
         };
 
         return res.status(200).json(formattedUpdatedEvent);
+
+      case 'DELETE':
+        try {
+          console.log(`Attempting to delete event: ${eventId}`);
+          
+          // Check if event exists
+          const eventToDelete = await Event.findById(eventId);
+          if (!eventToDelete) {
+            console.log(`Event not found: ${eventId}`);
+            return res.status(404).json({ message: 'Event not found' });
+          }
+
+          console.log(`Found event: ${eventToDelete.title}`);
+
+          // Check if there are any visitors registered for this event
+          const visitorCount = await Visitor.countDocuments({ eventId });
+          const registrationCount = await Registration.countDocuments({ eventId });
+
+          console.log(`Visitor count: ${visitorCount}, Registration count: ${registrationCount}`);
+
+          if (visitorCount > 0) {
+            console.log(`Cannot delete event - ${visitorCount} visitors exist`);
+            return res.status(400).json({ 
+              message: `Cannot delete event. There are ${visitorCount} visitors registered for this event. Please remove all registrations first.` 
+            });
+          }
+
+          if (registrationCount > 0) {
+            console.log(`Cannot delete event - ${registrationCount} registrations exist`);
+            return res.status(400).json({ 
+              message: `Cannot delete event. There are ${registrationCount} registrations for this event. Please remove all registrations first.` 
+            });
+          }
+
+          // Delete the event
+          console.log(`Proceeding with event deletion...`);
+          const deleteResult = await Event.findByIdAndDelete(eventId);
+          
+          if (!deleteResult) {
+            console.log(`Event deletion failed - no document found`);
+            return res.status(404).json({ message: 'Event not found or already deleted' });
+          }
+
+          console.log(`Event ${eventId} deleted successfully`);
+
+          return res.status(200).json({ 
+            message: 'Event deleted successfully',
+            deletedEventId: eventId
+          });
+
+        } catch (error) {
+          console.error('Error deleting event:', error);
+          return res.status(500).json({ 
+            message: 'Internal server error while deleting event',
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
 
       default:
         return res.status(405).json({ message: 'Method not allowed' });

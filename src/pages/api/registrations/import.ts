@@ -30,6 +30,47 @@ interface ImportedVisitor {
   status?: string;
 }
 
+// Helper function to convert Excel serial number to DD-MM-YYYY format
+const convertExcelDateToDDMMYYYY = (excelDate: number | string): string => {
+  if (typeof excelDate === 'string') {
+    // If it's already a string, try to parse it as a date
+    const date = new Date(excelDate);
+    if (!isNaN(date.getTime())) {
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = String(date.getFullYear());
+      return `${day}-${month}-${year}`;
+    }
+    return excelDate; // Return as is if not a valid date
+  }
+  
+  if (typeof excelDate === 'number') {
+    // Excel serial number (days since 1900-01-01)
+    const date = new Date((excelDate - 25569) * 86400 * 1000);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = String(date.getFullYear());
+    return `${day}-${month}-${year}`;
+  }
+  
+  return String(excelDate);
+};
+
+// Helper function to detect and convert date fields
+const convertDateFields = (obj: any): any => {
+  const dateFields = ['eventdate', 'event end date', 'registration date', 'eventenddate', 'registrationdate'];
+  const converted = { ...obj };
+  
+  Object.keys(converted).forEach(key => {
+    const lowerKey = key.toLowerCase();
+    if (dateFields.includes(lowerKey) && converted[key] !== undefined && converted[key] !== null) {
+      converted[key] = convertExcelDateToDDMMYYYY(converted[key]);
+    }
+  });
+  
+  return converted;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -100,9 +141,16 @@ export default async function handler(
       }
 
       importedData = result.data as ImportedVisitor[];
+      // Convert date fields in CSV data as well
+      importedData = importedData.map(row => convertDateFields(row));
     } else if (fileName.endsWith('.xlsx') || fileName.endsWith('.xls')) {
-      // Parse Excel
-      const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+      // Parse Excel with date handling
+      const workbook = XLSX.read(fileBuffer, { 
+        type: 'buffer',
+        cellDates: true, // Parse dates as Date objects
+        cellNF: false,
+        cellText: false
+      });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
@@ -111,7 +159,7 @@ export default async function handler(
         return res.status(400).json({ error: 'Excel file is empty or has no data rows' });
       }
 
-      // Convert to array of objects
+      // Convert to array of objects with date conversion
       const headers = jsonData[0] as string[];
       importedData = (jsonData.slice(1) as any[][]).map(row => {
         const obj: any = {};
@@ -120,7 +168,8 @@ export default async function handler(
             obj[header.trim().toLowerCase()] = row[index];
           }
         });
-        return obj;
+        // Convert date fields in each row
+        return convertDateFields(obj);
       });
     } else {
       return res.status(400).json({ error: 'Unsupported file format. Please upload CSV or Excel files.' });

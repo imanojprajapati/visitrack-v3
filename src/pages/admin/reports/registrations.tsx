@@ -181,6 +181,32 @@ export default function RegistrationReport() {
     render: (_: any, record: Visitor) => record.additionalData?.[key]?.value || '-',
   }));
 
+  // Helper function to parse DD-MM-YYYY format to Date object
+  const parseDateString = (dateStr: string): Date => {
+    if (!dateStr) return new Date();
+    
+    // Check if it's already in ISO format
+    const isoDate = new Date(dateStr);
+    if (!isNaN(isoDate.getTime())) {
+      return isoDate;
+    }
+    
+    // Parse DD-MM-YYYY format
+    const parts = dateStr.split('-');
+    if (parts.length === 3) {
+      const day = parseInt(parts[0], 10);  // First part is day
+      const month = parseInt(parts[1], 10) - 1; // Second part is month (0-indexed)
+      const year = parseInt(parts[2], 10);
+      
+      // Create date with correct order: year, month, day
+      const date = new Date(year, month, day);
+      console.log(`parseDateString: DD-MM-YYYY format - ${dateStr} -> day: ${day}, month: ${month + 1}, year: ${year} -> ${date.toISOString()}`);
+      return date;
+    }
+    
+    return new Date();
+  };
+
   const columns = [
     {
       title: 'Full Name',
@@ -262,33 +288,20 @@ export default function RegistrationReport() {
       render: (date: string, record: Visitor) => {
         try {
           const dateToUse = date || record.eventEndDate;
+          console.log('Event Date render - input:', { date, eventEndDate: record.eventEndDate, dateToUse });
+          
           if (!dateToUse) return '-';
           
-          // Handle ISO date format (2024-01-15T00:00:00.000Z)
-          const dateObj = new Date(dateToUse);
-          if (!isNaN(dateObj.getTime())) {
-            return dateObj.toLocaleDateString('en-GB', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric'
-            });
-          }
+          // Use the parseDateString function for consistent parsing
+          const parsedDate = parseDateString(dateToUse);
+          const formatted = parsedDate.toLocaleDateString('en-GB', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric'
+          });
           
-          // Fallback: try to parse DD-MM-YY format
-          const [day, month, year] = dateToUse.split('-');
-          if (day && month && year) {
-            const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-            const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
-            if (!isNaN(fallbackDateObj.getTime())) {
-              return fallbackDateObj.toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric'
-              });
-            }
-          }
-          
-          return dateToUse || '-';
+          console.log('Event Date render - parsed and formatted:', { dateToUse, formatted });
+          return formatted;
         } catch (error) {
           console.error('Error formatting event date:', error);
           const dateToUse = date || record.eventEndDate;
@@ -329,9 +342,9 @@ export default function RegistrationReport() {
             return `${day}/${month}/${year}`;
           }
           
-          // Fallback: try to parse DD-MM-YY format
-          const [day, month, year] = date.split('-');
-          if (day && month && year) {
+          // Handle DD-MM-YY format
+          if (/^\d{1,2}-\d{1,2}-\d{2}$/.test(date)) {
+            const [day, month, year] = date.split('-');
             const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
             const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
             if (!isNaN(fallbackDateObj.getTime())) {
@@ -373,61 +386,28 @@ export default function RegistrationReport() {
       try {
         const dateToUse = visitor.eventStartDate || visitor.eventEndDate;
         if (dateToUse) {
-          // Handle ISO date format (2024-01-15T00:00:00.000Z)
-          const dateObj = new Date(dateToUse);
-          if (!isNaN(dateObj.getTime())) {
-            eventDate = dateObj.toLocaleDateString('en-GB', {
-              day: '2-digit',
-              month: 'short',
-              year: 'numeric'
-            });
-          } else {
-            // Fallback: try to parse DD-MM-YY format
-            const [day, month, year] = dateToUse.split('-');
-            if (day && month && year) {
-              const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-              const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
-              if (!isNaN(fallbackDateObj.getTime())) {
-                eventDate = fallbackDateObj.toLocaleDateString('en-GB', {
-                  day: '2-digit',
-                  month: 'short',
-                  year: 'numeric'
-                });
-              }
-            }
-          }
+          const parsedDate = parseDateString(dateToUse);
+          const day = String(parsedDate.getDate()).padStart(2, '0');
+          const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+          const year = parsedDate.getFullYear();
+          eventDate = `${day}/${month}/${year}`;
         }
       } catch (error) {
         console.error('Error formatting event date:', error);
-        eventDate = visitor.eventStartDate || '-';
       }
 
       // Format registration date
       let registrationDate = '-';
       try {
         if (visitor.createdAt) {
-          // Handle ISO date format (2025-06-05T18:30:00.000Z)
-          const dateObj = new Date(visitor.createdAt);
-          if (!isNaN(dateObj.getTime())) {
-            const day = String(dateObj.getDate()).padStart(2, '0');
-            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-            const year = dateObj.getFullYear();
-            registrationDate = `${day}/${month}/${year}`;
-          } else {
-            // Fallback: try to parse DD-MM-YY format
-            const [day, month, year] = visitor.createdAt.split('-');
-            if (day && month && year) {
-              const fullYear = Number(year) < 50 ? '20' + year : '19' + year;
-              const fallbackDateObj = new Date(`${fullYear}-${month}-${day}`);
-              if (!isNaN(fallbackDateObj.getTime())) {
-                registrationDate = `${day}/${month}/${fullYear}`;
-              }
-            }
-          }
+          const parsedDate = parseDateString(visitor.createdAt);
+          const day = String(parsedDate.getDate()).padStart(2, '0');
+          const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+          const year = parsedDate.getFullYear();
+          registrationDate = `${day}/${month}/${year}`;
         }
       } catch (error) {
         console.error('Error formatting registration date:', error);
-        registrationDate = visitor.createdAt || '-';
       }
 
       return [

@@ -90,11 +90,15 @@ const Home = () => {
 
   const fetchUpcomingEvents = async () => {
     try {
+      console.log('Fetching upcoming events...');
       const response = await fetch('/api/events?status=upcoming');
+      console.log('Response status:', response.status);
       if (!response.ok) {
         throw new Error('Failed to fetch events');
       }
       const data = await response.json();
+      console.log('Fetched events:', data);
+      console.log('Number of events:', data.length);
       setEvents(data);
     } catch (err) {
       console.error('Error fetching events:', err);
@@ -106,7 +110,18 @@ const Home = () => {
 
   const handleRegisterClick = (event: Event) => {
     const now = new Date();
-    const registrationDeadline = event.registrationDeadline ? new Date(event.registrationDeadline) : null;
+    let registrationDeadline = null;
+    
+    // Parse registration deadline if it exists
+    if (event.registrationDeadline) {
+      try {
+        // Parse DD-MM-YYYY format to Date object
+        const [day, month, year] = event.registrationDeadline.split('-').map(Number);
+        registrationDeadline = new Date(year, month - 1, day);
+      } catch (error) {
+        console.error('Error parsing registration deadline:', error);
+      }
+    }
     
     // Check if registration deadline has passed
     if (registrationDeadline && now > registrationDeadline) {
@@ -124,7 +139,19 @@ const Home = () => {
 
   const isRegistrationClosed = (event: Event) => {
     const now = new Date();
-    const registrationDeadline = event.registrationDeadline ? new Date(event.registrationDeadline) : null;
+    let registrationDeadline = null;
+    
+    // Parse registration deadline if it exists
+    if (event.registrationDeadline) {
+      try {
+        // Parse DD-MM-YYYY format to Date object
+        const [day, month, year] = event.registrationDeadline.split('-').map(Number);
+        registrationDeadline = new Date(year, month - 1, day);
+      } catch (error) {
+        console.error('Error parsing registration deadline:', error);
+      }
+    }
+    
     return registrationDeadline && now > registrationDeadline;
   };
 
@@ -197,7 +224,7 @@ const Home = () => {
                       {event.category}
                     </span>
                     <span className="text-sm text-gray-500">
-                      {new Date(event.startDate).toLocaleDateString()}
+                      {event.startDate}
                     </span>
                   </div>
                   <h3 className="text-xl font-bold text-gray-900 mb-2">
@@ -209,7 +236,7 @@ const Home = () => {
                   </p>
                   {event.registrationDeadline && (
                     <p className="text-gray-500 text-sm mb-2">
-                      Registration Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}
+                      Registration Deadline: {event.registrationDeadline}
                     </p>
                   )}
                   {isRegistrationClosed(event) ? (

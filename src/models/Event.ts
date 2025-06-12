@@ -5,8 +5,8 @@ export interface IEvent extends Document {
   description: string;
   location: string;
   venue?: string;
-  startDate: Date;
-  endDate: Date;
+  startDate: string;
+  endDate: string;
   time: string;
   endTime: string;
   category?: string;
@@ -16,7 +16,7 @@ export interface IEvent extends Document {
   capacity: number;
   visitors: number;
   banner?: string;
-  registrationDeadline?: Date;
+  registrationDeadline?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -41,23 +41,23 @@ const eventSchema = new mongoose.Schema({
     trim: true
   },
   startDate: {
-    type: Date,
+    type: String,
     required: true,
     validate: {
-      validator: function(v: Date) {
-        return v instanceof Date && !isNaN(v.getTime());
+      validator: function(v: string) {
+        return /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(v);
       },
-      message: 'Start date must be a valid date'
+      message: 'Start date must be in DD-MM-YYYY format'
     }
   },
   endDate: {
-    type: Date,
+    type: String,
     required: true,
     validate: {
-      validator: function(v: Date) {
-        return v instanceof Date && !isNaN(v.getTime());
+      validator: function(v: string) {
+        return /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(v);
       },
-      message: 'End date must be a valid date'
+      message: 'End date must be in DD-MM-YYYY format'
     }
   },
   time: {
@@ -129,7 +129,7 @@ const eventSchema = new mongoose.Schema({
     trim: true
   },
   registrationDeadline: {
-    type: Date
+    type: String
   },
   createdAt: {
     type: Date,
@@ -145,9 +145,6 @@ const eventSchema = new mongoose.Schema({
     transform: function(doc, ret) {
       ret._id = ret._id.toString();
       if (ret.formId) ret.formId = ret.formId.toString();
-      if (ret.startDate) ret.startDate = ret.startDate.toISOString();
-      if (ret.endDate) ret.endDate = ret.endDate.toISOString();
-      if (ret.registrationDeadline) ret.registrationDeadline = ret.registrationDeadline.toISOString();
       if (ret.createdAt) ret.createdAt = ret.createdAt.toISOString();
       if (ret.updatedAt) ret.updatedAt = ret.updatedAt.toISOString();
       return ret;
@@ -175,33 +172,65 @@ eventSchema.pre('save', function(next) {
 
 // Validate dates
 eventSchema.pre('save', function(next) {
-  // Ensure dates are valid
-  if (!(this.startDate instanceof Date) || isNaN(this.startDate.getTime())) {
-    next(new Error('Invalid start date'));
+  // Ensure dates are valid DD-MM-YYYY format
+  const dateRegex = /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/;
+  
+  if (!dateRegex.test(this.startDate)) {
+    next(new Error('Invalid start date format. Expected DD-MM-YYYY'));
     return;
   }
-  if (!(this.endDate instanceof Date) || isNaN(this.endDate.getTime())) {
-    next(new Error('Invalid end date'));
+  if (!dateRegex.test(this.endDate)) {
+    next(new Error('Invalid end date format. Expected DD-MM-YYYY'));
     return;
   }
-  if (this.registrationDeadline && (!(this.registrationDeadline instanceof Date) || isNaN(this.registrationDeadline.getTime()))) {
-    next(new Error('Invalid registration deadline'));
+  if (this.registrationDeadline && !dateRegex.test(this.registrationDeadline)) {
+    next(new Error('Invalid registration deadline format. Expected DD-MM-YYYY'));
     return;
   }
 
+  // Parse dates for comparison
+  const parseDate = (dateStr: string) => {
+    const [day, month, year] = dateStr.split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
+
+  const startDate = parseDate(this.startDate);
+  const endDate = parseDate(this.endDate);
+
   // Ensure end date is after or equal to start date
-  if (this.endDate < this.startDate) {
+  if (endDate < startDate) {
     next(new Error('End date must be after or equal to start date'));
     return;
   }
 
   // Ensure registration deadline is before start date if set
-  if (this.registrationDeadline && this.registrationDeadline > this.startDate) {
-    next(new Error('Registration deadline must be before start date'));
-    return;
+  if (this.registrationDeadline) {
+    const regDeadline = parseDate(this.registrationDeadline);
+    if (regDeadline > startDate) {
+      next(new Error('Registration deadline must be before start date'));
+      return;
+    }
   }
 
   next();
 });
 
-export default mongoose.models.Event || mongoose.model<IEvent>('Event', eventSchema); 
+// Delete the model if it exists to prevent schema conflicts
+if (mongoose.models.Event) {
+  console.log('Deleting cached Event model');
+  delete mongoose.models.Event;
+}
+
+// Clear any cached schemas
+if ((mongoose as any)._modelSchemas && (mongoose as any)._modelSchemas.Event) {
+  console.log('Deleting cached Event schema');
+  delete (mongoose as any)._modelSchemas.Event;
+}
+
+console.log('Creating Event model with schema:', {
+  startDateType: eventSchema.paths.startDate.instance,
+  endDateType: eventSchema.paths.endDate.instance,
+  registrationDeadlineType: eventSchema.paths.registrationDeadline?.instance
+});
+
+export default mongoose.model<IEvent>('Event', eventSchema); 

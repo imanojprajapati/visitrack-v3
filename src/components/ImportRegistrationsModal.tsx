@@ -38,6 +38,65 @@ interface ImportRegistrationsModalProps {
   events: Event[];
 }
 
+// Helper to convert Excel serial number to DD-MM-YYYY
+function excelSerialToDate(serial: any) {
+  console.log('Converting date value:', serial, 'Type:', typeof serial);
+  
+  if (typeof serial === 'number' && serial > 30000 && serial < 60000) { // crude range check for Excel dates
+    const utc_days = Math.floor(serial - 25569);
+    const utc_value = utc_days * 86400; // seconds
+    const date_info = new Date(utc_value * 1000);
+    const day = String(date_info.getDate()).padStart(2, '0');
+    const month = String(date_info.getMonth() + 1).padStart(2, '0');
+    const year = date_info.getFullYear();
+    const result = `${day}-${month}-${year}`;
+    console.log('Converted Excel serial to date:', serial, '->', result);
+    return result;
+  }
+  
+  // Also handle string dates that might be in DD-MM-YYYY format
+  if (typeof serial === 'string' && serial.includes('-')) {
+    console.log('Date is already in string format:', serial);
+    return serial;
+  }
+  
+  console.log('No conversion needed for:', serial);
+  return serial;
+}
+
+// Helper to process preview row and convert date fields
+function processPreviewRow(row: any) {
+  // Comprehensive list of possible date field variations
+  const dateFields = [
+    'eventdate', 'event date', 'event start date', 'eventstartdate',
+    'event end date', 'eventenddate', 'eventend date',
+    'registration date', 'registrationdate',
+    'start date', 'startdate',
+    'end date', 'enddate',
+    'date', 'event_date', 'start_date', 'end_date'
+  ];
+  
+  const processed: any = { ...row };
+  
+  console.log('Processing row for dates:', Object.keys(processed));
+  
+  Object.keys(processed).forEach(key => {
+    const lowerKey = key.toLowerCase().trim();
+    
+    // Check if this key matches any of our date field patterns
+    const isDateField = dateFields.some(dateField => 
+      lowerKey.includes(dateField) || dateField.includes(lowerKey)
+    );
+    
+    if (isDateField) {
+      console.log('Found date field:', key, 'Value:', processed[key]);
+      processed[key] = excelSerialToDate(processed[key]);
+    }
+  });
+  
+  return processed;
+}
+
 export default function ImportRegistrationsModal({ 
   visible, 
   onCancel, 
@@ -56,11 +115,15 @@ export default function ImportRegistrationsModal({
     setImportResult(null);
     
     try {
+      console.log('Starting file upload:', file.name, 'Size:', file.size, 'Type:', file.type);
+      
       let result: ImportResult;
       
       if (file.name.toLowerCase().endsWith('.csv')) {
+        console.log('Parsing CSV file...');
         result = await parseCSV(file);
       } else if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+        console.log('Parsing Excel file...');
         result = await parseExcel(file);
       } else {
         message.error('Please upload a CSV or Excel file');
@@ -68,20 +131,30 @@ export default function ImportRegistrationsModal({
         return false;
       }
 
+      console.log('Parse result:', result);
       setImportResult(result);
       
       // Dynamically generate columns from the data
       if (result.data.length > 0) {
         const allKeys = Array.from(new Set(result.data.flatMap(row => Object.keys(row))));
+        console.log('Found columns:', allKeys);
+        
+        // Don't filter out date columns - only filter out specific problematic columns
+        const filteredKeys = allKeys.filter(key => {
+          const lowerKey = key.toLowerCase();
+          // Only filter out phone and eventname, keep all date columns
+          return lowerKey !== 'phone' && lowerKey !== 'eventname';
+        });
+        
+        console.log('Filtered columns:', filteredKeys);
+        
         setPreviewColumns(
-          allKeys
-            .filter(key => key.toLowerCase() !== 'phone' && key.toLowerCase() !== 'eventname')
-            .map(key => ({
-              title: key.charAt(0).toUpperCase() + key.slice(1),
-              dataIndex: key,
-              key,
-              width: 150,
-            }))
+          filteredKeys.map(key => ({
+            title: key.charAt(0).toUpperCase() + key.slice(1),
+            dataIndex: key,
+            key,
+            width: 150,
+          }))
         );
       } else {
         setPreviewColumns([]);
@@ -97,7 +170,8 @@ export default function ImportRegistrationsModal({
       
     } catch (error) {
       console.error('File parsing error:', error);
-      message.error('Failed to parse file. Please check the file format.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to parse file. Please check the file format.';
+      message.error(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -348,14 +422,26 @@ export default function ImportRegistrationsModal({
               {importResult.validRows > 0 && (
                 <div>
                   <Title level={5} className="m-0 mb-3">Data Preview (First 5 rows)</Title>
-                  <Table
-                    columns={previewColumns}
-                    dataSource={importResult.data.slice(0, 5).map((item, index) => ({ ...item, key: index }))}
-                    size="small"
-                    scroll={{ x: 'max-content' }}
-                    pagination={false}
-                    className="border border-gray-200 rounded"
-                  />
+                  {(() => {
+                    const processedData = importResult.data.slice(0, 5).map((item, index) => {
+                      const processed = processPreviewRow(item);
+                      console.log(`Processed row ${index}:`, processed);
+                      return { ...processed, key: index };
+                    });
+                    console.log('Final table data:', processedData);
+                    console.log('Table columns:', previewColumns);
+                    
+                    return (
+                      <Table
+                        columns={previewColumns}
+                        dataSource={processedData}
+                        size="small"
+                        scroll={{ x: 'max-content' }}
+                        pagination={false}
+                        className="border border-gray-200 rounded"
+                      />
+                    );
+                  })()}
                 </div>
               )}
             </div>

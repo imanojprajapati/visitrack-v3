@@ -41,6 +41,22 @@ interface FormattedEvent {
   [key: string]: any;
 }
 
+// Helper function to format dates to DD-MM-YYYY format
+const formatDate = (date: Date | string): string => {
+  if (typeof date === 'string') {
+    // If it's already a string in DD-MM-YYYY format, return it
+    if (/^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(date)) {
+      return date;
+    }
+    // Otherwise parse it as a date
+    date = new Date(date);
+  }
+  const day = String(date.getDate()).padStart(2, '0');
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const year = String(date.getFullYear());
+  return `${day}-${month}-${year}`;
+};
+
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
@@ -84,15 +100,24 @@ export default async function handler(
 
           // Handle status filter
           if (status === 'upcoming') {
-            query.startDate = { $gte: new Date() };
+            // Convert current date to DD-MM-YYYY format for string comparison
+            const today = new Date();
+            const todayStr = formatDate(today);
+            console.log('Upcoming events query - today:', todayStr);
+            query.startDate = { $gte: todayStr };
             query.status = { $in: ['published', 'upcoming'] };
+            console.log('Upcoming events query:', JSON.stringify(query));
           } else if (status) {
             query.status = status;
           }
 
           // Filter out events where end date has passed (only for public pages, not admin)
           if ((status === 'upcoming' || !status) && !admin) {
-            query.endDate = { $gte: new Date() };
+            const today = new Date();
+            const todayStr = formatDate(today);
+            console.log('Public events query - today:', todayStr);
+            query.endDate = { $gte: todayStr };
+            console.log('Public events query:', JSON.stringify(query));
           }
 
           // Add error handling for the query
@@ -105,28 +130,42 @@ export default async function handler(
             .lean()
             .exec();
 
+          console.log(`Found ${events.length} events for query:`, JSON.stringify(query));
+          if (events.length > 0) {
+            console.log('First event:', {
+              _id: events[0]._id,
+              title: events[0].title,
+              startDate: events[0].startDate,
+              endDate: events[0].endDate,
+              status: events[0].status
+            });
+          }
+
           if (!events) {
             throw new ApiError(404, 'No events found');
           }
 
-          // Transform dates to ISO strings to prevent JSON serialization issues
+          // Transform dates to DD-MM-YYYY format to prevent JSON serialization issues
           const formattedEvents = events.map(event => {
             try {
+              // Extract formId before spreading to avoid type conflicts
+              const { formId, ...eventWithoutFormId } = event;
+              
               const formatted: FormattedEvent = {
-                ...event,
+                ...eventWithoutFormId,
                 _id: event._id?.toString() || '',
-                startDate: new Date(event.startDate).toISOString(),
-                endDate: new Date(event.endDate).toISOString(),
+                startDate: event.startDate, // Already in DD-MM-YYYY format
+                endDate: event.endDate, // Already in DD-MM-YYYY format
                 createdAt: new Date(event.createdAt).toISOString(),
                 updatedAt: new Date(event.updatedAt).toISOString()
               };
 
               // Handle optional fields
               if (event.registrationDeadline) {
-                formatted.registrationDeadline = new Date(event.registrationDeadline).toISOString();
+                formatted.registrationDeadline = event.registrationDeadline; // Already in DD-MM-YYYY format
               }
-              if (event.formId) {
-                formatted.formId = event.formId.toString();
+              if (formId) {
+                formatted.formId = formId.toString();
               }
 
               return formatted;
@@ -155,16 +194,45 @@ export default async function handler(
           const eventData = req.body;
           console.log('Received event data:', eventData);
 
+          // Test: Check the Event model schema
+          console.log('Event model schema check:', {
+            startDatePath: Event.schema.paths.startDate,
+            endDatePath: Event.schema.paths.endDate,
+            registrationDeadlinePath: Event.schema.paths.registrationDeadline
+          });
+
+          // Test: Try to create a minimal event first
+          console.log('Testing minimal event creation...');
+          try {
+            const testEvent = await Event.create({
+              title: 'Test Event',
+              location: 'Test Location',
+              startDate: '20-08-2025',
+              endDate: '25-08-2025',
+              time: '09:00',
+              endTime: '17:00',
+              status: 'draft',
+              capacity: 100
+            });
+            console.log('Test event created successfully:', testEvent._id);
+            // Delete the test event
+            await Event.findByIdAndDelete(testEvent._id);
+            console.log('Test event deleted');
+          } catch (testError) {
+            console.error('Test event creation failed:', testError);
+            throw new ApiError(400, `Schema test failed: ${testError instanceof Error ? testError.message : 'Unknown error'}`);
+          }
+
           // Validate required fields
           if (!eventData.title || !eventData.location || !eventData.startDate || !eventData.endDate) {
             throw new ApiError(400, 'Missing required fields');
           }
 
-          // Convert date strings to Date objects
+          // Convert date strings to DD-MM-YYYY format
           try {
-            if (eventData.startDate) eventData.startDate = new Date(eventData.startDate);
-            if (eventData.endDate) eventData.endDate = new Date(eventData.endDate);
-            if (eventData.registrationDeadline) eventData.registrationDeadline = new Date(eventData.registrationDeadline);
+            if (eventData.startDate) eventData.startDate = formatDate(eventData.startDate);
+            if (eventData.endDate) eventData.endDate = formatDate(eventData.endDate);
+            if (eventData.registrationDeadline) eventData.registrationDeadline = formatDate(eventData.registrationDeadline);
           } catch (error) {
             throw new ApiError(400, 'Invalid date format');
           }
@@ -190,25 +258,35 @@ export default async function handler(
           console.log('Processed event data:', eventData);
 
           // Create new event
+          console.log('Creating event with data:', JSON.stringify(eventData, null, 2));
           const newEvent = await Event.create({
             ...eventData,
             createdAt: new Date(),
             updatedAt: new Date()
           });
+          console.log('Event created successfully:', newEvent._id);
 
           // Format response
           const formattedEvent: FormattedEvent = {
-            ...newEvent.toObject(),
-            _id: newEvent._id.toString(),
-            startDate: newEvent.startDate.toISOString(),
-            endDate: newEvent.endDate.toISOString(),
+            _id: newEvent._id?.toString() || '',
+            title: newEvent.title,
+            description: newEvent.description,
+            location: newEvent.location,
+            venue: newEvent.venue,
+            startDate: newEvent.startDate,
+            endDate: newEvent.endDate,
+            time: newEvent.time,
+            endTime: newEvent.endTime,
+            status: newEvent.status,
+            capacity: newEvent.capacity,
+            visitors: newEvent.visitors,
             createdAt: newEvent.createdAt.toISOString(),
             updatedAt: newEvent.updatedAt.toISOString()
           };
 
           // Handle optional fields
           if (newEvent.registrationDeadline) {
-            formattedEvent.registrationDeadline = newEvent.registrationDeadline.toISOString();
+            formattedEvent.registrationDeadline = newEvent.registrationDeadline;
           }
           if (newEvent.formId) {
             formattedEvent.formId = newEvent.formId.toString();

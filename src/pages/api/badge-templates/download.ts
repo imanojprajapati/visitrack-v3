@@ -136,7 +136,8 @@ export default async function handler(
       const rightColumn = [
         visitorData.eventName && `Event: ${visitorData.eventName}`,
         visitorData.eventLocation && `Location: ${visitorData.eventLocation}`,
-        visitorData.eventStartDate && `Date: ${visitorData.eventStartDate}`,
+        visitorData.eventStartDate && visitorData.eventEndDate && `Date: ${visitorData.eventStartDate} - ${visitorData.eventEndDate}`,
+        visitorData.eventStartDate && !visitorData.eventEndDate && `Date: ${visitorData.eventStartDate}`,
         visitorData._id && `ID: ${visitorData._id}`,
       ].filter(Boolean);
       

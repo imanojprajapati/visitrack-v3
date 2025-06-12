@@ -8,8 +8,8 @@ export interface Event {
   title: string;
   description: string;
   category?: EventCategory;
-  startDate: string | Date;
-  endDate: string | Date;
+  startDate: string;
+  endDate: string;
   time: string;
   endTime: string;
   location: string;
@@ -19,7 +19,7 @@ export interface Event {
   status: EventStatus;
   capacity: number;
   visitors?: number;
-  registrationDeadline?: string | Date;
+  registrationDeadline?: string;
   formId?: string;
   form?: EventForm;
   createdAt?: Date;
@@ -30,8 +30,8 @@ export interface CreateEventInput {
   title: string;
   description?: string;
   category?: EventCategory;
-  startDate: string | Date;
-  endDate: string | Date;
+  startDate: string;
+  endDate: string;
   time: string;
   endTime: string;
   location: string;
@@ -40,6 +40,6 @@ export interface CreateEventInput {
   banner?: string;
   status?: EventStatus;
   capacity?: number;
-  registrationDeadline?: string | Date;
+  registrationDeadline?: string;
   formId?: string;
 }

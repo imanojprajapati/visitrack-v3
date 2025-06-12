@@ -35,10 +35,54 @@ export const validateEmail = (email: string): boolean => {
 };
 
 export const validatePhone = (phone: string): boolean => {
+  // Convert to string first in case it's a number from Excel
+  const phoneStr = String(phone || '');
+  
   // Basic phone validation - allows digits, spaces, dashes, parentheses, and plus
   const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,}$/;
-  return phoneRegex.test(phone.replace(/\s/g, ''));
+  return phoneRegex.test(phoneStr.replace(/\s/g, ''));
 };
+
+// Helper to normalize column names
+const columnMap: Record<string, string> = {
+  // Event date variations
+  'event date': 'eventDate',
+  'event start date': 'eventDate',
+  'eventstartdate': 'eventDate',
+  'event_date': 'eventDate',
+  'start date': 'eventDate',
+  'startdate': 'eventDate',
+  
+  // Event end date variations
+  'event end date': 'eventEndDate',
+  'eventenddate': 'eventEndDate',
+  'eventend date': 'eventEndDate',
+  'end date': 'eventEndDate',
+  'enddate': 'eventEndDate',
+  
+  // Registration date variations
+  'registration date': 'registrationDate',
+  'registrationdate': 'registrationDate',
+  
+  // Other common variations
+  'eventname': 'eventName',
+  'phone number': 'phone',
+  'phonenumber': 'phone',
+  // add more mappings as needed
+};
+
+function normalizeRowKeys(row: any): any {
+  const normalized: any = {};
+  Object.entries(row).forEach(([key, value]) => {
+    if (key && key.trim()) { // Only process non-empty keys
+      const lowerKey = key.trim().toLowerCase();
+      const mappedKey = columnMap[lowerKey] || key.trim();
+      // Ensure value is properly handled (convert null/undefined to empty string)
+      normalized[mappedKey] = value !== null && value !== undefined ? value : '';
+    }
+  });
+  return normalized;
+}
 
 export const parseCSV = (file: File): Promise<ImportResult> => {
   return new Promise((resolve, reject) => {
@@ -46,14 +90,37 @@ export const parseCSV = (file: File): Promise<ImportResult> => {
     
     reader.onload = (e) => {
       try {
+        console.log('CSV parsing started for file:', file.name);
         const csvText = e.target?.result as string;
+        
+        if (!csvText || csvText.trim() === '') {
+          console.error('CSV file is empty');
+          resolve({
+            data: [],
+            errors: ['CSV file is empty'],
+            warnings: [],
+            totalRows: 0,
+            validRows: 0
+          });
+          return;
+        }
+
+        console.log('CSV content length:', csvText.length);
+        
         const result = Papa.parse(csvText, {
           header: true,
           skipEmptyLines: true,
           transformHeader: (header) => header.trim().toLowerCase(),
         });
 
+        console.log('Papa Parse result:', {
+          data: result.data.length,
+          errors: result.errors.length,
+          fields: result.meta?.fields
+        });
+
         if (result.errors.length > 0) {
+          console.error('CSV parsing errors:', result.errors);
           resolve({
             data: [],
             errors: result.errors.map(err => `Row ${err.row}: ${err.message}`),
@@ -64,7 +131,21 @@ export const parseCSV = (file: File): Promise<ImportResult> => {
           return;
         }
 
-        const data = result.data as ImportedVisitor[];
+        if (!result.data || result.data.length === 0) {
+          console.error('No data found in CSV');
+          resolve({
+            data: [],
+            errors: ['No data found in CSV file'],
+            warnings: [],
+            totalRows: 0,
+            validRows: 0
+          });
+          return;
+        }
+
+        const data = (result.data as ImportedVisitor[]).map(normalizeRowKeys);
+        console.log('Normalized data sample:', data.slice(0, 2));
+        
         const validationResult = validateImportedData(data);
         
         resolve({
@@ -75,12 +156,17 @@ export const parseCSV = (file: File): Promise<ImportResult> => {
           validRows: validationResult.validData.length
         });
       } catch (error) {
+        console.error('CSV parsing exception:', error);
         reject(error);
       }
     };
 
-    reader.onerror = () => reject(new Error('Failed to read CSV file'));
-    reader.readAsText(file);
+    reader.onerror = () => {
+      console.error('FileReader error occurred');
+      reject(new Error('Failed to read CSV file'));
+    };
+    
+    reader.readAsText(file, 'UTF-8');
   });
 };
 
@@ -90,13 +176,64 @@ export const parseExcel = (file: File): Promise<ImportResult> => {
     
     reader.onload = (e) => {
       try {
+        console.log('Excel parsing started for file:', file.name);
         const buffer = e.target?.result as ArrayBuffer;
-        const workbook = XLSX.read(buffer, { type: 'array' });
+        
+        if (!buffer || buffer.byteLength === 0) {
+          console.error('Excel file is empty');
+          resolve({
+            data: [],
+            errors: ['Excel file is empty'],
+            warnings: [],
+            totalRows: 0,
+            validRows: 0
+          });
+          return;
+        }
+
+        console.log('Excel file size:', buffer.byteLength, 'bytes');
+        
+        const workbook = XLSX.read(buffer, { 
+          type: 'array',
+          cellDates: true,
+          cellNF: false,
+          cellText: false
+        });
+        
+        console.log('Workbook sheets:', workbook.SheetNames);
+        
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+          console.error('No sheets found in Excel file');
+          resolve({
+            data: [],
+            errors: ['No sheets found in Excel file'],
+            warnings: [],
+            totalRows: 0,
+            validRows: 0
+          });
+          return;
+        }
+
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
+        
+        if (!worksheet) {
+          console.error('Worksheet is null');
+          resolve({
+            data: [],
+            errors: ['Worksheet is empty or corrupted'],
+            warnings: [],
+            totalRows: 0,
+            validRows: 0
+          });
+          return;
+        }
+
         const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        console.log('Excel JSON data length:', jsonData.length);
 
         if (jsonData.length < 2) {
+          console.error('Excel file has insufficient data rows');
           resolve({
             data: [],
             errors: ['Excel file is empty or has no data rows'],
@@ -109,16 +246,21 @@ export const parseExcel = (file: File): Promise<ImportResult> => {
 
         // Convert to array of objects
         const headers = jsonData[0] as string[];
-        const data: ImportedVisitor[] = (jsonData.slice(1) as any[][]).map(row => {
+        console.log('Excel headers:', headers);
+        
+        const data: ImportedVisitor[] = (jsonData.slice(1) as any[][]).map((row, index) => {
           const obj: any = {};
-          headers.forEach((header, index) => {
-            if (header && row[index] !== undefined) {
-              obj[header.trim().toLowerCase()] = row[index];
+          headers.forEach((header, headerIndex) => {
+            if (header && row[headerIndex] !== undefined) {
+              obj[header.trim().toLowerCase()] = row[headerIndex];
             }
           });
-          return obj;
+          console.log(`Row ${index + 1}:`, obj);
+          return normalizeRowKeys(obj);
         });
 
+        console.log('Processed Excel data sample:', data.slice(0, 2));
+        
         const validationResult = validateImportedData(data);
         
         resolve({
@@ -129,11 +271,16 @@ export const parseExcel = (file: File): Promise<ImportResult> => {
           validRows: validationResult.validData.length
         });
       } catch (error) {
+        console.error('Excel parsing exception:', error);
         reject(error);
       }
     };
 
-    reader.onerror = () => reject(new Error('Failed to read Excel file'));
+    reader.onerror = () => {
+      console.error('FileReader error occurred');
+      reject(new Error('Failed to read Excel file'));
+    };
+    
     reader.readAsArrayBuffer(file);
   });
 };
@@ -166,8 +313,11 @@ export const validateImportedData = (data: ImportedVisitor[]): {
     }
 
     // Check phone number if provided
-    if (row.phone && !validatePhone(row.phone)) {
-      warnings.push(`Row ${rowNumber}: Phone number '${row.phone}' may be invalid`);
+    if (row.phone && row.phone !== '') {
+      const phoneStr = String(row.phone);
+      if (!validatePhone(phoneStr)) {
+        warnings.push(`Row ${rowNumber}: Phone number '${phoneStr}' may be invalid`);
+      }
     }
 
     // Check for duplicate emails in the same import

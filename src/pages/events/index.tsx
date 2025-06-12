@@ -15,13 +15,18 @@ export default function EventsPage() {
 
   const fetchEvents = async () => {
     try {
+      console.log('Fetching all events...');
       const response = await fetch('/api/events');
+      console.log('Response status:', response.status);
       if (!response.ok) {
         throw new Error('Failed to fetch events');
       }
       const data = await response.json();
+      console.log('Fetched events:', data);
+      console.log('Number of events:', data.length);
       setEvents(data);
     } catch (err) {
+      console.error('Error fetching events:', err);
       setError('Error loading events. Please try again later.');
     } finally {
       setIsLoading(false);
@@ -30,7 +35,18 @@ export default function EventsPage() {
 
   const handleRegisterClick = (event: Event) => {
     const now = new Date();
-    const registrationDeadline = event.registrationDeadline ? new Date(event.registrationDeadline) : null;
+    let registrationDeadline = null;
+    
+    // Parse registration deadline if it exists
+    if (event.registrationDeadline) {
+      try {
+        // Parse DD-MM-YYYY format to Date object
+        const [day, month, year] = event.registrationDeadline.split('-').map(Number);
+        registrationDeadline = new Date(year, month - 1, day);
+      } catch (error) {
+        console.error('Error parsing registration deadline:', error);
+      }
+    }
     
     // Check if registration deadline has passed
     if (registrationDeadline && now > registrationDeadline) {
@@ -48,7 +64,19 @@ export default function EventsPage() {
 
   const isRegistrationClosed = (event: Event) => {
     const now = new Date();
-    const registrationDeadline = event.registrationDeadline ? new Date(event.registrationDeadline) : null;
+    let registrationDeadline = null;
+    
+    // Parse registration deadline if it exists
+    if (event.registrationDeadline) {
+      try {
+        // Parse DD-MM-YYYY format to Date object
+        const [day, month, year] = event.registrationDeadline.split('-').map(Number);
+        registrationDeadline = new Date(year, month - 1, day);
+      } catch (error) {
+        console.error('Error parsing registration deadline:', error);
+      }
+    }
+    
     return registrationDeadline && now > registrationDeadline;
   };
 
@@ -112,7 +140,7 @@ export default function EventsPage() {
                       {event.category}
                     </span>
                     <span className="text-sm text-gray-500">
-                      {new Date(event.startDate).toLocaleDateString()}
+                      {event.startDate}
                     </span>
                   </div>
                   <h3 className="mt-2 text-lg font-medium text-gray-900">
@@ -126,7 +154,7 @@ export default function EventsPage() {
                       <p>Location: {event.location}</p>
                       <p>Organizer: {event.organizer}</p>
                       {event.registrationDeadline && (
-                        <p>Registration Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}</p>
+                        <p>Registration Deadline: {event.registrationDeadline}</p>
                       )}
                     </div>
                     <div className="mt-4">

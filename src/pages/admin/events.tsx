@@ -160,9 +160,10 @@ export default function EventManagement() {
         method: 'DELETE',
       });
 
+      const responseData = await response.json();
+
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to delete event');
+        throw new Error(responseData.message || responseData.error || 'Failed to delete event');
       }
 
       messageApi?.success('Event deleted successfully');
@@ -204,7 +205,7 @@ export default function EventManagement() {
       key: 'date',
       render: (_, record) => (
         <div>
-          <div>{typeof record.startDate === 'string' ? new Date(record.startDate).toLocaleDateString() : record.startDate?.toLocaleDateString?.() ?? ''}</div>
+          <div>{record.startDate}</div>
           <div className="text-sm text-gray-500">{record.time}</div>
         </div>
       ),
@@ -481,11 +482,7 @@ export default function EventManagement() {
                 <Col xs={24} sm={12}>
                   <div className="font-semibold text-gray-600">Date & Time</div>
                   <div>
-                    {typeof selectedEvent.startDate === 'string' 
-                      ? new Date(selectedEvent.startDate).toLocaleDateString()
-                      : selectedEvent.startDate instanceof Date 
-                        ? selectedEvent.startDate.toLocaleDateString()
-                        : ''} at {selectedEvent.time}
+                    {selectedEvent.startDate} at {selectedEvent.time}
                   </div>
                 </Col>
                 <Col xs={24} sm={12}>
@@ -534,11 +531,7 @@ export default function EventManagement() {
                   <Col xs={24} sm={12}>
                     <div className="font-semibold text-gray-600">Registration Deadline</div>
                     <div>
-                      {typeof selectedEvent.registrationDeadline === 'string'
-                        ? new Date(selectedEvent.registrationDeadline).toLocaleDateString()
-                        : selectedEvent.registrationDeadline instanceof Date
-                          ? selectedEvent.registrationDeadline.toLocaleDateString()
-                          : ''}
+                      {selectedEvent.registrationDeadline}
                     </div>
                   </Col>
                 )}
