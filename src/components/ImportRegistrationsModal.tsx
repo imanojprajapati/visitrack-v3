@@ -66,33 +66,49 @@ function excelSerialToDate(serial: any) {
 
 // Helper to process preview row and convert date fields
 function processPreviewRow(row: any) {
-  // Comprehensive list of possible date field variations
+  // Comprehensive list of possible date field variations (both original and normalized)
   const dateFields = [
+    // Original variations
     'eventdate', 'event date', 'event start date', 'eventstartdate',
     'event end date', 'eventenddate', 'eventend date',
     'registration date', 'registrationdate',
     'start date', 'startdate',
     'end date', 'enddate',
-    'date', 'event_date', 'start_date', 'end_date'
+    'date', 'event_date', 'start_date', 'end_date',
+    // Normalized variations (after column mapping)
+    'eventdate', 'eventenddate', 'registrationdate'
   ];
   
   const processed: any = { ...row };
   
-  console.log('Processing row for dates:', Object.keys(processed));
+  console.log('=== DATE PROCESSING DEBUG ===');
+  console.log('Original row keys:', Object.keys(processed));
+  console.log('Original row values:', processed);
   
   Object.keys(processed).forEach(key => {
     const lowerKey = key.toLowerCase().trim();
+    console.log(`Checking key: "${key}" -> lowercase: "${lowerKey}"`);
     
     // Check if this key matches any of our date field patterns
-    const isDateField = dateFields.some(dateField => 
-      lowerKey.includes(dateField) || dateField.includes(lowerKey)
-    );
+    const isDateField = dateFields.some(dateField => {
+      const matches = lowerKey.includes(dateField) || dateField.includes(lowerKey);
+      if (matches) {
+        console.log(`  ✓ MATCH FOUND: "${lowerKey}" matches "${dateField}"`);
+      }
+      return matches;
+    });
     
     if (isDateField) {
-      console.log('Found date field:', key, 'Value:', processed[key]);
+      console.log(`  → Converting date field: "${key}" with value:`, processed[key]);
       processed[key] = excelSerialToDate(processed[key]);
+      console.log(`  → Result:`, processed[key]);
+    } else {
+      console.log(`  ✗ Not a date field: "${key}"`);
     }
   });
+  
+  console.log('Final processed row:', processed);
+  console.log('=== END DATE PROCESSING DEBUG ===');
   
   return processed;
 }
@@ -137,16 +153,20 @@ export default function ImportRegistrationsModal({
       // Dynamically generate columns from the data
       if (result.data.length > 0) {
         const allKeys = Array.from(new Set(result.data.flatMap(row => Object.keys(row))));
-        console.log('Found columns:', allKeys);
+        console.log('=== COLUMN DETECTION DEBUG ===');
+        console.log('All detected columns:', allKeys);
+        console.log('Sample row data:', result.data[0]);
         
         // Don't filter out date columns - only filter out specific problematic columns
         const filteredKeys = allKeys.filter(key => {
           const lowerKey = key.toLowerCase();
-          // Only filter out phone and eventname, keep all date columns
-          return lowerKey !== 'phone' && lowerKey !== 'eventname';
+          const shouldKeep = lowerKey !== 'phone' && lowerKey !== 'eventname';
+          console.log(`Column "${key}" (${lowerKey}) - Keep: ${shouldKeep}`);
+          return shouldKeep;
         });
         
-        console.log('Filtered columns:', filteredKeys);
+        console.log('Final filtered columns:', filteredKeys);
+        console.log('=== END COLUMN DETECTION DEBUG ===');
         
         setPreviewColumns(
           filteredKeys.map(key => ({
@@ -423,13 +443,22 @@ export default function ImportRegistrationsModal({
                 <div>
                   <Title level={5} className="m-0 mb-3">Data Preview (First 5 rows)</Title>
                   {(() => {
+                    console.log('=== TABLE DATA DEBUG ===');
+                    console.log('Raw import data:', importResult.data.slice(0, 5));
+                    
                     const processedData = importResult.data.slice(0, 5).map((item, index) => {
+                      console.log(`\n--- Processing Row ${index + 1} ---`);
+                      console.log('Raw item:', item);
+                      console.log('Item keys:', Object.keys(item));
+                      console.log('Item values:', Object.values(item));
+                      
                       const processed = processPreviewRow(item);
                       console.log(`Processed row ${index}:`, processed);
                       return { ...processed, key: index };
                     });
                     console.log('Final table data:', processedData);
                     console.log('Table columns:', previewColumns);
+                    console.log('=== END TABLE DATA DEBUG ===');
                     
                     return (
                       <Table

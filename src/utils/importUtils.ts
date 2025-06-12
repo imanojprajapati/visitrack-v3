@@ -72,6 +72,9 @@ const columnMap: Record<string, string> = {
 };
 
 function normalizeRowKeys(row: any): any {
+  console.log('=== NORMALIZE ROW KEYS DEBUG ===');
+  console.log('Original row:', row);
+  
   const normalized: any = {};
   Object.entries(row).forEach(([key, value]) => {
     if (key && key.trim()) { // Only process non-empty keys
@@ -79,8 +82,13 @@ function normalizeRowKeys(row: any): any {
       const mappedKey = columnMap[lowerKey] || key.trim();
       // Ensure value is properly handled (convert null/undefined to empty string)
       normalized[mappedKey] = value !== null && value !== undefined ? value : '';
+      
+      console.log(`Key mapping: "${key}" -> "${lowerKey}" -> "${mappedKey}" =`, normalized[mappedKey]);
     }
   });
+  
+  console.log('Normalized row:', normalized);
+  console.log('=== END NORMALIZE ROW KEYS DEBUG ===');
   return normalized;
 }
 

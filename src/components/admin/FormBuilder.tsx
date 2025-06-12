@@ -93,7 +93,7 @@ export default function FormBuilder({ onSave, initialData }: FormBuilderProps) {
     // Fetch all events for admin form builder
     const fetchEvents = async () => {
       try {
-        const response = await fetch('/api/events');
+        const response = await fetch('/api/events?admin=true');
         if (!response.ok) throw new Error('Failed to fetch events');
         const data = await response.json();
         console.log('Fetched events for form builder:', data);

@@ -16,7 +16,7 @@ export default function EventsPage() {
   const fetchEvents = async () => {
     try {
       console.log('Fetching all events...');
-      const response = await fetch('/api/events');
+      const response = await fetch('/api/events?admin=true');
       console.log('Response status:', response.status);
       if (!response.ok) {
         throw new Error('Failed to fetch events');
@@ -80,6 +80,43 @@ export default function EventsPage() {
     return registrationDeadline && now > registrationDeadline;
   };
 
+  // Helper function to categorize events
+  const categorizeEvents = (events: Event[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    const upcoming: Event[] = [];
+    const ongoing: Event[] = [];
+    const past: Event[] = [];
+    
+    events.forEach(event => {
+      try {
+        // Parse event dates (DD-MM-YYYY format)
+        const [startDay, startMonth, startYear] = event.startDate.split('-').map(Number);
+        const [endDay, endMonth, endYear] = event.endDate.split('-').map(Number);
+        
+        const eventStartDate = new Date(startYear, startMonth - 1, startDay);
+        const eventEndDate = new Date(endYear, endMonth - 1, endDay);
+        
+        if (eventStartDate > today) {
+          upcoming.push(event);
+        } else if (eventEndDate >= today) {
+          ongoing.push(event);
+        } else {
+          past.push(event);
+        }
+      } catch (error) {
+        console.error('Error parsing event date:', error);
+        // If date parsing fails, treat as upcoming
+        upcoming.push(event);
+      }
+    });
+    
+    return { upcoming, ongoing, past };
+  };
+
+  const { upcoming, ongoing, past } = categorizeEvents(events);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -118,66 +155,195 @@ export default function EventsPage() {
             No events found. Create your first event!
           </div>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {events.map((event) => (
-              <div
-                key={event._id}
-                className="bg-white overflow-hidden shadow rounded-lg"
-              >                {event.banner && (
-                  <div className="relative h-48 w-full">
-                    <Image
-                      src={event.banner}
-                      alt={event.title}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    />
-                  </div>
-                )}
-                <div className="px-4 py-5 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {event.category}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {event.startDate}
-                    </span>
-                  </div>
-                  <h3 className="mt-2 text-lg font-medium text-gray-900">
-                    {event.title}
-                  </h3>
-                  <p className="mt-1 text-sm text-gray-500 line-clamp-2">
-                    {event.description}
-                  </p>
-                  <div className="mt-4">
-                    <div className="text-sm text-gray-500">
-                      <p>Location: {event.location}</p>
-                      <p>Organizer: {event.organizer}</p>
-                      {event.registrationDeadline && (
-                        <p>Registration Deadline: {event.registrationDeadline}</p>
+          <div className="space-y-12">
+            {/* Upcoming Events */}
+            {upcoming.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Upcoming Events</h2>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {upcoming.map((event) => (
+                    <div
+                      key={event._id}
+                      className="bg-white overflow-hidden shadow rounded-lg"
+                    >
+                      {event.banner && (
+                        <div className="relative h-48 w-full">
+                          <Image
+                            src={event.banner}
+                            alt={event.title}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        </div>
                       )}
+                      <div className="px-4 py-5 sm:p-6">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Upcoming
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {event.startDate} - {event.endDate}
+                          </span>
+                        </div>
+                        <h3 className="mt-2 text-lg font-medium text-gray-900">
+                          {event.title}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                          {event.description}
+                        </p>
+                        <div className="mt-4">
+                          <div className="text-sm text-gray-500">
+                            <p>Location: {event.location}</p>
+                            <p>Organizer: {event.organizer}</p>
+                            {event.registrationDeadline && (
+                              <p>Registration Deadline: {event.registrationDeadline}</p>
+                            )}
+                          </div>
+                          <div className="mt-4">
+                            {isRegistrationClosed(event) ? (
+                              <button
+                                onClick={() => handleRegisterClick(event)}
+                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
+                              >
+                                Registration Closed
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRegisterClick(event)}
+                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA] cursor-pointer"
+                              >
+                                Register Now
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <div className="mt-4">
-                      {isRegistrationClosed(event) ? (
-                        <button
-                          onClick={() => handleRegisterClick(event)}
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
-                        >
-                          Registration Closed
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleRegisterClick(event)}
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA] cursor-pointer"
-                        >
-                          Register Now
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
+
+            {/* Ongoing Events */}
+            {ongoing.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Ongoing Events</h2>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {ongoing.map((event) => (
+                    <div
+                      key={event._id}
+                      className="bg-white overflow-hidden shadow rounded-lg"
+                    >
+                      {event.banner && (
+                        <div className="relative h-48 w-full">
+                          <Image
+                            src={event.banner}
+                            alt={event.title}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        </div>
+                      )}
+                      <div className="px-4 py-5 sm:p-6">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Ongoing
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {event.startDate} - {event.endDate}
+                          </span>
+                        </div>
+                        <h3 className="mt-2 text-lg font-medium text-gray-900">
+                          {event.title}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                          {event.description}
+                        </p>
+                        <div className="mt-4">
+                          <div className="text-sm text-gray-500">
+                            <p>Location: {event.location}</p>
+                            <p>Organizer: {event.organizer}</p>
+                            {event.registrationDeadline && (
+                              <p>Registration Deadline: {event.registrationDeadline}</p>
+                            )}
+                          </div>
+                          <div className="mt-4">
+                            <button
+                              onClick={() => handleRegisterClick(event)}
+                              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA] cursor-pointer"
+                            >
+                              Register Now
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Past Events */}
+            {past.length > 0 && (
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Past Events</h2>
+                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                  {past.map((event) => (
+                    <div
+                      key={event._id}
+                      className="bg-white overflow-hidden shadow rounded-lg opacity-75"
+                    >
+                      {event.banner && (
+                        <div className="relative h-48 w-full">
+                          <Image
+                            src={event.banner}
+                            alt={event.title}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        </div>
+                      )}
+                      <div className="px-4 py-5 sm:p-6">
+                        <div className="flex items-center justify-between">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                            Past
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {event.startDate} - {event.endDate}
+                          </span>
+                        </div>
+                        <h3 className="mt-2 text-lg font-medium text-gray-900">
+                          {event.title}
+                        </h3>
+                        <p className="mt-1 text-sm text-gray-500 line-clamp-2">
+                          {event.description}
+                        </p>
+                        <div className="mt-4">
+                          <div className="text-sm text-gray-500">
+                            <p>Location: {event.location}</p>
+                            <p>Organizer: {event.organizer}</p>
+                            {event.registrationDeadline && (
+                              <p>Registration Deadline: {event.registrationDeadline}</p>
+                            )}
+                          </div>
+                          <div className="mt-4">
+                            <button
+                              disabled
+                              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-400 cursor-not-allowed"
+                            >
+                              Event Ended
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

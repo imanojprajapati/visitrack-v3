@@ -90,8 +90,8 @@ const Home = () => {
 
   const fetchUpcomingEvents = async () => {
     try {
-      console.log('Fetching upcoming events...');
-      const response = await fetch('/api/events?status=upcoming');
+      console.log('Fetching all events for home page...');
+      const response = await fetch('/api/events?admin=true');
       console.log('Response status:', response.status);
       if (!response.ok) {
         throw new Error('Failed to fetch events');
@@ -155,6 +155,43 @@ const Home = () => {
     return registrationDeadline && now > registrationDeadline;
   };
 
+  // Helper function to categorize events
+  const categorizeEvents = (events: Event[]) => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    const upcoming: Event[] = [];
+    const ongoing: Event[] = [];
+    const past: Event[] = [];
+    
+    events.forEach(event => {
+      try {
+        // Parse event dates (DD-MM-YYYY format)
+        const [startDay, startMonth, startYear] = event.startDate.split('-').map(Number);
+        const [endDay, endMonth, endYear] = event.endDate.split('-').map(Number);
+        
+        const eventStartDate = new Date(startYear, startMonth - 1, startDay);
+        const eventEndDate = new Date(endYear, endMonth - 1, endDay);
+        
+        if (eventStartDate > today) {
+          upcoming.push(event);
+        } else if (eventEndDate >= today) {
+          ongoing.push(event);
+        } else {
+          past.push(event);
+        }
+      } catch (error) {
+        console.error('Error parsing event date:', error);
+        // If date parsing fails, treat as upcoming
+        upcoming.push(event);
+      }
+    });
+    
+    return { upcoming, ongoing, past };
+  };
+
+  const { upcoming, ongoing, past } = categorizeEvents(events);
+
   if (!mounted) {
     return null;
   }
@@ -192,71 +229,144 @@ const Home = () => {
       {/* Events Section */}
       <div className="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
         <h2 className="text-3xl font-extrabold text-gray-900 text-center mb-12">
-          Upcoming Events
+          Events
         </h2>
         {isLoading ? (
           <div className="text-center">Loading events...</div>
         ) : error ? (
           <div className="text-center text-red-600">{error}</div>
         ) : events.length === 0 ? (
-          <div className="text-center text-gray-500">No upcoming events found</div>
+          <div className="text-center text-gray-500">No events found</div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {events.map((event) => (
-              <div
-                key={event._id}
-                className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
-              >
-                {event.banner && (
-                  <div className="relative h-64">
-                    <Image
-                      src={event.banner}
-                      alt={event.title}
-                      fill
-                      className="object-cover"
-                      sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                    />
+          <div className="space-y-12">
+            {/* Upcoming Events */}
+            {upcoming.length > 0 && (
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-6">Upcoming Events</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {upcoming.slice(0, 6).map((event) => (
+                    <div
+                      key={event._id}
+                      className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
+                    >
+                      {event.banner && (
+                        <div className="relative h-64">
+                          <Image
+                            src={event.banner}
+                            alt={event.title}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        </div>
+                      )}
+                      <div className="p-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Upcoming
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {event.startDate} - {event.endDate}
+                          </span>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">
+                          {event.title}
+                        </h3>
+                        <p className="text-gray-600 mb-2">{event.location}</p>
+                        <p className="text-gray-500 text-sm mb-4 line-clamp-2">
+                          {event.description}
+                        </p>
+                        {event.registrationDeadline && (
+                          <p className="text-gray-500 text-sm mb-2">
+                            Registration Deadline: {event.registrationDeadline}
+                          </p>
+                        )}
+                        {isRegistrationClosed(event) ? (
+                          <button
+                            onClick={() => handleRegisterClick(event)}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
+                          >
+                            Registration Closed
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleRegisterClick(event)}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA] cursor-pointer"
+                          >
+                            Register Now
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {upcoming.length > 6 && (
+                  <div className="text-center mt-8">
+                    <Link
+                      href="/events"
+                      className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA]"
+                    >
+                      View All Events
+                    </Link>
                   </div>
                 )}
-                <div className="p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                      {event.category}
-                    </span>
-                    <span className="text-sm text-gray-500">
-                      {event.startDate}
-                    </span>
-                  </div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">
-                    {event.title}
-                  </h3>
-                  <p className="text-gray-600 mb-2">{event.location}</p>
-                  <p className="text-gray-500 text-sm mb-4 line-clamp-2">
-                    {event.description}
-                  </p>
-                  {event.registrationDeadline && (
-                    <p className="text-gray-500 text-sm mb-2">
-                      Registration Deadline: {event.registrationDeadline}
-                    </p>
-                  )}
-                  {isRegistrationClosed(event) ? (
-                    <button
-                      onClick={() => handleRegisterClick(event)}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
+              </div>
+            )}
+
+            {/* Ongoing Events */}
+            {ongoing.length > 0 && (
+              <div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-6">Ongoing Events</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  {ongoing.slice(0, 3).map((event) => (
+                    <div
+                      key={event._id}
+                      className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300"
                     >
-                      Registration Closed
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleRegisterClick(event)}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA] cursor-pointer"
-                    >
-                      Register Now
-                    </button>
-                  )}
+                      {event.banner && (
+                        <div className="relative h-64">
+                          <Image
+                            src={event.banner}
+                            alt={event.title}
+                            fill
+                            className="object-cover"
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                          />
+                        </div>
+                      )}
+                      <div className="p-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Ongoing
+                          </span>
+                          <span className="text-sm text-gray-500">
+                            {event.startDate} - {event.endDate}
+                          </span>
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">
+                          {event.title}
+                        </h3>
+                        <p className="text-gray-600 mb-2">{event.location}</p>
+                        <p className="text-gray-500 text-sm mb-4 line-clamp-2">
+                          {event.description}
+                        </p>
+                        {event.registrationDeadline && (
+                          <p className="text-gray-500 text-sm mb-2">
+                            Registration Deadline: {event.registrationDeadline}
+                          </p>
+                        )}
+                        <button
+                          onClick={() => handleRegisterClick(event)}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#4338CA] hover:bg-[#3730A3] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#4338CA] cursor-pointer"
+                        >
+                          Register Now
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>

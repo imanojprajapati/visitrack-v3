@@ -120,6 +120,14 @@ export default async function handler(
             console.log('Public events query:', JSON.stringify(query));
           }
 
+          // For admin pages, return all events regardless of date
+          if (admin) {
+            console.log('Admin request - returning all events');
+            // Remove any date-based filters for admin
+            delete query.startDate;
+            delete query.endDate;
+          }
+
           // Add error handling for the query
           if (status && !['upcoming', 'published', 'draft', 'cancelled'].includes(status as string)) {
             throw new ApiError(400, 'Invalid status filter');
