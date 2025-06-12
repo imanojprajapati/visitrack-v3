@@ -61,8 +61,8 @@ export default function AdminDashboard() {
   };
 
   const fetchDashboardStats = async () => {
-    setLoading(true);
     try {
+      setLoading(true);
       const queryParams = new URLSearchParams();
       
       if (filters.eventId) {
@@ -75,10 +75,23 @@ export default function AdminDashboard() {
       }
 
       const response = await fetch(`/api/dashboard/stats?${queryParams.toString()}`);
-      if (!response.ok) throw new Error('Failed to fetch dashboard stats');
-      const data = await response.json();
-      setStats(data);
-      setError(null);
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Frontend received dashboard stats:', {
+          totalVisitors: data.totalVisitors,
+          totalEvents: data.totalEvents,
+          visitedVisitors: data.visitedVisitors,
+          upcomingEvents: data.upcomingEvents,
+          monthlyRegistrationsLength: data.monthlyRegistrations?.length,
+          monthlyRegistrationsSample: data.monthlyRegistrations?.slice(0, 3),
+          eventStatsLength: data.eventStats?.length
+        });
+        setStats(data);
+        setError(null);
+      } else {
+        console.error('Failed to fetch dashboard stats');
+        setError('Failed to load dashboard data');
+      }
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       setError('Failed to load dashboard data');
@@ -309,9 +322,16 @@ export default function AdminDashboard() {
                             r: 4,
                           },
                           formatter: (datum: any) => {
+                            // Ensure we have valid data
+                            const month = datum?.month || datum?.x || 'Unknown Month';
+                            const count = datum?.count || datum?.y || 0;
+                            
+                            console.log('Tooltip datum:', datum);
+                            console.log('Formatted tooltip:', { month, count });
+                            
                             return {
-                              name: 'Registrations',
-                              value: `${datum.count || 0} registrations`,
+                              name: month,
+                              value: `${count} registrations`,
                             };
                           },
                           domStyles: {

@@ -192,6 +192,16 @@ export default async function handler(
       eventStats
     };
 
+    console.log('Dashboard stats response:', {
+      totalVisitors,
+      totalEvents,
+      visitedVisitors,
+      upcomingEvents,
+      monthlyRegistrationsLength: monthlyRegistrations.length,
+      monthlyRegistrationsSample: monthlyRegistrations.slice(0, 3),
+      eventStatsLength: eventStats.length
+    });
+
     res.status(200).json(dashboardStats);
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);

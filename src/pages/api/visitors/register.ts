@@ -299,6 +299,8 @@ export default async function handler(
 
       // Send registration success email
       try {
+        console.log('Attempting to send registration success email for visitor:', visitor[0]._id);
+        
         const emailResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/visitors/send-registration-success`, {
           method: 'POST',
           headers: {
@@ -310,12 +312,30 @@ export default async function handler(
         });
 
         if (emailResponse.ok) {
-          console.log('Registration success email sent successfully');
+          const emailResult = await emailResponse.json();
+          console.log('Registration success email sent successfully:', {
+            visitorId: visitor[0]._id,
+            visitorEmail: visitor[0].email,
+            eventTitle: visitor[0].eventName,
+            pdfAttached: emailResult.pdfAttached
+          });
         } else {
-          console.error('Failed to send registration success email:', await emailResponse.text());
+          const errorText = await emailResponse.text();
+          console.error('Failed to send registration success email:', {
+            status: emailResponse.status,
+            statusText: emailResponse.statusText,
+            error: errorText,
+            visitorId: visitor[0]._id,
+            visitorEmail: visitor[0].email
+          });
         }
       } catch (emailError) {
-        console.error('Error sending registration success email:', emailError);
+        console.error('Error sending registration success email:', {
+          error: emailError,
+          visitorId: visitor[0]._id,
+          visitorEmail: visitor[0].email,
+          eventTitle: visitor[0].eventName
+        });
         // Don't fail the registration if email sending fails
       }
 
