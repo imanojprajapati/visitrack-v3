@@ -15,11 +15,20 @@ interface ScanEntryResponse {
   success: boolean;
   message: string;
   visitor?: {
-    id: string;
+    _id: string;
     name: string;
-    event: string;
+    email: string;
+    phone: string;
     company: string;
-    city: string;
+    eventName: string;
+    eventLocation: string;
+    eventStartDate: string;
+    eventEndDate: string;
+    eventStartTime: string;
+    eventEndTime: string;
+    status: string;
+    checkInTime: string;
+    additionalData?: Record<string, any>;
   };
   scanRecord?: {
     _id: string;
@@ -105,11 +114,20 @@ export default async function handler(
               success: false,
               message: 'Visitor is already checked in',
               visitor: {
-                id: visitor._id.toString(),
+                _id: visitor._id.toString(),
                 name: visitor.name,
-                event: visitor.eventName,
+                email: visitor.email,
+                phone: visitor.phone,
                 company: visitor.company,
-                city: visitor.eventLocation
+                eventName: visitor.eventName,
+                eventLocation: visitor.eventLocation,
+                eventStartDate: visitor.eventStartDate,
+                eventEndDate: visitor.eventEndDate,
+                eventStartTime: visitor.eventStartTime,
+                eventEndTime: visitor.eventEndTime,
+                status: visitor.status,
+                checkInTime: visitor.checkInTime || '',
+                additionalData: visitor.additionalData
               }
             });
           }
@@ -165,11 +183,20 @@ export default async function handler(
             success: true,
             message: 'Visitor checked in successfully',
             visitor: {
-              id: String((updatedVisitor as any)._id || visitorId),
+              _id: String((updatedVisitor as any)._id || visitorId),
               name: updatedVisitor.name,
-              event: updatedVisitor.eventName,
+              email: updatedVisitor.email,
+              phone: updatedVisitor.phone,
               company: updatedVisitor.company,
-              city: updatedVisitor.eventLocation
+              eventName: updatedVisitor.eventName,
+              eventLocation: updatedVisitor.eventLocation,
+              eventStartDate: updatedVisitor.eventStartDate,
+              eventEndDate: updatedVisitor.eventEndDate,
+              eventStartTime: updatedVisitor.eventStartTime,
+              eventEndTime: updatedVisitor.eventEndTime,
+              status: updatedVisitor.status,
+              checkInTime: updatedVisitor.checkInTime || '',
+              additionalData: updatedVisitor.additionalData
             },
             scanRecord: {
               _id: scanResult.insertedId.toString(),
