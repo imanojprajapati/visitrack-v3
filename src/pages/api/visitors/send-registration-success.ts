@@ -267,7 +267,7 @@ export default async function handler(
           const fallbackMailOptions = {
             ...mailOptions,
             attachments: undefined,
-            html: emailHtml.replace(/📎 Attachment.*?<\/div>/s, '') // Remove attachment section
+            html: emailHtml.replace(/📎 Attachment[\s\S]*?<\/div>/, '') // Remove attachment section
           };
           
           await transporter.sendMail(fallbackMailOptions);
