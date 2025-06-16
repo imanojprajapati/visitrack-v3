@@ -31,6 +31,7 @@ const menuItems = [
   { key: 'forms', icon: <FormOutlined />, label: 'Form Builder', path: '/admin/forms' },
   { key: 'messaging', icon: <MessageOutlined />, label: 'Messaging', path: '/admin/messaging' },
   { key: 'qr', icon: <QrcodeOutlined />, label: 'QR Scanner', path: '/admin/qr-scanner' },
+  { key: 'scan-by-camera', icon: <QrcodeOutlined />, label: 'Scan by Camera', path: '/admin/scan-by-camera' },
   { key: 'reports', icon: <FileTextOutlined />, label: 'Reports', path: '/admin/reports' },
   { key: 'settings', icon: <SettingOutlined />, label: 'Settings', path: '/admin/settings' },
 ];
@@ -44,6 +45,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   // Update selected key based on current path
   const getSelectedKey = () => {
     const path = router.pathname;
+    if (path.startsWith('/admin/scan-by-camera')) return 'scan-by-camera';
     if (path.startsWith('/admin/reports')) return 'reports';
     if (path.startsWith('/admin/settings')) return 'settings';
     if (path.startsWith('/admin/messaging')) return 'messaging';
