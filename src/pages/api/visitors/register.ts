@@ -4,6 +4,7 @@ import Visitor from '../../../models/Visitor';
 import Event, { IEvent } from '../../../models/Event';
 import Registration from '../../../models/Registration';
 import Form from '../../../models/Form';
+import Center from '../../../models/Center';
 import { generateQRCode } from '../../../lib/server-qrcode';
 import { QRCodeData } from '../../../lib/qrcode';
 import mongoose from 'mongoose';
@@ -293,6 +294,40 @@ export default async function handler(
         { visitorId: visitor[0]._id },
         { session }
       );
+
+      // Save/update center data in centerdb collection
+      try {
+        const centerData = {
+          name: visitor[0].name,
+          email: visitor[0].email,
+          phone: visitor[0].phone,
+          company: visitor[0].company,
+          city: additionalData.city?.value || '',
+          state: additionalData.state?.value || '',
+          country: additionalData.country?.value || '',
+          pincode: additionalData.pincode?.value || ''
+        };
+
+        // Check if center already exists
+        const existingCenter = await Center.findOne({ email: centerData.email.toLowerCase() });
+        
+        if (existingCenter) {
+          // Update existing center with new data
+          await Center.findByIdAndUpdate(
+            existingCenter._id,
+            centerData,
+            { session, runValidators: true }
+          );
+          console.log('Center data updated for email:', centerData.email);
+        } else {
+          // Create new center record
+          await Center.create([centerData], { session });
+          console.log('New center data created for email:', centerData.email);
+        }
+      } catch (centerError) {
+        console.error('Error saving center data:', centerError);
+        // Don't fail the registration if center data save fails
+      }
 
       // Commit the transaction
       await session.commitTransaction();

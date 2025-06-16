@@ -1,8 +1,9 @@
 import React from 'react';
 import { Tabs, Card, Typography, Space, Alert } from 'antd';
-import { UserOutlined, HistoryOutlined } from '@ant-design/icons';
+import { UserOutlined, HistoryOutlined, DatabaseOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
 import RegistrationReport from './reports/registrations';
+import CenterDBReport from './reports/centerdb';
 import dayjs from 'dayjs';
 
 const { TabPane } = Tabs;
@@ -108,6 +109,21 @@ export default function ReportsPage() {
                     </ul>
                   </div>
                 </Card>
+              </div>
+            </TabPane>
+
+            <TabPane 
+              tab={
+                <Space>
+                  <DatabaseOutlined />
+                  <span>CenterDB</span>
+                </Space>
+              } 
+              key="centerdb"
+              className="flex-1 flex flex-col overflow-hidden"
+            >
+              <div className="flex-1 flex flex-col overflow-hidden">
+                <CenterDBReport />
               </div>
             </TabPane>
           </Tabs>

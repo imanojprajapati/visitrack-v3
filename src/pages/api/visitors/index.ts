@@ -402,19 +402,12 @@ export default async function handler(
                 eventLocation: populatedVisitor.eventLocation,
                 eventStartDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventStartDate)),
                 eventEndDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventEndDate)),
-                checkInTime: (() => {
-                  const parsed = parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt);
-                  return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
-                })(),
-                createdAt: (() => {
-                  const parsed = parseDateString(populatedVisitor.createdAt);
-                  return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
-                })(),
-                updatedAt: (() => {
-                  const parsed = parseDateString(populatedVisitor.updatedAt);
-                  return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
-                })(),
-                additionalData: {}
+                status: populatedVisitor.status,
+                checkInTime: formatDateToISOString(populatedVisitor.checkInTime || populatedVisitor.createdAt),
+                checkOutTime: populatedVisitor.checkOutTime ? formatDateToISOString(populatedVisitor.checkOutTime) : undefined,
+                createdAt: formatDateToISOString(populatedVisitor.createdAt),
+                updatedAt: formatDateToISOString(populatedVisitor.updatedAt),
+                additionalData: populatedVisitor.additionalData as Record<string, { label: string; value: any }> || {}
               };
 
               // Handle optional fields
@@ -497,31 +490,13 @@ export default async function handler(
             eventLocation: populatedVisitor.eventLocation,
             eventStartDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventStartDate)),
             eventEndDate: formatDateToDDMMYYYY(parseDateString(populatedVisitor.eventEndDate)),
-            checkInTime: (() => {
-              const parsed = parseDateString(populatedVisitor.checkInTime || populatedVisitor.createdAt);
-              return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
-            })(),
-            createdAt: (() => {
-              const parsed = parseDateString(populatedVisitor.createdAt);
-              return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
-            })(),
-            updatedAt: (() => {
-              const parsed = parseDateString(populatedVisitor.updatedAt);
-              return parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
-            })(),
-            additionalData: {}
+            status: populatedVisitor.status,
+            checkInTime: formatDateToISOString(populatedVisitor.checkInTime || populatedVisitor.createdAt),
+            checkOutTime: populatedVisitor.checkOutTime ? formatDateToISOString(populatedVisitor.checkOutTime) : undefined,
+            createdAt: formatDateToISOString(populatedVisitor.createdAt),
+            updatedAt: formatDateToISOString(populatedVisitor.updatedAt),
+            additionalData: populatedVisitor.additionalData as Record<string, { label: string; value: any }> || {}
           };
-
-          // Handle optional fields
-          if (populatedVisitor.checkOutTime) {
-            const parsed = parseDateString(populatedVisitor.checkOutTime);
-            formattedVisitor.checkOutTime = parsed instanceof Date ? parsed.toISOString() : new Date(parsed).toISOString();
-          }
-          if (populatedVisitor.additionalData) {
-            formattedVisitor.additionalData = populatedVisitor.additionalData as Record<string, { label: string; value: any }>;
-          } else {
-            formattedVisitor.additionalData = {};
-          }
 
           return res.status(201).json(formattedVisitor);
 
@@ -617,4 +592,29 @@ const formatDateToDDMMYYYY = (date: Date | string): string => {
   
   // Fallback
   return '';
+};
+
+// Helper function to format date to ISO string
+const formatDateToISOString = (date: Date | string): string => {
+  if (date instanceof Date) {
+    return date.toISOString();
+  }
+  
+  // If it's already a string in DD-MM-YYYY format, convert it to a proper Date first
+  if (typeof date === 'string' && /^(0[1-9]|[12][0-9]|3[01])-(0[1-9]|1[0-2])-[0-9]{4}$/.test(date)) {
+    const [day, month, year] = date.split('-');
+    const dateObj = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    return dateObj.toISOString();
+  }
+  
+  // If it's already an ISO string, return it
+  if (typeof date === 'string') {
+    const parsedDate = new Date(date);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate.toISOString();
+    }
+  }
+  
+  // Fallback to current date
+  return new Date().toISOString();
 }; 

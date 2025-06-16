@@ -59,6 +59,46 @@ const interests = [
   'Other',
 ];
 
+// QR Code component with error boundary
+const QRCode: React.FC<{ value: string; size?: number }> = ({ value, size = 200 }) => {
+  const [hasError, setHasError] = useState(false);
+
+  if (hasError) {
+    return (
+      <Result
+        status="error"
+        title="QR Code Generation Failed"
+        subTitle="Unable to generate QR code. Please try again later."
+      />
+    );
+  }
+
+  try {
+    return (
+      <div style={{ background: '#fff', padding: '20px', textAlign: 'center' }}>
+        <QRCodeSVG
+          value={value}
+          size={size}
+          level="L"
+          includeMargin={true}
+          style={{ display: 'block', margin: '0 auto' }}
+          onError={(error) => {
+            console.error('QR Code generation error:', error);
+            setHasError(true);
+          }}
+        />
+        <div style={{ marginTop: '10px', fontSize: '12px', wordBreak: 'break-all' }}>
+          {value}
+        </div>
+      </div>
+    );
+  } catch (error) {
+    console.error('QR Code render error:', error);
+    setHasError(true);
+    return null;
+  }
+};
+
 export default function EventRegistration() {
   const router = useRouter();
   const { eventId } = router.query;
@@ -73,8 +113,10 @@ export default function EventRegistration() {
   const [isVerifying, setIsVerifying] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [formRenderKey, setFormRenderKey] = useState(0);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<Record<string, any>>({
     phoneNumber: '',
     otp: '',
     name: '',
@@ -92,6 +134,19 @@ export default function EventRegistration() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    console.log('formData changed:', formData);
+  }, [formData]);
+
+  // Simple debugging useEffect that doesn't cause infinite loops
+  useEffect(() => {
+    console.log('=== STATE CHANGE DEBUG ===');
+    console.log('currentStep:', currentStep);
+    console.log('visitor:', visitor ? 'SET' : 'NULL');
+    console.log('isAlreadyRegistered:', isAlreadyRegistered);
+    console.log('==================');
+  }, [currentStep, visitor, isAlreadyRegistered]);
 
   const fetchEventDetails = async () => {
     try {
@@ -114,7 +169,7 @@ export default function EventRegistration() {
       console.log('Event data received:', eventData);
 
       if (!eventData) {
-        throw new Error('Event not found');
+        throw new Error('Event not found - please check the event URL');
       }
 
       // Check if registration deadline has passed
@@ -149,10 +204,12 @@ export default function EventRegistration() {
       }
       
       setEvent(eventData);
+      console.log('Event set successfully:', eventData.title);
     } catch (error) {
       console.error('Error fetching event:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load event details');
-      messageApi.error(error instanceof Error ? error.message : 'Failed to load event details');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load event details';
+      setError(errorMessage);
+      messageApi.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -168,6 +225,7 @@ export default function EventRegistration() {
     if (currentStep === 2) {
       console.log('Current step:', currentStep);
       console.log('Event data:', event);
+      console.log('Current formData:', formData);
       if (event?.form) {
         console.log('Form fields:', event.form.fields);
         console.log('Form field IDs:', event.form.fields.map(f => f.id));
@@ -176,11 +234,34 @@ export default function EventRegistration() {
         console.log('No form data available');
       }
     }
-  }, [currentStep, event]);
+  }, [currentStep, event, formData]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  // Restore focus after form re-render
+  useEffect(() => {
+    if (focusedField && currentStep === 2) {
+      const element = document.getElementById(focusedField);
+      if (element) {
+        element.focus();
+        // Set cursor position to end of input
+        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+          const length = element.value.length;
+          element.setSelectionRange(length, length);
+        }
+      }
+    }
+  }, [formData, focusedField, currentStep]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleInputFocus = (fieldName: string) => {
+    setFocusedField(fieldName);
+  };
+
+  const handleInputBlur = () => {
+    setFocusedField(null);
   };
 
   const handleSendOTP = async (values: { email: string }) => {
@@ -200,11 +281,24 @@ export default function EventRegistration() {
       });
       
       if (checkResponse.isRegistered && checkResponse.visitor) {
-        setVisitor(checkResponse.visitor);
-        setIsAlreadyRegistered(true);
-        setCurrentStep(3); // Move to the final step
-        message.info('You are already registered for this event');
-        return;
+        console.log('=== ALREADY REGISTERED USER ===');
+        console.log('checkResponse:', checkResponse);
+        console.log('visitor object:', checkResponse.visitor);
+        
+        // Validate visitor object before proceeding
+        if (!checkResponse.visitor || !checkResponse.visitor._id) {
+          console.log('❌ ERROR: Invalid visitor object in check response');
+          console.log('Proceeding with normal registration flow instead');
+          // Don't set currentStep to 3, continue with normal flow
+        } else {
+          console.log('✅ Valid visitor object, setting currentStep to 3');
+          setVisitor(checkResponse.visitor);
+          setIsAlreadyRegistered(true);
+          setCurrentStep(3); // Move to the final step
+          message.info('You are already registered for this event');
+          return;
+        }
+        console.log('==================');
       }
 
       // If not registered, proceed with OTP
@@ -212,6 +306,9 @@ export default function EventRegistration() {
         method: 'POST',
         body: JSON.stringify({ email: values.email, eventId }),
       });
+      
+      // Set email in formData for later use
+      setFormData(prev => ({ ...prev, email: values.email }));
       
       setCurrentStep(1);
       message.success('OTP sent to your email');
@@ -234,13 +331,10 @@ export default function EventRegistration() {
       setIsVerifying(true);
       setError(null);
 
-      // Get email from form
-      const email = form.getFieldValue('email');
+      // Get email from formData
+      const email = formData.email;
       if (!email) {
-        form.setFields([{
-          name: 'email',
-          errors: ['Email is required']
-        }]);
+        setError('Email is required');
         return;
       }
 
@@ -281,9 +375,64 @@ export default function EventRegistration() {
         throw new Error(response.message || 'Failed to verify OTP');
       }
 
-      // OTP verification successful
+      // OTP verification successful - now fetch center data
+      try {
+        const centerResponse = await fetchApi('centers/find-by-email', {
+          method: 'POST',
+          body: JSON.stringify({ email })
+        });
+
+        if (centerResponse.found && centerResponse.center) {
+          // Populate form with center data
+          const centerData = centerResponse.center;
+          console.log('Center data found:', centerData);
+          
+          const updatedFormData = {
+            ...formData,
+            name: centerData.name,
+            email: centerData.email,
+            phone: centerData.phone,
+            phoneNumber: centerData.phone,
+            company: centerData.company,
+            companyName: centerData.company,
+            city: centerData.city,
+            state: centerData.state,
+            country: centerData.country,
+            pincode: centerData.pincode,
+            pinCode: centerData.pincode,
+            source: 'Website'
+          };
+          
+          console.log('Updated form data:', updatedFormData);
+          setFormData(updatedFormData);
+          setFormRenderKey(prev => prev + 1); // Force form re-render only when center data is found
+          
+          // Add a small delay to ensure state updates properly
+          setTimeout(() => {
+            console.log('Form data should now be updated, checking current state...');
+          }, 100);
+          
+          message.success('OTP verified successfully! Your information has been pre-filled from our database.');
+        } else {
+          console.log('No center data found for email:', email);
+          // Don't update formRenderKey when no center data is found to prevent form re-rendering
+          message.success('OTP verified successfully! Please fill in your details.');
+        }
+      } catch (centerError) {
+        console.error('Error fetching center data:', centerError);
+        // Continue with registration even if center data fetch fails
+        message.success('OTP verified successfully! Please fill in your details.');
+      }
+
+      // Move to registration form step
+      console.log('=== OTP VERIFICATION SUCCESS ===');
+      console.log('Setting currentStep to 2 (registration form)');
+      console.log('Current formData:', formData);
+      console.log('Ensuring visitor is null before showing form...');
+      setVisitor(null); // Ensure visitor is null for new registration
+      setIsAlreadyRegistered(false); // Ensure this is false for new registration
+      console.log('==================');
       setCurrentStep(2);
-      message.success('OTP verified successfully');
     } catch (error) {
       console.error('Error:', error);
       setError(error instanceof Error ? error.message : 'Failed to verify OTP');
@@ -293,7 +442,7 @@ export default function EventRegistration() {
     }
   };
 
-  const handleRegistration = async (values: any) => {
+  const handleRegistration = async (formValues: any) => {
     if (isSubmitting) {
       console.log('Registration already in progress');
       return;
@@ -304,77 +453,161 @@ export default function EventRegistration() {
       setError(null);
 
       // Add debug logging
-      console.log('Form values received:', values);
+      console.log('Form values received:', formValues);
       console.log('Event form fields:', event?.form?.fields);
+      console.log('Event ID:', eventId);
 
-      // Validate required fields
-      if (!event?.form?.fields) {
-        throw new Error('Form configuration is missing');
-      }
+      // Use formValues directly instead of getting from Ant Design form
+      console.log('Using form values:', formValues);
 
-      // Get all form values
-      const formValues = form.getFieldsValue();
-      console.log('All form values:', formValues);
-
-      // Validate that we have actual values
-      if (!formValues || Object.keys(formValues).length === 0) {
-        throw new Error('No form values provided');
-      }
-
-      // Extract required fields
-      const name = formValues.name;
-      const email = formValues.email || form.getFieldValue('email');
-      const phone = formValues.phone;
+      // Extract required fields from formValues with better field mapping
+      const name = formValues.name || formValues.fullName;
+      const email = formValues.email || formValues.emailId;
+      const phone = formValues.phone || formValues.phoneNumber || formValues.phoneNumber;
       const source = 'Website'; // Always set source to Website
 
       console.log('Extracted values:', { name, email, phone, source });
 
-      if (!name) {
+      if (!name || name.trim() === '') {
         throw new Error('Name is required');
       }
 
-      if (!email) {
+      if (!email || email.trim() === '') {
         throw new Error('Email is required');
       }
 
-      // Format form data
-      const formData = event.form.fields.reduce((acc: Record<string, any>, field) => {
-        // For source field, always use 'Website'
-        if (field.id === 'source') {
+      // Phone validation - make it more flexible
+      if (!phone || phone.trim() === '') {
+        throw new Error('Phone Number is required');
+      }
+
+      // Create form data structure based on whether event has form configuration or not
+      let formData: Record<string, any> = {};
+
+      if (event?.form?.fields) {
+        // Use dynamic form configuration
+        formData = event.form.fields.reduce((acc: Record<string, any>, field) => {
+          // For source field, always use 'Website'
+          if (field.id === 'source') {
+            acc[field.id] = {
+              label: field.label,
+              value: source
+            };
+            return acc;
+          }
+
+          // Map form field IDs to formValues with multiple possible field names
+          let value;
+          switch (field.id) {
+            case 'name':
+            case 'fullName':
+              value = formValues.name || formValues.fullName;
+              break;
+            case 'email':
+            case 'emailId':
+              value = formValues.email || formValues.emailId;
+              break;
+            case 'phone':
+            case 'phoneNumber':
+              value = formValues.phone || formValues.phoneNumber;
+              break;
+            case 'company':
+            case 'companyName':
+              value = formValues.company || formValues.companyName;
+              break;
+            case 'city':
+              value = formValues.city;
+              break;
+            case 'state':
+              value = formValues.state;
+              break;
+            case 'country':
+              value = formValues.country;
+              break;
+            case 'pincode':
+            case 'pinCode':
+              value = formValues.pincode || formValues.pinCode;
+              break;
+            case 'address':
+              value = formValues.address;
+              break;
+            case 'interestedIn':
+              value = formValues.interestedIn;
+              break;
+            default:
+              value = formValues[field.id];
+          }
+          
+          // Skip empty optional fields
+          if (!field.required && (value === undefined || value === '' || value === null)) {
+            return acc;
+          }
+
+          // Validate required fields
+          if (field.required && (value === undefined || value === '' || value === null)) {
+            throw new Error(`${field.label} is required`);
+          }
+
+          // Format the field value based on type
+          let formattedValue = value;
+          if (field.type === 'date' && value) {
+            formattedValue = dayjs(value).format('YYYY-MM-DD');
+          } else if (field.type === 'number' && value) {
+            formattedValue = Number(value);
+          }
+
           acc[field.id] = {
             label: field.label,
-            value: source
+            value: formattedValue
           };
+
           return acc;
-        }
-
-        const value = formValues[field.id];
-        
-        // Skip empty optional fields
-        if (!field.required && (value === undefined || value === '' || value === null)) {
-          return acc;
-        }
-
-        // Validate required fields
-        if (field.required && (value === undefined || value === '' || value === null)) {
-          throw new Error(`${field.label} is required`);
-        }
-
-        // Format the field value based on type
-        let formattedValue = value;
-        if (field.type === 'date' && value) {
-          formattedValue = dayjs(value).format('YYYY-MM-DD');
-        } else if (field.type === 'number' && value) {
-          formattedValue = Number(value);
-        }
-
-        acc[field.id] = {
-          label: field.label,
-          value: formattedValue
+        }, {});
+      } else {
+        // Use basic form structure for events without form configuration
+        formData = {
+          name: {
+            label: 'Full Name',
+            value: name
+          },
+          email: {
+            label: 'Email',
+            value: email
+          },
+          phone: {
+            label: 'Phone Number',
+            value: phone
+          },
+          company: {
+            label: 'Company Name',
+            value: formValues.company || formValues.companyName || ''
+          },
+          city: {
+            label: 'City',
+            value: formValues.city || ''
+          },
+          state: {
+            label: 'State',
+            value: formValues.state || ''
+          },
+          country: {
+            label: 'Country',
+            value: formValues.country || ''
+          },
+          pincode: {
+            label: 'PIN Code',
+            value: formValues.pincode || formValues.pinCode || ''
+          },
+          address: {
+            label: 'Address',
+            value: formValues.address || ''
+          },
+          interestedIn: {
+            label: 'Interested In',
+            value: formValues.interestedIn || ''
+          }
         };
-
-        return acc;
-      }, {});
+      }
 
       // Add source field if not already present
       if (!formData.source) {
@@ -383,6 +616,9 @@ export default function EventRegistration() {
           value: source
         };
       }
+
+      console.log('Formatted form data:', formData);
+      console.log('Submitting registration with eventId:', eventId);
 
       // Submit registration
       const response = await fetchApi('visitors/register', {
@@ -397,11 +633,17 @@ export default function EventRegistration() {
         })
       });
 
+      console.log('Registration response:', response);
+
       if (!response.visitor) {
         throw new Error('Failed to create visitor registration');
       }
 
       setVisitor(response.visitor);
+      console.log('=== REGISTRATION SUCCESS ===');
+      console.log('Setting visitor:', response.visitor);
+      console.log('Setting currentStep to 3 (success)');
+      console.log('==================');
       setCurrentStep(3);
       
       message.success('Registration successful! A confirmation email has been sent to your inbox.');
@@ -419,136 +661,6 @@ export default function EventRegistration() {
   // Helper function to validate MongoDB ObjectId format
   const isValidObjectId = (id: string): boolean => {
     return /^[0-9a-fA-F]{24}$/.test(id);
-  };
-
-  // QR Code component with error boundary
-  const QRCode: React.FC<{ value: string; size?: number }> = ({ value, size = 200 }) => {
-    const [hasError, setHasError] = useState(false);
-
-    if (hasError) {
-      return (
-        <Result
-          status="error"
-          title="QR Code Generation Failed"
-          subTitle="Unable to generate QR code. Please try again later."
-        />
-      );
-    }
-
-    try {
-      return (
-        <div style={{ background: '#fff', padding: '20px', textAlign: 'center' }}>
-          <QRCodeSVG
-            value={value}
-            size={size}
-            level="L"
-            includeMargin={true}
-            style={{ display: 'block', margin: '0 auto' }}
-            onError={(error) => {
-              console.error('QR Code generation error:', error);
-              setHasError(true);
-            }}
-          />
-          <div style={{ marginTop: '10px', fontSize: '12px', wordBreak: 'break-all' }}>
-            {value}
-          </div>
-        </div>
-      );
-    } catch (error) {
-      console.error('QR Code render error:', error);
-      setHasError(true);
-      return null;
-    }
-  };
-
-  // Registration details component
-  const RegistrationDetails: React.FC<{ visitor: Visitor }> = ({ visitor }) => {
-    const [qrError, setQrError] = useState<string | null>(null);
-    
-    if (!visitor) {
-      return (
-        <Result
-          status="error"
-          title="Registration Not Found"
-          subTitle="Unable to load registration details."
-        />
-      );
-    }
-
-    // QR code should only encode the visitor ID
-    const qrCodeValue = visitor._id ? visitor._id.toString() : '';
-
-    return (
-      <div className="mb-8">
-        <div className="mb-6">
-          <Title level={4}>Your QR Code</Title>
-          <div className="my-4 p-4 bg-white rounded-lg shadow-sm inline-block">
-            {qrError ? (
-              <Result
-                status="error"
-                title="Error Generating QR Code"
-                subTitle={qrError}
-              />
-            ) : (
-              <QRCode value={qrCodeValue} />
-            )}
-          </div>
-        </div>
-
-        <div className="text-left">
-          <Title level={4}>Registration Details</Title>
-          <Divider />
-          <Space direction="vertical" size="middle" style={{ width: '100%' }} className="p-4 bg-gray-50 rounded-lg">
-            <div>
-              <Text type="secondary">Name</Text>
-              <div><Text strong>{visitor.name}</Text></div>
-            </div>
-            <div>
-              <Text type="secondary">Email</Text>
-              <div><Text strong>{visitor.email}</Text></div>
-            </div>
-            {visitor.phone && (
-              <div>
-                <Text type="secondary">Phone</Text>
-                <div><Text strong>{visitor.phone}</Text></div>
-              </div>
-            )}
-            {visitor.company && (
-              <div>
-                <Text type="secondary">Company</Text>
-                <div><Text strong>{visitor.company}</Text></div>
-              </div>
-            )}
-            <div>
-              <Text type="secondary">Event</Text>
-              <div><Text strong>{visitor.eventName}</Text></div>
-            </div>
-            {visitor.eventLocation && (
-              <div>
-                <Text type="secondary">Location</Text>
-                <div><Text strong>{visitor.eventLocation}</Text></div>
-              </div>
-            )}
-            {visitor.eventStartDate && visitor.eventEndDate && (
-              <div>
-                <Text type="secondary">Event Date</Text>
-                <div><Text strong>{formatDate(visitor.eventStartDate)} - {formatDate(visitor.eventEndDate)}</Text></div>
-              </div>
-            )}
-            {visitor.eventStartDate && !visitor.eventEndDate && (
-              <div>
-                <Text type="secondary">Event Date</Text>
-                <div><Text strong>{formatDate(visitor.eventStartDate)}</Text></div>
-              </div>
-            )}
-            <div>
-              <Text type="secondary">Registration Date</Text>
-              <div><Text strong>{formatDateTime(visitor.createdAt)}</Text></div>
-            </div>
-          </Space>
-        </div>
-      </div>
-    );
   };
 
   const handleDownloadQR = async () => {
@@ -766,13 +878,109 @@ export default function EventRegistration() {
     }
   };
 
+  // Registration details component
+  const RegistrationDetails: React.FC<{ visitor: Visitor }> = ({ visitor }) => {
+    const [qrError, setQrError] = useState<string | null>(null);
+    
+    if (!visitor) {
+      return (
+        <Result
+          status="error"
+          title="Registration Not Found"
+          subTitle="Unable to load registration details."
+        />
+      );
+    }
+
+    // QR code should only encode the visitor ID
+    const qrCodeValue = visitor._id ? visitor._id.toString() : '';
+
+    return (
+      <div className="mb-8">
+        <div className="mb-6">
+          <Title level={4}>Your QR Code</Title>
+          <div className="my-4 p-4 bg-white rounded-lg shadow-sm inline-block">
+            {qrError ? (
+              <Result
+                status="error"
+                title="Error Generating QR Code"
+                subTitle={qrError}
+              />
+            ) : (
+              <QRCode value={qrCodeValue} />
+            )}
+          </div>
+        </div>
+
+        <div className="text-left">
+          <Title level={4}>Registration Details</Title>
+          <Divider />
+          <Space direction="vertical" size="middle" style={{ width: '100%' }} className="p-4 bg-gray-50 rounded-lg">
+            <div>
+              <Text type="secondary">Name</Text>
+              <div><Text strong>{visitor.name}</Text></div>
+            </div>
+            <div>
+              <Text type="secondary">Email</Text>
+              <div><Text strong>{visitor.email}</Text></div>
+            </div>
+            {visitor.phone && (
+              <div>
+                <Text type="secondary">Phone</Text>
+                <div><Text strong>{visitor.phone}</Text></div>
+              </div>
+            )}
+            {visitor.company && (
+              <div>
+                <Text type="secondary">Company</Text>
+                <div><Text strong>{visitor.company}</Text></div>
+              </div>
+            )}
+            <div>
+              <Text type="secondary">Event</Text>
+              <div><Text strong>{visitor.eventName}</Text></div>
+            </div>
+            {visitor.eventLocation && (
+              <div>
+                <Text type="secondary">Location</Text>
+                <div><Text strong>{visitor.eventLocation}</Text></div>
+              </div>
+            )}
+            {visitor.eventStartDate && visitor.eventEndDate && (
+              <div>
+                <Text type="secondary">Event Date</Text>
+                <div><Text strong>{formatDate(visitor.eventStartDate)} - {formatDate(visitor.eventEndDate)}</Text></div>
+              </div>
+            )}
+            {visitor.eventStartDate && !visitor.eventEndDate && (
+              <div>
+                <Text type="secondary">Event Date</Text>
+                <div><Text strong>{formatDate(visitor.eventStartDate)}</Text></div>
+              </div>
+            )}
+            <div>
+              <Text type="secondary">Registration Date</Text>
+              <div><Text strong>{formatDateTime(visitor.createdAt)}</Text></div>
+            </div>
+          </Space>
+        </div>
+      </div>
+    );
+  };
+
   const renderStepContent = () => {
     if (!event) {
+      console.log('renderStepContent: No event data available');
       return null;
     }
 
+    console.log('renderStepContent: Rendering step', currentStep, 'for event:', event.title);
+    console.log('renderStepContent: Event form configuration:', event.form);
+    console.log('renderStepContent: Current formData:', formData);
+
     switch (currentStep) {
       case 0:
+        console.log('renderStepContent: Rendering email verification step');
         return (
           <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
             <div className="lg:w-1/2 text-center lg:text-left">
@@ -822,6 +1030,7 @@ export default function EventRegistration() {
         );
 
       case 1:
+        console.log('renderStepContent: Rendering OTP verification step');
         return (
           <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
             <div className="lg:w-1/2 text-center lg:text-left">
@@ -914,7 +1123,12 @@ export default function EventRegistration() {
         );
 
       case 2:
+        console.log('renderStepContent: Rendering registration form step');
+        console.log('renderStepContent: Event form configuration:', event.form);
+        console.log('renderStepContent: Form data to be displayed:', formData);
+        
         if (!event.form) {
+          console.log('renderStepContent: Using basic form (no event.form configuration)');
           return (
             <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
               <div className="lg:w-1/2 text-center lg:text-left">
@@ -937,7 +1151,7 @@ export default function EventRegistration() {
                 </p>
               </div>
               <div className="lg:w-1/2">
-                <form onSubmit={handleFormSubmit} className="space-y-6">
+                <form onSubmit={handleFormSubmit} className="space-y-6" key={`form-${formRenderKey}`}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -949,6 +1163,8 @@ export default function EventRegistration() {
                         name="name"
                         value={formData.name}
                         onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('name')}
+                        onBlur={handleInputBlur}
                         className="visitrack-input"
                         required
                       />
@@ -964,6 +1180,8 @@ export default function EventRegistration() {
                         name="companyName"
                         value={formData.companyName}
                         onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('companyName')}
+                        onBlur={handleInputBlur}
                         className="visitrack-input"
                         required
                       />
@@ -979,6 +1197,25 @@ export default function EventRegistration() {
                         name="email"
                         value={formData.email}
                         onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('email')}
+                        onBlur={handleInputBlur}
+                        className="visitrack-input"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                        Phone Number *
+                      </label>
+                      <input
+                        type="tel"
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        value={formData.phoneNumber}
+                        onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('phoneNumber')}
+                        onBlur={handleInputBlur}
                         className="visitrack-input"
                         required
                       />
@@ -993,6 +1230,8 @@ export default function EventRegistration() {
                         name="interestedIn"
                         value={formData.interestedIn}
                         onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('interestedIn')}
+                        onBlur={handleInputBlur}
                         className="visitrack-input"
                         required
                       >
@@ -1015,6 +1254,8 @@ export default function EventRegistration() {
                         name="address"
                         value={formData.address}
                         onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('address')}
+                        onBlur={handleInputBlur}
                         className="visitrack-input"
                         required
                       />
@@ -1030,6 +1271,8 @@ export default function EventRegistration() {
                         name="city"
                         value={formData.city}
                         onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('city')}
+                        onBlur={handleInputBlur}
                         className="visitrack-input"
                         required
                       />
@@ -1045,6 +1288,8 @@ export default function EventRegistration() {
                         name="state"
                         value={formData.state}
                         onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('state')}
+                        onBlur={handleInputBlur}
                         className="visitrack-input"
                         required
                       />
@@ -1059,6 +1304,8 @@ export default function EventRegistration() {
                         name="country"
                         value={formData.country}
                         onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('country')}
+                        onBlur={handleInputBlur}
                         className="visitrack-input"
                         required
                       >
@@ -1081,6 +1328,8 @@ export default function EventRegistration() {
                         name="pinCode"
                         value={formData.pinCode}
                         onChange={handleInputChange}
+                        onFocus={() => handleInputFocus('pinCode')}
+                        onBlur={handleInputBlur}
                         className="visitrack-input"
                         required
                       />
@@ -1107,148 +1356,239 @@ export default function EventRegistration() {
               </div>
             </div>
           );
+        } else {
+          console.log('renderStepContent: Using dynamic form (event.form configuration exists)');
+          return (
+            <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
+              <div className="lg:w-1/2 text-center lg:text-left">
+                <div className="mb-6">
+                  <Image
+                    src="/images/registration-form.svg"
+                    alt="Registration Form"
+                    width={300}
+                    height={300}
+                    className="mx-auto lg:mx-0"
+                    onError={(e) => {
+                      // Fallback to a placeholder if image doesn't exist
+                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3ERegistration Form%3C/text%3E%3C/svg%3E";
+                    }}
+                  />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Details</h3>
+                <p className="text-gray-600 mb-6">
+                  Please fill in your personal and professional details to complete your registration.
+                </p>
+              </div>
+              <div className="lg:w-1/2">
+                <form onSubmit={handleFormSubmit} className="space-y-6" key={`dynamic-form-${formRenderKey}`}>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {event?.form?.fields?.map((field) => {
+                      // Skip the source field - it should be automatically set to 'Website'
+                      if (field.id === 'source') {
+                        return null;
+                      }
+                      
+                      const isFullWidth = field.type === 'textarea' || field.type === 'select';
+                      
+                      return (
+                        <div 
+                          key={field.id} 
+                          className={isFullWidth ? 'col-span-1 md:col-span-2' : 'col-span-1'}
+                        >
+                          <label htmlFor={field.id} className="block text-sm font-medium text-gray-700 mb-1">
+                            {field.label} {field.required && '*'}
+                          </label>
+                          
+                          {field.type === 'textarea' ? (
+                            <textarea
+                              id={field.id}
+                              name={field.id}
+                              value={formData[field.id] || ''}
+                              onChange={handleInputChange}
+                              onFocus={() => handleInputFocus(field.id)}
+                              onBlur={handleInputBlur}
+                              className="visitrack-input"
+                              rows={4}
+                              required={field.required}
+                              placeholder={field.placeholder}
+                              readOnly={field.readOnly}
+                            />
+                          ) : field.type === 'select' ? (
+                            <select
+                              id={field.id}
+                              name={field.id}
+                              value={formData[field.id] || ''}
+                              onChange={handleInputChange}
+                              onFocus={() => handleInputFocus(field.id)}
+                              onBlur={handleInputBlur}
+                              className="visitrack-input"
+                              required={field.required}
+                              disabled={field.readOnly}
+                            >
+                              <option value="">Select {field.label.toLowerCase()}</option>
+                              {field.options?.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          ) : field.type === 'email' ? (
+                            <input
+                              type="email"
+                              id={field.id}
+                              name={field.id}
+                              value={formData[field.id] || ''}
+                              onChange={handleInputChange}
+                              onFocus={() => handleInputFocus(field.id)}
+                              onBlur={handleInputBlur}
+                              className="visitrack-input"
+                              required={field.required}
+                              placeholder={field.placeholder}
+                              readOnly={field.readOnly}
+                            />
+                          ) : field.type === 'phone' ? (
+                            <input
+                              type="tel"
+                              id={field.id}
+                              name={field.id}
+                              value={formData[field.id] || ''}
+                              onChange={handleInputChange}
+                              onFocus={() => handleInputFocus(field.id)}
+                              onBlur={handleInputBlur}
+                              className="visitrack-input"
+                              required={field.required}
+                              placeholder={field.placeholder}
+                              readOnly={field.readOnly}
+                            />
+                          ) : field.type === 'number' ? (
+                            <input
+                              type="number"
+                              id={field.id}
+                              name={field.id}
+                              value={formData[field.id] || ''}
+                              onChange={handleInputChange}
+                              onFocus={() => handleInputFocus(field.id)}
+                              onBlur={handleInputBlur}
+                              className="visitrack-input"
+                              required={field.required}
+                              placeholder={field.placeholder}
+                              readOnly={field.readOnly}
+                              min={field.validation?.min}
+                              max={field.validation?.max}
+                            />
+                          ) : field.type === 'date' ? (
+                            <input
+                              type="date"
+                              id={field.id}
+                              name={field.id}
+                              value={formData[field.id] || ''}
+                              onChange={handleInputChange}
+                              onFocus={() => handleInputFocus(field.id)}
+                              onBlur={handleInputBlur}
+                              className="visitrack-input"
+                              required={field.required}
+                              readOnly={field.readOnly}
+                            />
+                          ) : (
+                            <input
+                              type="text"
+                              id={field.id}
+                              name={field.id}
+                              value={formData[field.id] || ''}
+                              onChange={handleInputChange}
+                              onFocus={() => handleInputFocus(field.id)}
+                              onBlur={handleInputBlur}
+                              className="visitrack-input"
+                              required={field.required}
+                              placeholder={field.placeholder}
+                              readOnly={field.readOnly}
+                              maxLength={field.validation?.maxLength}
+                            />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-6">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentStep(1)}
+                      className="text-[#4f46e5] hover:text-[#4338ca] font-medium"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="visitrack-button"
+                    >
+                      {isSubmitting ? 'Submitting...' : 'Submit'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          );
         }
 
-        return (
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
-            <div className="lg:w-1/2 text-center lg:text-left">
-              <div className="mb-6">
-                <Image
-                  src="/images/registration-form.svg"
-                  alt="Registration Form"
-                  width={300}
-                  height={300}
-                  className="mx-auto lg:mx-0"
-                  onError={(e) => {
-                    // Fallback to a placeholder if image doesn't exist
-                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3ERegistration Form%3C/text%3E%3C/svg%3E";
-                  }}
-                />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Details</h3>
-              <p className="text-gray-600 mb-6">
-                Please fill in your personal and professional details to complete your registration.
-              </p>
-            </div>
-            <div className="lg:w-1/2">
-              <Form
-                form={form}
-                onFinish={handleRegistration}
-                layout="vertical"
-                className="registration-form"
-                preserve={false}
-                initialValues={{ source: 'Website' }}
-              >
-                <Form.Item name="source" hidden>
-                  <Input />
-                </Form.Item>
-
-                <DynamicForm
-                  template={{
-                    id: 'registration-form',
-                    name: 'Registration Form',
-                    description: 'Please fill in your details',
-                    fields: event.form.fields
-                      .filter(field => field.id !== 'source')
-                      .map(field => {
-                        let fieldType: FormField['type'] = 'text';
-                        const fieldTypeStr = field.type as string;
-                        
-                        switch (fieldTypeStr) {
-                          case 'phone':
-                          case 'tel':
-                            fieldType = 'phone';
-                            break;
-                          case 'textarea':
-                            fieldType = 'textarea';
-                            break;
-                          case 'number':
-                            fieldType = 'number';
-                            break;
-                          case 'email':
-                            fieldType = 'email';
-                            break;
-                          case 'date':
-                            fieldType = 'date';
-                            break;
-                          case 'select':
-                            fieldType = 'select';
-                            break;
-                          default:
-                            fieldType = 'text';
-                        }
-
-                        return {
-                          id: field.id,
-                          label: field.label,
-                          type: fieldType,
-                          required: field.required,
-                          placeholder: field.placeholder,
-                          options: field.options ? field.options.map(opt => ({
-                            label: String(opt),
-                            value: String(opt)
-                          })) : undefined,
-                          validation: field.validation ? {
-                            min: field.validation.min,
-                            max: field.validation.max,
-                            maxLength: field.validation.maxLength,
-                            pattern: field.validation.pattern,
-                            message: field.validation.message,
-                          } : undefined
-                        };
-                      })
-                  }}
-                  form={form}
-                  onFinish={handleRegistration}
-                />
-                
-                <div className="text-center mt-6 space-x-4">
-                  <Button
-                    type="default"
-                    onClick={() => {
-                      form.resetFields();
-                      setCurrentStep(1);
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    Back
-                  </Button>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    loading={isSubmitting}
-                    disabled={isSubmitting}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      if (!isSubmitting) {
-                        form.validateFields()
-                          .then(validatedValues => {
-                            console.log('Form validation successful, values:', validatedValues);
-                            handleRegistration(validatedValues);
-                          })
-                          .catch(errorInfo => {
-                            console.error('Form validation failed:', errorInfo);
-                            message.error('Please fill in all required fields correctly');
-                          });
-                      }
-                    }}
-                  >
-                    {isSubmitting ? 'Submitting...' : 'Submit Registration'}
-                  </Button>
-                </div>
-              </Form>
-            </div>
-          </div>
-        );
-
       case 3:
+        console.log('=== CASE 3 DEBUG ===');
+        console.log('Rendering case 3 (success step)');
+        console.log('visitor:', visitor);
+        console.log('currentStep:', currentStep);
+        console.log('isAlreadyRegistered:', isAlreadyRegistered);
+        console.log('event:', event);
+        console.log('==================');
+        
+        // Only show success page if we have a valid visitor
         if (!visitor) {
+          console.log('❌ ERROR: No visitor object in case 3!');
+          console.log('This should not happen. The visitor should be set before reaching step 3.');
+          
+          // If we're not actually registered, redirect to registration form
+          if (!isAlreadyRegistered) {
+            console.log('User is not actually registered, redirecting to step 2 (registration form)');
+            // Use setTimeout to avoid immediate state update during render
+            setTimeout(() => {
+              setCurrentStep(2);
+            }, 0);
+            return null; // Return null to prevent rendering while transitioning
+          }
+          
+          // If we are marked as already registered but no visitor, show error
+          console.log('User is marked as already registered but no visitor object. Showing error...');
           return (
-            <Result
-              status="error"
-              title="Visitor information not found"
-              subTitle="Please try registering again."
-            />
+            <div className="text-center">
+              <Result
+                status="error"
+                title="Registration Error"
+                subTitle="There was an issue with your registration. Please try again or contact support."
+              />
+              <div className="mt-6">
+                <Space size="middle">
+                  <Button 
+                    type="primary"
+                    onClick={() => {
+                      console.log('User clicked to restart registration');
+                      setCurrentStep(0);
+                      setVisitor(null);
+                      setIsAlreadyRegistered(false);
+                    }}
+                  >
+                    Start Over
+                  </Button>
+                  <Button 
+                    onClick={() => {
+                      console.log('User clicked to go back to registration form');
+                      setCurrentStep(2);
+                    }}
+                  >
+                    Continue Registration
+                  </Button>
+                </Space>
+              </div>
+            </div>
           );
         }
         return (
@@ -1315,21 +1655,12 @@ export default function EventRegistration() {
 
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    // Validate all fields
-    if (!formData.name || !formData.email || !formData.companyName || !formData.address || 
-        !formData.city || !formData.state || !formData.country || !formData.pinCode || 
-        !formData.interestedIn) {
-      setError('Please fill in all required fields');
-      setLoading(false);
-      return;
-    }
-
-    // Simulate form submission
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    router.push('/badge');
+    
+    // Clear any previous errors when starting form submission
+    setError(null);
+    
+    // Call the actual registration function with formData
+    await handleRegistration(formData);
   };
 
   if (!mounted) {
@@ -1367,12 +1698,19 @@ export default function EventRegistration() {
                   type="primary"
                   onClick={() => {
                     setError(null);
+                    setLoading(true);
                     if (eventId) {
                       fetchEventDetails();
                     }
                   }}
                 >
                   Try Again
+                </Button>,
+                <Button
+                  key="back"
+                  onClick={() => router.push('/events')}
+                >
+                  Back to Events
                 </Button>
               ]}
             />
@@ -1419,7 +1757,8 @@ export default function EventRegistration() {
     );
   }
 
-  if (isAlreadyRegistered && visitor && event) {
+  // Only show "Already Registered" page if user is actually registered AND we're not in the middle of registration
+  if (isAlreadyRegistered && visitor && event && currentStep === 3) {
     const eventTitle = event?.title || 'Event';
     return (
       <div className="min-h-screen bg-gray-50 py-12">
@@ -1439,7 +1778,7 @@ export default function EventRegistration() {
                   <div className="mb-8">
                     <Title level={4}>Your QR Code</Title>
                     <div className="my-6 p-4 bg-white rounded-lg shadow-sm inline-block">
-                      <QRCode value={visitor._id} size={200} />
+                      <QRCode value={visitor._id ? visitor._id.toString() : ''} size={200} />
                     </div>
                   </div>
                   
@@ -1533,16 +1872,47 @@ export default function EventRegistration() {
   return (
     <div className="flex flex-col">
       <Head>
-        <title>Register - {event.title}</title>
-        <meta name="description" content={`Register for ${event.title}`} />
+        <title>Register - {event?.title || 'Event'}</title>
+        <meta name="description" content={`Register for ${event?.title || 'Event'}`} />
       </Head>
+
+      {/* Debug information - remove this in production */}
+      {process.env.NODE_ENV === 'development' && (
+        <div style={{ 
+          position: 'fixed', 
+          top: '10px', 
+          right: '10px', 
+          background: '#f0f0f0', 
+          padding: '10px', 
+          border: '1px solid #ccc', 
+          zIndex: 9999,
+          fontSize: '12px',
+          maxWidth: '300px'
+        }}>
+          <strong>DEBUG INFO:</strong><br/>
+          Current Step: {currentStep}<br/>
+          isAlreadyRegistered: {isAlreadyRegistered.toString()}<br/>
+          visitor: {visitor ? 'SET' : 'NULL'}<br/>
+          event: {event ? 'SET' : 'NULL'}<br/>
+          Condition: {(isAlreadyRegistered && Boolean(visitor) && Boolean(event)).toString()}<br/>
+          <button onClick={() => {
+            console.log('=== DEBUG STATE ===');
+            console.log('currentStep:', currentStep);
+            console.log('isAlreadyRegistered:', isAlreadyRegistered);
+            console.log('visitor:', visitor);
+            console.log('event:', event);
+            console.log('formData:', formData);
+            console.log('==================');
+          }}>Log State</button>
+        </div>
+      )}
 
       {/* Event Banner */}
       <div className="relative h-[400px] w-full">
         <div className="absolute inset-0">
           <div className="relative w-full h-full">
             <Image
-              src={event.banner || "/images/event-banner.jpg"}
+              src={event?.banner || "/images/event-banner.jpg"}
               alt="Event Banner"
               fill
               style={{ objectFit: 'cover' }}
@@ -1559,16 +1929,16 @@ export default function EventRegistration() {
         <div className="relative max-w-7xl mx-auto py-16 px-4 sm:py-24 sm:px-6 lg:px-8 h-full flex items-center">
           <div className="text-center w-full">
             <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl">
-              {event.title}
+              {event?.title || 'Event'}
             </h1>
             <p className="mt-6 max-w-lg mx-auto text-xl text-indigo-100 sm:max-w-3xl">
-              {event.description || `Join us for ${event.title} featuring cutting-edge innovations and industry leaders.`}
+              {event?.description || `Join us for ${event?.title || 'Event'} featuring cutting-edge innovations and industry leaders.`}
             </p>
             <div className="mt-4 text-indigo-100">
               <p className="text-lg">
-                {formatDate(event.startDate)} - {formatDate(event.endDate)}
+                {formatDate(event?.startDate)} - {formatDate(event?.endDate)}
               </p>
-              {event.location && (
+              {event?.location && (
                 <p className="text-lg mt-2">
                   📍 {event.location}
                 </p>
@@ -1594,34 +1964,37 @@ export default function EventRegistration() {
             </p>
           </div>
 
-          <div className="bg-white shadow-xl rounded-xl p-6 sm:p-8 lg:p-12">
-            {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg">
-                <div className="flex items-center">
-                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  {error}
-                </div>
-              </div>
-            )}
-
-            {currentStep < 3 && (
-              <div className="mb-8">
-                <Steps current={currentStep} className="max-w-2xl mx-auto">
-                  <Step title="Email" icon={<MailOutlined />} />
-                  <Step title="Verify" icon={<SafetyOutlined />} />
-                  <Step title="Details" icon={<UserOutlined />} />
-                  <Step title="Complete" icon={<UserOutlined />} />
-                </Steps>
-              </div>
-            )}
-
-            {renderStepContent()}
+          {/* Progress Steps */}
+          <div className="mb-8">
+            <Steps current={currentStep} className="max-w-2xl mx-auto">
+              <Steps.Step title="Email" description="Enter email" />
+              <Steps.Step title="Verify" description="OTP verification" />
+              <Steps.Step title="Details" description="Registration form" />
+              <Steps.Step title="Complete" description="Registration done" />
+            </Steps>
           </div>
+
+          {/* Error Display */}
+          {error && (
+            <div className="mb-6">
+              <Alert
+                message="Error"
+                description={error}
+                type="error"
+                showIcon
+                closable
+                onClose={() => setError(null)}
+              />
+            </div>
+          )}
+
+          {/* Main Content */}
+          <Card className="shadow-lg">
+            {contextHolder}
+            {renderStepContent()}
+          </Card>
         </div>
       </div>
-      {contextHolder}
     </div>
   );
 }
