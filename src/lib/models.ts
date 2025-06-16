@@ -7,6 +7,7 @@ import '../models/QRScan';
 import '../models/Registration';
 import '../models/Form';
 import '../models/Entry';
+import '../models/User';
 
 // Function to register all models
 export function registerModels() {

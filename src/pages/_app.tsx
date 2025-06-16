@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import { AppProvider } from '../components/AppProvider';
+import { AuthProvider } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
 import { App as AntApp } from 'antd';
 
@@ -42,6 +43,19 @@ function MyApp({ Component, pageProps }: AppProps) {
 
   if (!mounted) {
     return null;
+  }
+
+  // Only wrap with AuthProvider for admin pages
+  if (isAdminPage) {
+    return (
+      <AntApp>
+        <AppProvider>
+          <AuthProvider>
+            {content}
+          </AuthProvider>
+        </AppProvider>
+      </AntApp>
+    );
   }
 
   return (

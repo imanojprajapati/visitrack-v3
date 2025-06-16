@@ -1,229 +1,216 @@
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import { Layout, Menu, Typography, Button } from 'antd';
+import { Layout, Menu, Button, Avatar, Dropdown, Space, Typography, Spin } from 'antd';
 import {
   DashboardOutlined,
   UserOutlined,
-  IdcardOutlined,
   CalendarOutlined,
   FormOutlined,
-  MessageOutlined,
   QrcodeOutlined,
-  FileTextOutlined,
+  BarChartOutlined,
+  MessageOutlined,
   SettingOutlined,
+  LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  CameraOutlined,
+  IdcardOutlined,
 } from '@ant-design/icons';
+import { useRouter } from 'next/router';
+import { useAuth } from '../../context/AuthContext';
 
-const { Content, Sider } = Layout;
+const { Header, Sider, Content } = Layout;
 const { Text } = Typography;
 
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
-const menuItems = [
-  { key: 'dashboard', icon: <DashboardOutlined />, label: 'Dashboard', path: '/admin' },
-  { key: 'visitors', icon: <UserOutlined />, label: 'Visitor Management', path: '/admin/visitors' },
-  { key: 'badges', icon: <IdcardOutlined />, label: 'Badge Management', path: '/admin/badge-management' },
-  { key: 'events', icon: <CalendarOutlined />, label: 'Event Management', path: '/admin/events' },
-  { key: 'forms', icon: <FormOutlined />, label: 'Form Builder', path: '/admin/forms' },
-  { key: 'messaging', icon: <MessageOutlined />, label: 'Messaging', path: '/admin/messaging' },
-  { key: 'qr', icon: <QrcodeOutlined />, label: 'QR Scanner', path: '/admin/qr-scanner' },
-  { key: 'scan-by-camera', icon: <QrcodeOutlined />, label: 'Scan by Camera', path: '/admin/scan-by-camera' },
-  { key: 'reports', icon: <FileTextOutlined />, label: 'Reports', path: '/admin/reports' },
-  { key: 'settings', icon: <SettingOutlined />, label: 'Settings', path: '/admin/settings' },
-];
-
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [mobileMenuVisible, setMobileMenuVisible] = useState(false);
-  
-  // Update selected key based on current path
-  const getSelectedKey = () => {
-    const path = router.pathname;
-    if (path.startsWith('/admin/scan-by-camera')) return 'scan-by-camera';
-    if (path.startsWith('/admin/reports')) return 'reports';
-    if (path.startsWith('/admin/settings')) return 'settings';
-    if (path.startsWith('/admin/messaging')) return 'messaging';
-    if (path.startsWith('/admin/forms')) return 'forms';
-    if (path.startsWith('/admin/events')) return 'events';
-    if (path.startsWith('/admin/dashboard')) return 'dashboard';
-    if (path.startsWith('/admin/badge-management')) return 'badge-management';
-    if (path.startsWith('/admin/visitors')) return 'visitors';
-    if (path.startsWith('/admin/qr-scanner')) return 'qr-scanner';
-    return 'dashboard';
-  };
 
-  const [selectedKey, setSelectedKey] = useState(getSelectedKey());
-
-  // Update selected key when route changes
+  // Redirect to login if not authenticated
   useEffect(() => {
-    setSelectedKey(getSelectedKey());
-  }, [router.pathname]);
+    if (!isLoading && !isAuthenticated) {
+      router.push('/admin/login');
+    }
+  }, [isLoading, isAuthenticated, router]);
 
-  // Handle responsive behavior
-  useEffect(() => {
-    const checkMobile = () => {
-      const mobile = window.innerWidth < 768;
-      setIsMobile(mobile);
-      if (mobile) {
-        setCollapsed(true);
-        setMobileMenuVisible(false);
-      } else {
-        setMobileMenuVisible(true);
-        setCollapsed(false);
-      }
-    };
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Spin size="large" />
+      </div>
+    );
+  }
 
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
+  // Don't render layout if not authenticated
+  if (!isAuthenticated) {
+    return null;
+  }
 
-  const toggleMobileMenu = () => {
-    setMobileMenuVisible(!mobileMenuVisible);
+  const handleLogout = async () => {
+    await logout();
+    router.push('/admin/login');
   };
 
-  const toggleSidebar = () => {
-    setCollapsed(!collapsed);
+  const getMenuItems = () => {
+    const menuItems = [];
+
+    // Dashboard - available for all roles
+    menuItems.push({
+      key: '/admin',
+      icon: <DashboardOutlined />,
+      label: 'Dashboard',
+    });
+
+    // Visitors - available for all roles
+    menuItems.push({
+      key: '/admin/visitors',
+      icon: <UserOutlined />,
+      label: 'Visitors',
+    });
+
+    // Event Management - available for admin and manager
+    if (user?.role === 'admin' || user?.role === 'manager') {
+      menuItems.push({
+        key: '/admin/events',
+        icon: <CalendarOutlined />,
+        label: 'Event Management',
+      });
+    }
+
+    // Badge Management - available for admin and manager
+    if (user?.role === 'admin' || user?.role === 'manager') {
+      menuItems.push({
+        key: '/admin/badge-management',
+        icon: <IdcardOutlined />,
+        label: 'Badge Management',
+      });
+    }
+
+    // Forms - available for admin and manager
+    if (user?.role === 'admin' || user?.role === 'manager') {
+      menuItems.push({
+        key: '/admin/forms',
+        icon: <FormOutlined />,
+        label: 'Forms',
+      });
+    }
+
+    // Messaging - available for admin and manager
+    if (user?.role === 'admin' || user?.role === 'manager') {
+      menuItems.push({
+        key: '/admin/messaging',
+        icon: <MessageOutlined />,
+        label: 'Messaging',
+      });
+    }
+
+    // QR Scanner - available for all roles
+    menuItems.push({
+      key: '/admin/qr-scanner',
+      icon: <QrcodeOutlined />,
+      label: 'QR Scanner',
+    });
+
+    // Scan by Camera - available for all roles
+    menuItems.push({
+      key: '/admin/scan-by-camera',
+      icon: <CameraOutlined />,
+      label: 'Scan by Camera',
+    });
+
+    // Reports - available for admin and manager
+    if (user?.role === 'admin' || user?.role === 'manager') {
+      menuItems.push({
+        key: '/admin/reports',
+        icon: <BarChartOutlined />,
+        label: 'Reports',
+      });
+    }
+
+    // Settings - available for admin only
+    if (user?.role === 'admin') {
+      menuItems.push({
+        key: '/admin/settings',
+        icon: <SettingOutlined />,
+        label: 'Settings',
+      });
+    }
+
+    return menuItems;
   };
+
+  const userMenuItems = [
+    {
+      key: 'profile',
+      icon: <UserOutlined />,
+      label: 'Profile',
+      onClick: () => router.push('/admin/profile'),
+    },
+    {
+      key: 'logout',
+      icon: <LogoutOutlined />,
+      label: 'Logout',
+      onClick: handleLogout,
+    },
+  ];
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      {/* Mobile Menu Toggle Button */}
-      {isMobile && (
-        <Button
-          type="text"
-          icon={mobileMenuVisible ? <MenuFoldOutlined /> : <MenuUnfoldOutlined />}
-          onClick={toggleMobileMenu}
-          style={{
-            position: 'fixed',
-            top: '16px',
-            left: '16px',
-            zIndex: 1001,
-            background: '#fff',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            width: '40px',
-            height: '40px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            borderRadius: '4px',
-          }}
-        />
-      )}
-      
-      <Sider
-        theme="light"
-        collapsible
-        collapsed={collapsed}
-        onCollapse={toggleSidebar}
-        breakpoint="md"
-        collapsedWidth={isMobile ? 0 : 80}
-        style={{
-          height: '100vh',
-          position: isMobile ? 'fixed' : 'sticky',
-          left: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 1000,
-          boxShadow: '2px 0 8px rgba(0, 0, 0, 0.06)',
-          overflow: 'auto',
-          transform: isMobile ? (mobileMenuVisible ? 'translateX(0)' : 'translateX(-100%)') : 'none',
-          transition: 'all 0.3s ease-in-out',
-          width: isMobile ? '250px' : undefined,
-          visibility: isMobile ? (mobileMenuVisible ? 'visible' : 'hidden') : 'visible',
-          opacity: isMobile ? (mobileMenuVisible ? 1 : 0) : 1,
-        }}
-        trigger={null}
+      <Sider 
+        trigger={null} 
+        collapsible 
+        collapsed={collapsed} 
+        width={250}
+        style={{ background: '#FFFFFF' }}
       >
-        <div className="logo p-4 flex items-center justify-center border-b border-gray-100">
-          <Link href="/admin" className="flex items-center justify-center w-full">
-            {!collapsed ? (
-              <img
-                src="/images/logo.png"
-                alt="Visitrack"
-                className="h-8 w-auto"
-              />
-            ) : (
-              <Text strong style={{ fontSize: '24px', color: '#3730A3' }}>V</Text>
-            )}
-          </Link>
+        <div className="p-4">
+          <h1 className="text-black text-lg font-bold">Visitrack</h1>
         </div>
         <Menu
           theme="light"
-          selectedKeys={[selectedKey]}
           mode="inline"
-          items={menuItems.map((item) => ({
-            key: item.key,
-            icon: item.icon,
-            label: (
-              <Link href={item.path}>
-                {item.label}
-              </Link>
-            ),
-          }))}
+          selectedKeys={[router.pathname]}
+          items={getMenuItems()}
+          onClick={({ key }) => router.push(key)}
+          style={{ 
+            background: '#FFFFFF',
+            color: '#000000',
+            borderRight: '1px solid #f0f0f0'
+          }}
         />
-        {/* Collapse Trigger Button */}
-        {!isMobile && (
-          <div 
-            className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-100 cursor-pointer hover:bg-gray-50"
-            onClick={toggleSidebar}
-          >
-            <div className="flex items-center justify-center text-gray-500">
-              {collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-              {!collapsed && <span className="ml-2"></span>}
-            </div>
-          </div>
-        )}
       </Sider>
       
-      {/* Overlay for mobile menu */}
-      {isMobile && mobileMenuVisible && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            zIndex: 999,
-            opacity: mobileMenuVisible ? 1 : 0,
-            transition: 'opacity 0.3s ease-in-out',
-          }}
-          onClick={() => setMobileMenuVisible(false)}
-        />
-      )}
-
-      <Layout style={{ 
-        marginLeft: isMobile ? 0 : (collapsed ? 0 : 0),
-        transition: 'all 0.2s',
-        minHeight: '100vh',
-        background: '#f0f2f5',
-        padding: isMobile ? '12px' : '24px',
-        width: '100%',
-        maxWidth: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        overflow: 'hidden',
-      }}>
-        <Content style={{ 
-          padding: isMobile ? '16px' : '24px',
-          height: '100%',
-          display: 'flex',
-          flexDirection: 'column',
-          width: '100%',
-          maxWidth: '100%',
-          background: '#fff',
-          borderRadius: '8px',
-          boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03)',
-          // overflow: 'hidden',
-        }}>
+      <Layout>
+        <Header style={{ padding: '0 16px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Button
+            type="text"
+            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => setCollapsed(!collapsed)}
+            style={{ fontSize: '16px', width: 64, height: 64 }}
+          />
+          
+          <div className="flex items-center space-x-4">
+            <Text strong>{user?.name}</Text>
+            <Text type="secondary">({user?.role})</Text>
+            
+            <Dropdown
+              menu={{ items: userMenuItems }}
+              placement="bottomRight"
+              arrow
+            >
+              <Space className="cursor-pointer">
+                <Avatar icon={<UserOutlined />} />
+              </Space>
+            </Dropdown>
+          </div>
+        </Header>
+        
+        <Content style={{ margin: '24px 16px', padding: 24, background: '#fff', minHeight: 280 }}>
           {children}
         </Content>
       </Layout>

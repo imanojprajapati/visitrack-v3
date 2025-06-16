@@ -1,72 +1,107 @@
-import React, { useState } from 'react';
-import { Card, Table, Form, Input, Button, Select, Space, Modal, message } from 'antd';
+import React, { useState, useEffect } from 'react';
+import { Card, Table, Form, Input, Button, Select, Space, Modal, message, Switch, Tag, Spin } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
-import AdminLayout from './layout';
+import { PlusOutlined, EditOutlined, DeleteOutlined, UserOutlined } from '@ant-design/icons';
+import { useAuth } from '../../context/AuthContext';
+import MainLayout from '../../components/admin/MainLayout';
 
 const { Option } = Select;
 
-interface Role {
-  key: string;
+interface User {
+  id: string;
   name: string;
-  description: string;
-  permissions: string[];
+  email: string;
+  role: 'admin' | 'manager' | 'staff';
+  isActive: boolean;
+  createdAt: string;
 }
 
 const Settings: React.FC = () => {
-  const [roles, setRoles] = useState<Role[]>([
-    {
-      key: '1',
-      name: 'Admin',
-      description: 'Full access to all features',
-      permissions: ['dashboard', 'visitors', 'badges', 'forms', 'messaging', 'reports', 'settings'],
-    },
-    {
-      key: '2',
-      name: 'Manager',
-      description: 'Access to visitor management and reports',
-      permissions: ['dashboard', 'visitors', 'reports'],
-    },
-    {
-      key: '3',
-      name: 'Staff',
-      description: 'Basic access to visitor check-in',
-      permissions: ['dashboard', 'visitors'],
-    },
-  ]);
+  const { user: currentUser } = useAuth();
+  const [users, setUsers] = useState<User[]>([]);
+  const [isUserModalVisible, setIsUserModalVisible] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userForm] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+  const [fetchingUsers, setFetchingUsers] = useState(true);
 
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [editingRole, setEditingRole] = useState<Role | null>(null);
-  const [form] = Form.useForm();
+  // Fetch users from database
+  const fetchUsers = async () => {
+    try {
+      setFetchingUsers(true);
+      const response = await fetch('/api/admin/users', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Use cookies instead of Bearer token
+      });
 
-  const columns: ColumnsType<Role> = [
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          setUsers(data.users);
+        } else {
+          message.error(data.message || 'Failed to fetch users');
+        }
+      } else {
+        message.error('Failed to fetch users');
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      message.error('Failed to fetch users');
+    } finally {
+      setFetchingUsers(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.role === 'admin') {
+      fetchUsers();
+    }
+  }, [currentUser]);
+
+  const userColumns: ColumnsType<User> = [
     {
-      title: 'Role Name',
+      title: 'Name',
       dataIndex: 'name',
       key: 'name',
       fixed: 'left' as const,
       width: 150,
     },
     {
-      title: 'Description',
-      dataIndex: 'description',
-      key: 'description',
-      width: 250,
+      title: 'Email',
+      dataIndex: 'email',
+      key: 'email',
+      width: 200,
     },
     {
-      title: 'Permissions',
-      dataIndex: 'permissions',
-      key: 'permissions',
-      render: (permissions: string[]) => (
-        <Space wrap>
-          {permissions.map(permission => (
-            <span key={permission} className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
-              {permission}
-            </span>
-          ))}
-        </Space>
+      title: 'Role',
+      dataIndex: 'role',
+      key: 'role',
+      width: 120,
+      render: (role: string) => {
+        const color = role === 'admin' ? 'red' : role === 'manager' ? 'blue' : 'green';
+        return <Tag color={color}>{role.toUpperCase()}</Tag>;
+      },
+    },
+    {
+      title: 'Status',
+      dataIndex: 'isActive',
+      key: 'isActive',
+      width: 100,
+      render: (isActive: boolean) => (
+        <Tag color={isActive ? 'green' : 'red'}>
+          {isActive ? 'Active' : 'Inactive'}
+        </Tag>
       ),
-      width: 300,
+    },
+    {
+      title: 'Created',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 120,
+      render: (date: string) => new Date(date).toLocaleDateString(),
     },
     {
       title: 'Actions',
@@ -74,140 +109,229 @@ const Settings: React.FC = () => {
       fixed: 'right' as const,
       width: 120,
       render: (_, record) => (
-        <Space size="small" className="flex-wrap">
+        <Space size="small">
           <Button
             type="text"
             icon={<EditOutlined />}
-            onClick={() => {
-              setEditingRole(record);
-              form.setFieldsValue(record);
-              setIsModalVisible(true);
-            }}
+            onClick={() => handleEditUser(record)}
             size="small"
           />
-          <Button
-            type="text"
-            danger
-            icon={<DeleteOutlined />}
-            onClick={() => handleDelete(record.key)}
-            size="small"
-          />
+          {record.id !== currentUser?.id && (
+            <Button
+              type="text"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => handleDeleteUser(record.id)}
+              size="small"
+            />
+          )}
         </Space>
       ),
     },
   ];
 
-  const handleAdd = () => {
-    setEditingRole(null);
-    form.resetFields();
-    setIsModalVisible(true);
+  const handleAddUser = () => {
+    setEditingUser(null);
+    userForm.resetFields();
+    setIsUserModalVisible(true);
   };
 
-  const handleDelete = (key: string) => {
-    setRoles(roles.filter(role => role.key !== key));
-    message.success('Role deleted successfully');
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    userForm.setFieldsValue(user);
+    setIsUserModalVisible(true);
   };
 
-  const handleModalOk = () => {
-    form.validateFields().then(values => {
-      if (editingRole) {
-        // Update existing role
-        setRoles(roles.map(role =>
-          role.key === editingRole.key ? { ...role, ...values } : role
-        ));
-        message.success('Role updated successfully');
+  const handleDeleteUser = async (id: string) => {
+    try {
+      const response = await fetch(`/api/admin/users/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Use cookies instead of Bearer token
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          message.success('User deleted successfully');
+          fetchUsers(); // Refresh the list
+        } else {
+          message.error(data.message || 'Failed to delete user');
+        }
       } else {
-        // Add new role
-        const newRole = {
-          key: String(roles.length + 1),
-          ...values,
-        };
-        setRoles([...roles, newRole]);
-        message.success('Role added successfully');
+        message.error('Failed to delete user');
       }
-      setIsModalVisible(false);
-    });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      message.error('Failed to delete user');
+    }
   };
+
+  const handleUserModalOk = async () => {
+    try {
+      const values = await userForm.validateFields();
+      setLoading(true);
+
+      const url = editingUser 
+        ? `/api/admin/users/${editingUser.id}`
+        : '/api/admin/create-user';
+      
+      const method = editingUser ? 'PUT' : 'POST';
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Use cookies instead of Bearer token
+        body: JSON.stringify(values),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        message.success(editingUser ? 'User updated successfully' : 'User created successfully');
+        setIsUserModalVisible(false);
+        fetchUsers(); // Refresh the list
+      } else {
+        message.error(data.message || 'Operation failed');
+      }
+    } catch (error) {
+      console.error('Form submission error:', error);
+      message.error('Operation failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Only show user management for admin users
+  if (currentUser?.role !== 'admin') {
+    return (
+      <MainLayout>
+        <div className="w-full px-2 sm:px-4 lg:px-8 py-6">
+          <h1 className="text-xl sm:text-2xl font-bold mb-6">Settings</h1>
+          <Card>
+            <p className="text-center text-gray-500">Access denied. Admin privileges required.</p>
+          </Card>
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
-    <AdminLayout>
+    <MainLayout>
       <div className="w-full px-2 sm:px-4 lg:px-8 py-6">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
         </div>
         
         <Card
-          title="Role Management"
+          title="User Management"
           extra={
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={handleAdd}
+              onClick={handleAddUser}
               className="w-full sm:w-auto"
             >
-              Add Role
+              Add User
             </Button>
           }
         >
-          <div className="overflow-x-auto">
-            <Table
-              columns={columns}
-              dataSource={roles}
-              rowKey="key"
-              pagination={false}
-              scroll={{ x: 'max-content' }}
-            />
-          </div>
+          {fetchingUsers ? (
+            <div className="flex justify-center items-center py-8">
+              <Spin size="large" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table
+                columns={userColumns}
+                dataSource={users}
+                rowKey="id"
+                pagination={{ pageSize: 10 }}
+                scroll={{ x: 'max-content' }}
+              />
+            </div>
+          )}
         </Card>
 
+        {/* User Modal */}
         <Modal
-          title={editingRole ? 'Edit Role' : 'Add Role'}
-          open={isModalVisible}
-          onOk={handleModalOk}
-          onCancel={() => setIsModalVisible(false)}
+          title={editingUser ? 'Edit User' : 'Add User'}
+          open={isUserModalVisible}
+          onOk={handleUserModalOk}
+          onCancel={() => setIsUserModalVisible(false)}
           width={window.innerWidth < 640 ? '100%' : 600}
           style={{ top: 24 }}
           bodyStyle={{ padding: window.innerWidth < 640 ? 16 : 24 }}
+          confirmLoading={loading}
         >
           <Form
-            form={form}
+            form={userForm}
             layout="vertical"
           >
             <Form.Item
               name="name"
-              label="Role Name"
-              rules={[{ required: true, message: 'Please enter role name' }]}
+              label="Full Name"
+              rules={[{ required: true, message: 'Please enter full name' }]}
             >
-              <Input />
+              <Input prefix={<UserOutlined />} placeholder="Full Name" />
             </Form.Item>
 
             <Form.Item
-              name="description"
-              label="Description"
-              rules={[{ required: true, message: 'Please enter role description' }]}
+              name="email"
+              label="Email"
+              rules={[
+                { required: true, message: 'Please enter email' },
+                { type: 'email', message: 'Invalid email format' }
+              ]}
             >
-              <Input.TextArea rows={3} />
+              <Input placeholder="Email" />
             </Form.Item>
 
+            {!editingUser && (
+              <Form.Item
+                name="password"
+                label="Password"
+                rules={[
+                  { required: true, message: 'Please enter password' },
+                  { 
+                    pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/,
+                    message: 'Password must be at least 6 characters with 1 uppercase, 1 lowercase, and 1 number'
+                  }
+                ]}
+              >
+                <Input.Password placeholder="Password" />
+              </Form.Item>
+            )}
+
             <Form.Item
-              name="permissions"
-              label="Permissions"
-              rules={[{ required: true, message: 'Please select permissions' }]}
+              name="role"
+              label="Role"
+              rules={[{ required: true, message: 'Please select role' }]}
             >
-              <Select mode="multiple" className="w-full">
-                <Option value="dashboard">Dashboard</Option>
-                <Option value="visitors">Visitor Management</Option>
-                <Option value="badges">Badge Management</Option>
-                <Option value="forms">Form Builder</Option>
-                <Option value="messaging">Messaging</Option>
-                <Option value="reports">Reports</Option>
-                <Option value="settings">Settings</Option>
+              <Select placeholder="Select role">
+                <Option value="admin">Admin - Full Access</Option>
+                <Option value="manager">Manager - Limited Access</Option>
+                <Option value="staff">Staff - Basic Access</Option>
               </Select>
             </Form.Item>
+
+            {editingUser && (
+              <Form.Item
+                name="isActive"
+                label="Status"
+                valuePropName="checked"
+              >
+                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+              </Form.Item>
+            )}
           </Form>
         </Modal>
       </div>
-    </AdminLayout>
+    </MainLayout>
   );
 };
 
