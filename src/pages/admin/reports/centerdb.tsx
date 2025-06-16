@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { Table, Input, Button, Space, Card, Typography, message, Modal, Form, Select, Tag } from 'antd';
-import { SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { Table, Input, Button, Space, Card, Typography, message, Modal, Form, Select, Tag, Alert } from 'antd';
+import { SearchOutlined, ReloadOutlined, EditOutlined, DeleteOutlined, DownloadOutlined, UploadOutlined, FileExcelOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -32,6 +32,13 @@ interface CenterDBResponse {
   };
 }
 
+interface ImportResult {
+  total: number;
+  created: number;
+  updated: number;
+  errors: Array<{ row: number; error: string; data: any }>;
+}
+
 const CenterDBReport: React.FC = () => {
   const [centers, setCenters] = useState<CenterData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -45,7 +52,11 @@ const CenterDBReport: React.FC = () => {
   });
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingCenter, setEditingCenter] = useState<CenterData | null>(null);
+  const [importModalVisible, setImportModalVisible] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const [form] = Form.useForm();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchCenters = async (page = 1, search = '') => {
     try {
@@ -117,6 +128,166 @@ const CenterDBReport: React.FC = () => {
       console.error('Error updating center:', error);
       message.error('Failed to update center data');
     }
+  };
+
+  const handleExport = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/centers/export');
+      
+      if (!response.ok) {
+        throw new Error('Failed to export data');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `centerdb-export-${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      message.success('Data exported successfully');
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      message.error('Failed to export data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await fetch('/api/centers/template');
+      
+      if (!response.ok) {
+        throw new Error('Failed to download template');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'centerdb-template.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      message.success('Template downloaded successfully');
+    } catch (error) {
+      console.error('Error downloading template:', error);
+      message.error('Failed to download template');
+    }
+  };
+
+  const parseCSV = (csvText: string): any[] => {
+    const lines = csvText.split('\n');
+    if (lines.length < 2) {
+      throw new Error('CSV file must have at least a header and one data row');
+    }
+
+    const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+    const data: any[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      if (lines[i].trim() === '') continue;
+      
+      const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+      const row: Record<string, any> = {};
+      
+      headers.forEach((header, index) => {
+        if (values[index]) {
+          // Normalize header names to handle different variations
+          const normalizedHeader = header.toLowerCase().replace(/\s+/g, '');
+          let value: any = values[index];
+          
+          // Handle date fields - convert to Date object if it's a valid date
+          if (normalizedHeader.includes('created') || normalizedHeader.includes('updated')) {
+            const dateValue = new Date(value);
+            if (!isNaN(dateValue.getTime())) {
+              value = dateValue;
+            } else {
+              // If date is invalid, use current date
+              value = new Date();
+            }
+          }
+          
+          row[normalizedHeader] = value;
+        }
+      });
+      
+      data.push(row);
+    }
+
+    return data;
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+      console.log('Starting import process for file:', file.name);
+      setImportLoading(true);
+      setImportResult(null);
+
+      const text = await file.text();
+      console.log('File content length:', text.length);
+      
+      const data = parseCSV(text);
+      console.log('Parsed CSV data:', data);
+
+      if (data.length === 0) {
+        message.error('No valid data found in the CSV file');
+        return;
+      }
+
+      console.log('Sending data to import API...');
+      const response = await fetch('/api/centers/import', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ data }),
+      });
+
+      console.log('Import API response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Import API error:', errorText);
+        throw new Error(`Failed to import data: ${response.status} ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      console.log('Import API result:', result);
+      setImportResult(result.results);
+      
+      if (result.results.errors.length === 0) {
+        message.success(`Import completed successfully! Created: ${result.results.created}, Updated: ${result.results.updated}`);
+        fetchCenters(pagination.current, searchText);
+      } else {
+        message.warning(`Import completed with ${result.results.errors.length} errors. Created: ${result.results.created}, Updated: ${result.results.updated}`);
+      }
+    } catch (error) {
+      console.error('Error importing data:', error);
+      message.error(error instanceof Error ? error.message : 'Failed to import data');
+    } finally {
+      setImportLoading(false);
+    }
+  };
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleImport(file);
+    }
+    // Reset the input value so the same file can be selected again
+    event.target.value = '';
   };
 
   const columns = [
@@ -209,6 +380,20 @@ const CenterDBReport: React.FC = () => {
                 onSearch={handleSearch}
                 style={{ width: 300 }}
               />
+              <Button
+                icon={<DownloadOutlined />}
+                onClick={handleExport}
+                loading={loading}
+                type="primary"
+              >
+                Export All
+              </Button>
+              <Button
+                icon={<UploadOutlined />}
+                onClick={() => setImportModalVisible(true)}
+              >
+                Import
+              </Button>
               <Button
                 icon={<ReloadOutlined />}
                 onClick={() => fetchCenters(pagination.current, searchText)}
@@ -347,6 +532,104 @@ const CenterDBReport: React.FC = () => {
             </Space>
           </Form.Item>
         </Form>
+      </Modal>
+
+      {/* Import Modal */}
+      <Modal
+        title="Import Center Data"
+        open={importModalVisible}
+        onCancel={() => {
+          setImportModalVisible(false);
+          setImportResult(null);
+        }}
+        footer={null}
+        width={600}
+      >
+        <div className="space-y-4">
+          <Alert
+            message="Import Instructions"
+            description={
+              <div>
+                <p>Upload a CSV file with the following columns:</p>
+                <ul className="list-disc list-inside mt-2">
+                  <li>ID (optional - will be auto-generated if missing)</li>
+                  <li>Name (required)</li>
+                  <li>Email (required)</li>
+                  <li>Phone (required)</li>
+                  <li>Company (required)</li>
+                  <li>City (required)</li>
+                  <li>State (required)</li>
+                  <li>Country (required)</li>
+                  <li>Pincode (required)</li>
+                  <li>Created At (optional - current time will be used if missing)</li>
+                  <li>Updated At (optional - current time will be used if missing)</li>
+                </ul>
+                <p className="mt-2 text-sm text-gray-600">
+                  Existing records will be updated based on email address. New records will be created.
+                  Missing IDs will be auto-generated, and missing dates will use current timestamp.
+                </p>
+              </div>
+            }
+            type="info"
+            showIcon
+          />
+
+          <div className="flex space-x-2">
+            <Button
+              icon={<FileExcelOutlined />}
+              onClick={handleDownloadTemplate}
+              style={{ flex: 1 }}
+            >
+              Download Template
+            </Button>
+            <div style={{ flex: 1 }}>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv"
+                onChange={handleFileInputChange}
+                style={{ display: 'none' }}
+              />
+              <Button
+                icon={<UploadOutlined />}
+                loading={importLoading}
+                onClick={handleFileSelect}
+                block
+                size="large"
+              >
+                {importLoading ? 'Processing...' : 'Select CSV File'}
+              </Button>
+            </div>
+          </div>
+
+          {importResult && (
+            <div className="mt-4">
+              <Alert
+                message={`Import Results: ${importResult.total} total records processed`}
+                description={
+                  <div>
+                    <p>✅ Created: {importResult.created}</p>
+                    <p>🔄 Updated: {importResult.updated}</p>
+                    {importResult.errors.length > 0 && (
+                      <div className="mt-2">
+                        <p className="text-red-600">❌ Errors: {importResult.errors.length}</p>
+                        <div className="max-h-40 overflow-y-auto mt-2">
+                          {importResult.errors.map((error, index) => (
+                            <div key={index} className="text-sm text-red-600 mb-1">
+                              Row {error.row}: {error.error}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                }
+                type={importResult.errors.length === 0 ? "success" : "warning"}
+                showIcon
+              />
+            </div>
+          )}
+        </div>
       </Modal>
     </div>
   );

@@ -2,7 +2,7 @@
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  output: 'standalone',
+  // output: 'standalone', // Temporarily disabled to fix middleware manifest issue
   env: {
     NEXT_PUBLIC_API_URL: process.env.NODE_ENV === 'production' 
       ? 'https://www.visitrack.in/api'

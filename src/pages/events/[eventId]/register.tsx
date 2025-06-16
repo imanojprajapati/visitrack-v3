@@ -242,8 +242,15 @@ export default function EventRegistration() {
       const element = document.getElementById(focusedField);
       if (element) {
         element.focus();
-        // Set cursor position to end of input
-        if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
+        // Set cursor position to end of input (only for text inputs that support selection)
+        if (element instanceof HTMLInputElement) {
+          const inputType = element.type;
+          // Only set selection range for text inputs that support it
+          if (inputType === 'text' || inputType === 'password' || inputType === 'search' || inputType === 'tel' || inputType === 'url') {
+            const length = element.value.length;
+            element.setSelectionRange(length, length);
+          }
+        } else if (element instanceof HTMLTextAreaElement) {
           const length = element.value.length;
           element.setSelectionRange(length, length);
         }
