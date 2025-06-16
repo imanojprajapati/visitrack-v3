@@ -39,6 +39,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import ReactDOM from 'react-dom/client';
 import { QRCodeComponent, generateVerificationURL } from '../../lib/qrcode';
+import AccessControl from '../../components/admin/AccessControl';
 
 const { Title, Text } = Typography;
 const { Option } = Select;
@@ -655,330 +656,332 @@ const BadgeManagement: React.FC = () => {
   }
 
   return (
-    <AdminLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <Title level={2} className="m-0">Badge Management</Title>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={handleNewTemplate}
-            className="w-full sm:w-auto"
-          >
-            New Template
-          </Button>
-        </div>
-
-        <Card title={form.getFieldValue('_id') ? 'Edit Template' : 'Create New Template'}>
-          <Form
-            form={form}
-            layout="vertical"
-            onFinish={handleSaveTemplate}
-            className="space-y-6"
-          >
-            <Row gutter={[24, 24]}>
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name="name"
-                  label="Template Name"
-                  rules={[{ required: true, message: 'Please enter template name' }]}
-                >
-                  <Input placeholder="Enter template name" />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name="eventId"
-                  label="Select Event"
-                  rules={[{ required: true, message: 'Please select an event' }]}
-                >
-                  <Select
-                    placeholder="Select event"
-                    loading={loading}
-                    onChange={(value) => handleEventChange(value)}
-                  >
-                    {events.map((event) => (
-                      <Option key={event._id} value={event._id}>
-                        {event.title}
-                      </Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-              </Col>
-            </Row>
-
-            <Row gutter={[24, 24]}>
-              <Col xs={24} sm={12}>
-                <Form.Item
-                  name="showQRCode"
-                  label="Show QR Code"
-                  valuePropName="checked"
-                >
-                  <Switch />
-                </Form.Item>
-              </Col>
-              <Col xs={24} sm={12}>
-                <Form.Item label="Upload Badge">
-                  <Upload {...uploadProps}>
-                    <Button icon={<UploadOutlined />}>Upload Badge</Button>
-                  </Upload>
-                  {form.getFieldValue(['badge', 'cloudinaryUrl']) && (
-                    <div className="mt-2">
-                      <Image
-                        src={form.getFieldValue(['badge', 'cloudinaryUrl'])}
-                        alt="Badge preview"
-                        style={{ maxWidth: '200px', maxHeight: '200px', objectFit: 'contain' }}
-                        preview={true}
-                      />
-                    </div>
-                  )}
-                </Form.Item>
-              </Col>
-            </Row>
-
-            {/* Hidden form fields to capture badge data */}
-            <Form.Item name="_id" hidden>
-              <Input />
-            </Form.Item>
-            <Form.Item name={['badge', 'cloudinaryUrl']} hidden>
-              <Input />
-            </Form.Item>
-            <Form.Item name={['badge', 'cloudinaryPublicId']} hidden>
-              <Input />
-            </Form.Item>
-            <Form.Item name={['badge', 'imageData']} hidden>
-              <Input />
-            </Form.Item>
-            <Form.Item name="badge" hidden>
-              <Input />
-            </Form.Item>
-
-            <Form.Item>
-              <Space>
-                <Button type="primary" htmlType="submit" loading={loading}>
-                  {form.getFieldValue('_id') ? 'Update Template' : 'Save Template'}
-                </Button>
-                <Button onClick={() => form.resetFields()}>Reset</Button>
-              </Space>
-            </Form.Item>
-          </Form>
-        </Card>
-
-        <Card title="Saved Templates" className="mt-6">
-          <Table
-            dataSource={templates}
-            columns={columns}
-            rowKey="_id"
-            pagination={{
-              pageSize: 10,
-              showSizeChanger: true,
-              showTotal: (total) => `Total ${total} templates`,
-              responsive: true,
-            }}
-            scroll={{ x: 'max-content' }}
-          />
-        </Card>
-      </div>
-
-      {/* Preview Drawer */}
-      <Drawer
-        title="Badge Preview"
-        placement="right"
-        width={600}
-        onClose={() => setPreviewDrawerVisible(false)}
-        open={previewDrawerVisible}
-        extra={
-          <Space className="flex-wrap">
-            <Button onClick={() => setPreviewDrawerVisible(false)}>Close</Button>
+    <AccessControl allowedRoles={['admin', 'manager']} pageName="Badge Management">
+      <AdminLayout>
+        <div className="space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <Title level={2} className="m-0">Badge Management</Title>
             <Button
               type="primary"
-              onClick={() => selectedTemplate && handleDownload(selectedTemplate)}
-              icon={<PrinterOutlined />}
+              icon={<PlusOutlined />}
+              onClick={handleNewTemplate}
+              className="w-full sm:w-auto"
             >
-              Download
+              New Template
             </Button>
-          </Space>
-        }
-      >
-        {selectedTemplate && (
-          <div className="space-y-4">
-            <div
-              ref={badgeRef}
-              style={{
-                width: '210mm',
-                minHeight: '297mm',
-                background: '#fff',
-                border: '1px solid #d9d9d9',
-                borderRadius: '4px',
-                overflow: 'hidden',
-                display: 'flex',
-                flexDirection: 'column',
-                position: 'relative',
-                boxSizing: 'border-box',
-              }}
-            >
-              {/* Badge Image - Top Section */}
-              <div style={{ 
-                width: '100%', 
-                height: '180px', 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center',
-                background: '#f8f9fa'
-              }}>
-                {selectedTemplate.badge?.cloudinaryUrl ? (
-                  <img
-                    src={selectedTemplate.badge.cloudinaryUrl}
-                    alt="Badge"
-                    style={{
-                      width: '100%',
-                      height: '180px',
-                      objectFit: 'contain',
-                    }}
-                  />
-                ) : (
-                  <div style={{
-                    width: '100%',
-                    height: '180px',
-                    display: 'flex',
-                    justifyContent: 'center',
-                    alignItems: 'center',
-                    color: '#999',
-                    fontSize: '16px',
-                    border: '2px dashed #d9d9d9'
-                  }}>
-                    Badge Image Placeholder
-                  </div>
-                )}
-              </div>
+          </div>
 
-              {/* QR Code - Middle Section */}
-              {selectedTemplate.showQRCode && (
+          <Card title={form.getFieldValue('_id') ? 'Edit Template' : 'Create New Template'}>
+            <Form
+              form={form}
+              layout="vertical"
+              onFinish={handleSaveTemplate}
+              className="space-y-6"
+            >
+              <Row gutter={[24, 24]}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="name"
+                    label="Template Name"
+                    rules={[{ required: true, message: 'Please enter template name' }]}
+                  >
+                    <Input placeholder="Enter template name" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="eventId"
+                    label="Select Event"
+                    rules={[{ required: true, message: 'Please select an event' }]}
+                  >
+                    <Select
+                      placeholder="Select event"
+                      loading={loading}
+                      onChange={(value) => handleEventChange(value)}
+                    >
+                      {events.map((event) => (
+                        <Option key={event._id} value={event._id}>
+                          {event.title}
+                        </Option>
+                      ))}
+                    </Select>
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              <Row gutter={[24, 24]}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="showQRCode"
+                    label="Show QR Code"
+                    valuePropName="checked"
+                  >
+                    <Switch />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item label="Upload Badge">
+                    <Upload {...uploadProps}>
+                      <Button icon={<UploadOutlined />}>Upload Badge</Button>
+                    </Upload>
+                    {form.getFieldValue(['badge', 'cloudinaryUrl']) && (
+                      <div className="mt-2">
+                        <Image
+                          src={form.getFieldValue(['badge', 'cloudinaryUrl'])}
+                          alt="Badge preview"
+                          style={{ maxWidth: '200px', maxHeight: '200px', objectFit: 'contain' }}
+                          preview={true}
+                        />
+                      </div>
+                    )}
+                  </Form.Item>
+                </Col>
+              </Row>
+
+              {/* Hidden form fields to capture badge data */}
+              <Form.Item name="_id" hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={['badge', 'cloudinaryUrl']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={['badge', 'cloudinaryPublicId']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name={['badge', 'imageData']} hidden>
+                <Input />
+              </Form.Item>
+              <Form.Item name="badge" hidden>
+                <Input />
+              </Form.Item>
+
+              <Form.Item>
+                <Space>
+                  <Button type="primary" htmlType="submit" loading={loading}>
+                    {form.getFieldValue('_id') ? 'Update Template' : 'Save Template'}
+                  </Button>
+                  <Button onClick={() => form.resetFields()}>Reset</Button>
+                </Space>
+              </Form.Item>
+            </Form>
+          </Card>
+
+          <Card title="Saved Templates" className="mt-6">
+            <Table
+              dataSource={templates}
+              columns={columns}
+              rowKey="_id"
+              pagination={{
+                pageSize: 10,
+                showSizeChanger: true,
+                showTotal: (total) => `Total ${total} templates`,
+                responsive: true,
+              }}
+              scroll={{ x: 'max-content' }}
+            />
+          </Card>
+        </div>
+
+        {/* Preview Drawer */}
+        <Drawer
+          title="Badge Preview"
+          placement="right"
+          width={600}
+          onClose={() => setPreviewDrawerVisible(false)}
+          open={previewDrawerVisible}
+          extra={
+            <Space className="flex-wrap">
+              <Button onClick={() => setPreviewDrawerVisible(false)}>Close</Button>
+              <Button
+                type="primary"
+                onClick={() => selectedTemplate && handleDownload(selectedTemplate)}
+                icon={<PrinterOutlined />}
+              >
+                Download
+              </Button>
+            </Space>
+          }
+        >
+          {selectedTemplate && (
+            <div className="space-y-4">
+              <div
+                ref={badgeRef}
+                style={{
+                  width: '210mm',
+                  minHeight: '297mm',
+                  background: '#fff',
+                  border: '1px solid #d9d9d9',
+                  borderRadius: '4px',
+                  overflow: 'hidden',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                  boxSizing: 'border-box',
+                }}
+              >
+                {/* Badge Image - Top Section */}
                 <div style={{ 
                   width: '100%', 
+                  height: '180px', 
                   display: 'flex', 
                   justifyContent: 'center', 
-                  alignItems: 'center', 
-                  marginTop: '20px',
-                  marginBottom: '20px'
+                  alignItems: 'center',
+                  background: '#f8f9fa'
                 }}>
-                  {selectedTemplate.qrCode?.cloudinaryUrl ? (
+                  {selectedTemplate.badge?.cloudinaryUrl ? (
                     <img
-                      src={selectedTemplate.qrCode.cloudinaryUrl}
-                      alt="QR Code"
+                      src={selectedTemplate.badge.cloudinaryUrl}
+                      alt="Badge"
                       style={{
-                        width: '200px',
-                        height: '200px',
+                        width: '100%',
+                        height: '180px',
                         objectFit: 'contain',
                       }}
                     />
                   ) : (
                     <div style={{
-                      width: '200px',
-                      height: '200px',
+                      width: '100%',
+                      height: '180px',
                       display: 'flex',
                       justifyContent: 'center',
                       alignItems: 'center',
-                      border: '2px dashed #d9d9d9',
                       color: '#999',
-                      fontSize: '14px'
+                      fontSize: '16px',
+                      border: '2px dashed #d9d9d9'
                     }}>
-                      QR Code Placeholder
+                      Badge Image Placeholder
                     </div>
                   )}
                 </div>
-              )}
 
-              {/* Visitor Details Section - Styled like PDF */}
-              <div style={{
-                width: '400px',
-                margin: '20px auto',
-                background: '#f8f9fa',
-                border: '1px solid #e9ecef',
-                borderRadius: '4px',
-                padding: '20px',
-                minHeight: '120px'
-              }}>
+                {/* QR Code - Middle Section */}
+                {selectedTemplate.showQRCode && (
+                  <div style={{ 
+                    width: '100%', 
+                    display: 'flex', 
+                    justifyContent: 'center', 
+                    alignItems: 'center', 
+                    marginTop: '20px',
+                    marginBottom: '20px'
+                  }}>
+                    {selectedTemplate.qrCode?.cloudinaryUrl ? (
+                      <img
+                        src={selectedTemplate.qrCode.cloudinaryUrl}
+                        alt="QR Code"
+                        style={{
+                          width: '200px',
+                          height: '200px',
+                          objectFit: 'contain',
+                        }}
+                      />
+                    ) : (
+                      <div style={{
+                        width: '200px',
+                        height: '200px',
+                        display: 'flex',
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                        border: '2px dashed #d9d9d9',
+                        color: '#999',
+                        fontSize: '14px'
+                      }}>
+                        QR Code Placeholder
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Visitor Details Section - Styled like PDF */}
                 <div style={{
-                  fontSize: '14px',
-                  fontWeight: 'bold',
-                  color: '#1f2937',
-                  marginBottom: '15px'
+                  width: '400px',
+                  margin: '20px auto',
+                  background: '#f8f9fa',
+                  border: '1px solid #e9ecef',
+                  borderRadius: '4px',
+                  padding: '20px',
+                  minHeight: '120px'
                 }}>
-                  Registration Details
-                </div>
-                
-                <div style={{
-                  display: 'flex',
-                  gap: '20px'
-                }}>
-                  {/* Left Column */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
-                      Name: Sample Visitor
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
-                      Email: sample@example.com
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
-                      Phone: +1234567890
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
-                      Company: Sample Company
-                    </div>
+                  <div style={{
+                    fontSize: '14px',
+                    fontWeight: 'bold',
+                    color: '#1f2937',
+                    marginBottom: '15px'
+                  }}>
+                    Registration Details
                   </div>
                   
-                  {/* Right Column */}
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
-                      Event: {events.find(e => e._id === selectedTemplate.eventId)?.title || 'Sample Event'}
+                  <div style={{
+                    display: 'flex',
+                    gap: '20px'
+                  }}>
+                    {/* Left Column */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                        Name: Sample Visitor
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                        Email: sample@example.com
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                        Phone: +1234567890
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                        Company: Sample Company
+                      </div>
                     </div>
-                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
-                      Location: Sample Location
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
-                      Date: 01 Jan 2024
-                    </div>
-                    <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
-                      ID: SAMPLE123
+                    
+                    {/* Right Column */}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                        Event: {events.find(e => e._id === selectedTemplate.eventId)?.title || 'Sample Event'}
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                        Location: Sample Location
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                        Date: 01 Jan 2024
+                      </div>
+                      <div style={{ fontSize: '10px', color: '#374151', marginBottom: '5px' }}>
+                        ID: SAMPLE123
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {/* VISITOR text at bottom */}
-              <div style={{ 
-                width: '100%', 
-                height: '72px', 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center',
-                position: 'absolute',
-                bottom: '20px',
-                left: 0,
-                fontSize: '64px',
-                fontWeight: 'bold',
-                color: '#4338CA',
-              }}>
-                VISITOR
+                {/* VISITOR text at bottom */}
+                <div style={{ 
+                  width: '100%', 
+                  height: '72px', 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center',
+                  position: 'absolute',
+                  bottom: '20px',
+                  left: 0,
+                  fontSize: '64px',
+                  fontWeight: 'bold',
+                  color: '#4338CA',
+                }}>
+                  VISITOR
+                </div>
               </div>
+              
+              <Descriptions column={1} size="small" className="w-full">
+                <Descriptions.Item label="Template Name">
+                  {selectedTemplate.name}
+                </Descriptions.Item>
+                <Descriptions.Item label="Event">
+                  {events.find(e => e._id === selectedTemplate.eventId)?.title || 'N/A'}
+                </Descriptions.Item>
+                <Descriptions.Item label="QR Code">
+                  {selectedTemplate.showQRCode ? 'Enabled' : 'Disabled'}
+                </Descriptions.Item>
+              </Descriptions>
             </div>
-            
-            <Descriptions column={1} size="small" className="w-full">
-              <Descriptions.Item label="Template Name">
-                {selectedTemplate.name}
-              </Descriptions.Item>
-              <Descriptions.Item label="Event">
-                {events.find(e => e._id === selectedTemplate.eventId)?.title || 'N/A'}
-              </Descriptions.Item>
-              <Descriptions.Item label="QR Code">
-                {selectedTemplate.showQRCode ? 'Enabled' : 'Disabled'}
-              </Descriptions.Item>
-            </Descriptions>
-          </div>
-        )}
-      </Drawer>
-    </AdminLayout>
+          )}
+        </Drawer>
+      </AdminLayout>
+    </AccessControl>
   );
 };
 

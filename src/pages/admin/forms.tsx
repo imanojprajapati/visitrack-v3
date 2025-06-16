@@ -6,6 +6,7 @@ import AdminLayout from './layout';
 import FormBuilder from '@/components/admin/FormBuilder';
 import { EventForm } from '../../types/form';
 import { useRouter } from 'next/router';
+import AccessControl from '../../components/admin/AccessControl';
 
 // Define the form record type to match the database structure
 interface FormRecord {
@@ -155,44 +156,46 @@ export default function FormsPage() {
   }
 
   return (
-    <AdminLayout>
-      <div className="w-full max-w-screen px-2 sm:px-4 lg:px-8 py-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold">Forms</h1>
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => setShowFormBuilder(true)}
-            className="w-full sm:w-auto"
-          >
-            Create New Form
-          </Button>
-        </div>
+    <AccessControl allowedRoles={['admin', 'manager']} pageName="Forms">
+      <AdminLayout>
+        <div className="w-full max-w-screen px-2 sm:px-4 lg:px-8 py-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h1 className="text-xl sm:text-2xl font-bold">Forms</h1>
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              onClick={() => setShowFormBuilder(true)}
+              className="w-full sm:w-auto"
+            >
+              Create New Form
+            </Button>
+          </div>
 
-        {showFormBuilder ? (
-          <Card className="mb-6">
-            <FormBuilder onSave={handleSaveForm} />
-          </Card>
-        ) : (
-          <Card>
-            <div className="overflow-x-auto">
-              <Table
-                columns={columns}
-                dataSource={forms}
-                rowKey="_id"
-                loading={loading}
-                pagination={{
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showTotal: (total) => `Total ${total} forms`,
-                  responsive: true,
-                }}
-                scroll={{ x: 'max-content' }}
-              />
-            </div>
-          </Card>
-        )}
-      </div>
-    </AdminLayout>
+          {showFormBuilder ? (
+            <Card className="mb-6">
+              <FormBuilder onSave={handleSaveForm} />
+            </Card>
+          ) : (
+            <Card>
+              <div className="overflow-x-auto">
+                <Table
+                  columns={columns}
+                  dataSource={forms}
+                  rowKey="_id"
+                  loading={loading}
+                  pagination={{
+                    pageSize: 10,
+                    showSizeChanger: true,
+                    showTotal: (total) => `Total ${total} forms`,
+                    responsive: true,
+                  }}
+                  scroll={{ x: 'max-content' }}
+                />
+              </div>
+            </Card>
+          )}
+        </div>
+      </AdminLayout>
+    </AccessControl>
   );
 }
