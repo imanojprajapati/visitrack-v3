@@ -26,17 +26,25 @@ const QRScanner: React.FC<{
   const scannerContainerId = 'qr-reader-scan-by-camera';
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Ensure container exists
-  const ensureContainer = () => {
-    let container = document.getElementById(scannerContainerId);
-    if (!container && containerRef.current) {
-      container = document.createElement('div');
-      container.id = scannerContainerId;
-      container.style.width = '100%';
-      container.style.height = '100%';
-      containerRef.current.appendChild(container);
+  // Ensure container exists, retry if parent not ready
+  const ensureContainer = async (): Promise<HTMLElement | null> => {
+    let attempts = 0;
+    while (attempts < 10) {
+      let container = document.getElementById(scannerContainerId);
+      if (container) return container;
+      if (containerRef.current) {
+        container = document.createElement('div');
+        container.id = scannerContainerId;
+        container.style.width = '100%';
+        container.style.height = '100%';
+        containerRef.current.appendChild(container);
+        return container;
+      }
+      // Wait for parent container to be available
+      await new Promise(res => setTimeout(res, 100));
+      attempts++;
     }
-    return container;
+    return null;
   };
 
   // Cleanup function to properly stop and clear scanner
@@ -98,7 +106,7 @@ const QRScanner: React.FC<{
     const start = async () => {
       await cleanupScanner();
       await new Promise(res => setTimeout(res, 100));
-      const container = ensureContainer();
+      const container = await ensureContainer();
       if (!container) {
         setError('Failed to create scanner container');
         setIsInitializing(false);
