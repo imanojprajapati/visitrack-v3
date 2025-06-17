@@ -145,7 +145,7 @@ const QRScanner: React.FC<{
     }
   };
 
-  if (!isClient || !isActive || !containerReady) return null;
+  if (!isClient || !isActive || !containerReady) return <div>Loading scanner...</div>;
   if (isInitializing || loading) {
     return (
       <div className="flex flex-col items-center justify-center">
@@ -405,7 +405,9 @@ const MinimalScanByCameraPage: React.FC = () => {
   if (!isClient) {
     return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spin size="large" /><span style={{ marginLeft: 8 }}>Loading client...</span></div>;
   }
-
+  if (typeof window === 'undefined') {
+    return <div>Loading window...</div>;
+  }
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
       {contextHolder}
