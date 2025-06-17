@@ -1,4 +1,4 @@
-"use client"
+'use client'
 import React, { useEffect, useState, useRef } from 'react';
 import { Alert, Button, Spin, Typography, Modal, message } from 'antd';
 
@@ -100,12 +100,12 @@ const MinimalQRScanner: React.FC<{
             }
           },
           (errorMessage: string) => {
-            // Only show real errors, not normal 'no code found' errors
+            console.log('QR SCANNER ERROR:', errorMessage); // For debugging
+            const normalized = errorMessage.toLowerCase();
             if (
-              !errorMessage.includes('NotFoundException') &&
-              !errorMessage.includes('No QR code found') &&
-              !errorMessage.includes('No Multiformat readers were able to detect the code') &&
-              !errorMessage.includes('No multiformat readers were able to detect the code')
+              !normalized.includes('notfoundexception') &&
+              !normalized.includes('no qr code found') &&
+              !normalized.includes('no multiformat readers were able to detect the code')
             ) {
               setError(errorMessage);
               onScanError(errorMessage);
@@ -282,6 +282,7 @@ const MinimalScanByCameraPage: React.FC = () => {
   const handleScanSuccess = async (result: string) => {
     setIsScanning(false);
     setError(null);
+    setErrorDebounce(null);
     setLoading(true);
     try {
       const checkinResult = await checkInVisitorByQr(result, messageApi);
