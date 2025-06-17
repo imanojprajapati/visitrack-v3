@@ -33,8 +33,6 @@ const QRScanner: React.FC<{
       const stream = await navigator.mediaDevices.getUserMedia({
         video: deviceId ? { deviceId: { exact: deviceId } } : true
       });
-      
-      // Stop the test stream immediately
       stream.getTracks().forEach(track => track.stop());
       return true;
     } catch (err) {
@@ -46,27 +44,21 @@ const QRScanner: React.FC<{
   // Helper function to get the best available camera
   const getBestCamera = async (devices: CameraDevice[]): Promise<string | null> => {
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    // Try back camera first on mobile
     if (isMobile) {
       const backCamera = devices.find(device => 
         device.label.toLowerCase().includes('back') || 
         device.label.toLowerCase().includes('rear') ||
         device.label.toLowerCase().includes('environment')
       );
-      
       if (backCamera && await checkCameraAvailability(backCamera.id)) {
         return backCamera.id;
       }
     }
-
-    // Try each camera in order until we find one that works
     for (const device of devices) {
       if (await checkCameraAvailability(device.id)) {
         return device.id;
       }
     }
-
     return null;
   };
 
@@ -78,8 +70,6 @@ const QRScanner: React.FC<{
         await html5QrCodeRef.current.clear();
         html5QrCodeRef.current = null;
       }
-
-      // Cleanup any existing video streams
       if (videoRef.current && videoRef.current.srcObject) {
         const stream = videoRef.current.srcObject as MediaStream;
         stream.getTracks().forEach(track => track.stop());
@@ -99,60 +89,41 @@ const QRScanner: React.FC<{
 
   useEffect(() => {
     if (!isClient || !isActive) return;
-
     const initializeScanner = async () => {
       try {
         setIsInitializing(true);
         setLoading(true);
         setError(null);
-
         await cleanupScanner();
-
-        // Check for secure context
         if (!window.isSecureContext) {
           throw new Error('Camera access requires HTTPS or localhost. Please use a secure connection.');
         }
-
-        // Check for camera support
         if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error('Camera access is not supported in this browser. Please try using Chrome or Firefox.');
         }
-
-        // Import Html5Qrcode
-        const { Html5Qrcode } = await import('html5-qrcode');
-
-        // Get available cameras with retry
-        let devices: MediaDeviceInfo[] = [];
-        try {
-          // Try to get cameras with a retry mechanism
-          for (let i = 0; i < 3; i++) {
-            try {
-              devices = await Html5Qrcode.getCameras();
-              if (devices.length > 0) break;
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            } catch (e) {
-              console.warn('Attempt', i + 1, 'to get cameras failed:', e);
-              await new Promise(resolve => setTimeout(resolve, 1000));
-            }
+        // Get available cameras with retry (CameraDevice[])
+        let devices: CameraDevice[] = [];
+        for (let i = 0; i < 3; i++) {
+          try {
+            const { Html5Qrcode } = await import('html5-qrcode');
+            devices = await Html5Qrcode.getCameras(); // returns CameraDevice[]
+            if (devices.length > 0) break;
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (e) {
+            console.warn('Attempt', i + 1, 'to get cameras failed:', e);
+            await new Promise(resolve => setTimeout(resolve, 1000));
           }
-        } catch (err) {
-          console.error('Failed to get cameras after retries:', err);
         }
-
         if (!devices || devices.length === 0) {
           throw new Error('No cameras found. Please ensure camera permissions are granted and your camera is not being used by another application.');
         }
-
         setCameras(devices);
-
         // Find the best available camera
         const bestCameraId = await getBestCamera(devices);
         if (!bestCameraId) {
           throw new Error('No working cameras found. Please check your camera connections and permissions.');
         }
-
         setSelectedCamera(bestCameraId);
-
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Failed to initialize camera';
         console.error('Camera initialization error:', err);
@@ -163,27 +134,20 @@ const QRScanner: React.FC<{
         setLoading(false);
       }
     };
-
     initializeScanner();
   }, [isClient, isActive, onScanError]);
 
   useEffect(() => {
     if (!isClient || !selectedCamera || isInitializing || !isActive) return;
-
     let stopped = false;
-
     const startScanner = async () => {
       try {
         await cleanupScanner();
         await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Verify camera is still available
         const isAvailable = await checkCameraAvailability(selectedCamera);
         if (!isAvailable) {
           throw new Error('Selected camera is no longer available. Please try another camera or refresh the page.');
         }
-
-        // Create scanner container if it doesn't exist
         let container = document.getElementById(scannerContainerId);
         if (!container && containerRef.current) {
           container = document.createElement('div');
@@ -192,17 +156,13 @@ const QRScanner: React.FC<{
           container.style.height = '100%';
           containerRef.current.appendChild(container);
         }
-
         if (!container) {
           throw new Error('Failed to create or find scanner container');
         }
-
         const { Html5Qrcode } = await import('html5-qrcode');
         const scanner = new Html5Qrcode(scannerContainerId);
         html5QrCodeRef.current = scanner;
-
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
         await scanner.start(
           selectedCamera,
           {
@@ -249,7 +209,6 @@ const QRScanner: React.FC<{
             throw err;
           }
         });
-
       } catch (err) {
         const errorMsg = err instanceof Error ? 
           err.message : 
@@ -259,9 +218,7 @@ const QRScanner: React.FC<{
         onScanError(errorMsg);
       }
     };
-
     startScanner();
-
     return () => {
       stopped = true;
       cleanupScanner();
