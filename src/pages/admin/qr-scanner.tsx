@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, Button, Space, Table, Tag, Modal, message, Select } from 'antd';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 import { PrinterOutlined, QrcodeOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
 import dayjs from 'dayjs';
@@ -58,7 +57,7 @@ const QRScanner: React.FC = () => {
   const [manualVisitorId, setManualVisitorId] = useState('');
   // QR scanner state
   const [isProcessingScan, setIsProcessingScan] = useState(false);
-  const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+  const scannerRef = useRef<any>(null);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 10,
@@ -66,30 +65,46 @@ const QRScanner: React.FC = () => {
   });
   // Print loading state for individual buttons
   const [printingVisitors, setPrintingVisitors] = useState<Set<string>>(new Set());
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Initialize QR scanner when modal opens
   useEffect(() => {
-    if (showScanner && !scannerRef.current) {
-      const scanner = new Html5QrcodeScanner(
-        "qr-reader",
-        { 
-          fps: 10, 
-          qrbox: { width: 250, height: 250 },
-          disableFlip: false 
-        },
-        false
-      );
-      
-      scanner.render((decodedText) => {
-        if (!isProcessingScan) {
-          handleQrCodeScan(decodedText);
-        }
-      }, (error) => {
-        console.error('QR Scan error:', error);
-      });
-      
-      scannerRef.current = scanner;
-    }
+    if (!isClient || !showScanner || scannerRef.current) return;
+
+    const initializeScanner = async () => {
+      try {
+        // Dynamically import Html5QrcodeScanner only on client side
+        const { Html5QrcodeScanner } = await import('html5-qrcode');
+        const scanner = new Html5QrcodeScanner(
+          "qr-reader",
+          { 
+            fps: 10, 
+            qrbox: { width: 250, height: 250 },
+            disableFlip: false 
+          },
+          false
+        );
+        
+        scanner.render((decodedText: string) => {
+          if (!isProcessingScan) {
+            handleQrCodeScan(decodedText);
+          }
+        }, (error: any) => {
+          console.error('QR Scan error:', error);
+        });
+        
+        scannerRef.current = scanner;
+      } catch (error) {
+        console.error('Error initializing QR scanner:', error);
+        messageApi.error('Failed to initialize QR scanner');
+      }
+    };
+
+    initializeScanner();
 
     // Cleanup scanner when modal closes
     return () => {
@@ -98,7 +113,7 @@ const QRScanner: React.FC = () => {
         scannerRef.current = null;
       }
     };
-  }, [showScanner, isProcessingScan]);
+  }, [showScanner, isProcessingScan, isClient, messageApi]);
 
   // Cleanup scanner when component unmounts
   useEffect(() => {

@@ -1151,11 +1151,11 @@ export default function EventRegistration() {
               <p className="text-gray-600 mb-6">
                 Please fill in your personal and professional details to complete your registration.
               </p>
-              <div className="w-full max-w-2xl">
+              <div className="w-full max-w-2xl text-left">
                 <form onSubmit={handleFormSubmit} className="space-y-6" key={`form-${formRenderKey}`}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         Full Name *
                       </label>
                       <input

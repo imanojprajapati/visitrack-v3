@@ -1,5 +1,4 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
 import { Button, message, Alert, Select, Space } from 'antd';
 import { CameraOutlined, LoadingOutlined } from '@ant-design/icons';
 
@@ -16,14 +15,23 @@ interface QRCodeScannerProps {
 
 const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, onScanError }) => {
   const [isScanning, setIsScanning] = useState(false);
-  const [html5QrCode, setHtml5QrCode] = useState<Html5Qrcode | null>(null);
+  const [html5QrCode, setHtml5QrCode] = useState<any>(null);
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const getCameras = useCallback(async () => {
+    if (!isClient) return;
+    
     try {
+      // Dynamically import Html5Qrcode only on client side
+      const { Html5Qrcode } = await import('html5-qrcode');
       const devices = await Html5Qrcode.getCameras();
       if (devices && devices.length) {
         setCameras(devices);
@@ -40,18 +48,22 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, onScanErro
       console.error('Error getting cameras:', err);
       setError('Unable to access device cameras. Please ensure camera permissions are granted.');
     }
-  }, []);
+  }, [isClient]);
 
   useEffect(() => {
-    getCameras();
+    if (isClient) {
+      getCameras();
+    }
     return () => {
       if (html5QrCode) {
         html5QrCode.stop().catch(console.error);
       }
     };
-  }, [getCameras]);
+  }, [getCameras, html5QrCode, isClient]);
 
   const startScanning = async () => {
+    if (!isClient) return;
+    
     try {
       setLoading(true);
       setError(null);
@@ -60,6 +72,8 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, onScanErro
         throw new Error('Please select a camera');
       }
 
+      // Dynamically import Html5Qrcode only on client side
+      const { Html5Qrcode } = await import('html5-qrcode');
       const scanner = new Html5Qrcode('qr-reader');
       setHtml5QrCode(scanner);
 
@@ -70,10 +84,10 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, onScanErro
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
         },
-        (decodedText) => {
+        (decodedText: string) => {
           handleScanSuccess(decodedText, scanner);
         },
-        (errorMessage) => {
+        (errorMessage: string) => {
           // Ignore the continuous scanning errors
           console.debug('QR scan error:', errorMessage);
         }
@@ -91,7 +105,7 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, onScanErro
     }
   };
 
-  const handleScanSuccess = async (decodedText: string, scanner: Html5Qrcode) => {
+  const handleScanSuccess = async (decodedText: string, scanner: any) => {
     try {
       await scanner.stop();
       setIsScanning(false);
@@ -123,9 +137,22 @@ const QRCodeScanner: React.FC<QRCodeScannerProps> = ({ onScanSuccess, onScanErro
     }
   };
 
+  if (!isClient) {
+    return (
+      <div className="qr-scanner-container">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-center">
+            <LoadingOutlined style={{ fontSize: '24px' }} />
+            <p className="mt-2">Loading scanner...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="qr-scanner-container">
-      {!window.isSecureContext && (
+      {typeof window !== 'undefined' && !window.isSecureContext && (
         <Alert
           message="Security Warning"
           description={

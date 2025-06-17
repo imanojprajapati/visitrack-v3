@@ -1,67 +1,139 @@
 import { useEffect, useRef, useState } from 'react';
-import { message, Alert, Typography, Space, Modal, Button } from 'antd';
-import { Html5Qrcode } from 'html5-qrcode';
+import { message, Alert, Typography, Space, Modal, Button, Spin } from 'antd';
 import Head from 'next/head';
 import Image from 'next/image';
+import dynamic from 'next/dynamic';
 
 const { Title, Text } = Typography;
 
-const ScanByCameraPage: React.FC = () => {
-  const [error, setError] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [showResult, setShowResult] = useState(false);
-  const [lastResult, setLastResult] = useState<string | null>(null);
-  const [cameraId, setCameraId] = useState<string | null>(null);
-  const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+// Client-side only QR Scanner component
+const QRScannerComponent: React.FC<{
+  onScanSuccess: (result: string) => void;
+  onError: (error: string) => void;
+  onCameraChange: (cameras: { id: string; label: string }[]) => void;
+}> = ({ onScanSuccess, onError, onCameraChange }) => {
+  const [isClient, setIsClient] = useState(false);
   const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
+  const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const html5QrCodeRef = useRef<any>(null);
 
-  // Get available cameras on mount
   useEffect(() => {
-    Html5Qrcode.getCameras().then(devices => {
-      setCameras(devices);
-      // Prefer back camera if available
-      const backCam = devices.find(d => d.label.toLowerCase().includes('back') || d.label.toLowerCase().includes('rear'));
-      setCameraId(backCam ? backCam.id : devices[0]?.id || null);
-    }).catch(err => {
-      setError('Unable to access device cameras. Please ensure camera permissions are granted.');
-    });
+    setIsClient(true);
   }, []);
 
-  // Start scanning automatically when cameraId is set and not showing result
   useEffect(() => {
-    if (!cameraId || showResult) return;
+    if (!isClient) return;
+
+    const initializeCameras = async () => {
+      try {
+        setIsInitializing(true);
+        
+        // Check if we're in a secure context (required for camera access)
+        if (!window.isSecureContext) {
+          onError('Camera access requires a secure connection (HTTPS). Please use HTTPS or localhost.');
+          return;
+        }
+
+        // Check if getUserMedia is supported
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          onError('Camera access is not supported in this browser.');
+          return;
+        }
+
+        // Check if we're on a mobile device
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile) {
+          // On mobile, we need to request camera permissions first
+          try {
+            await navigator.mediaDevices.getUserMedia({ video: true });
+          } catch (permError) {
+            console.error('Camera permission denied:', permError);
+            onError('Camera permission denied. Please allow camera access and refresh the page.');
+            return;
+          }
+        }
+
+        // Dynamically import Html5Qrcode only on client side
+        const { Html5Qrcode } = await import('html5-qrcode');
+        const devices = await Html5Qrcode.getCameras();
+        
+        if (devices && devices.length > 0) {
+          setCameras(devices);
+          // Prefer back camera if available
+          const backCam = devices.find((d: any) => 
+            d.label.toLowerCase().includes('back') || 
+            d.label.toLowerCase().includes('rear')
+          );
+          const cameraId = backCam ? backCam.id : devices[0].id;
+          setSelectedCamera(cameraId);
+          onCameraChange(devices);
+        } else {
+          onError('No cameras found on this device.');
+        }
+      } catch (err) {
+        console.error('Error initializing cameras:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        if (errorMessage.includes('NotAllowedError') || errorMessage.includes('Permission denied')) {
+          onError('Camera permission denied. Please allow camera access and refresh the page.');
+        } else if (errorMessage.includes('NotFoundError') || errorMessage.includes('No cameras')) {
+          onError('No cameras found on this device.');
+        } else {
+          onError('Unable to access device cameras. Please ensure camera permissions are granted.');
+        }
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initializeCameras();
+  }, [isClient, onError, onCameraChange]);
+
+  useEffect(() => {
+    if (!isClient || !selectedCamera || isInitializing) return;
+
     let stopped = false;
     const startScanner = async () => {
-      setError(null);
-      setScanning(true);
-      const scanner = new Html5Qrcode('qr-reader');
-      html5QrCodeRef.current = scanner;
       try {
+        setIsScanning(true);
+        const { Html5Qrcode } = await import('html5-qrcode');
+        const scanner = new Html5Qrcode('qr-reader');
+        html5QrCodeRef.current = scanner;
+
         await scanner.start(
-          cameraId,
+          selectedCamera,
           {
             fps: 10,
             qrbox: { width: 250, height: 250 },
             aspectRatio: 1.0,
+            disableFlip: false,
           },
-          (decodedText) => {
+          (decodedText: string) => {
             if (!stopped) {
-              setLastResult(decodedText);
-              setShowResult(true);
-              message.success('QR code scanned!');
-              scanner.stop();
+              onScanSuccess(decodedText);
+              scanner.stop().catch(console.error);
             }
           },
-          (errorMessage) => {
+          (errorMessage: string) => {
             // Ignore continuous scan errors
+            console.debug('QR scan error:', errorMessage);
           }
         );
       } catch (err) {
-        setError('Failed to start QR scanner. ' + (err instanceof Error ? err.message : ''));
-        setScanning(false);
+        console.error('Error starting scanner:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        if (errorMessage.includes('NotAllowedError') || errorMessage.includes('Permission denied')) {
+          onError('Camera permission denied. Please allow camera access and try again.');
+        } else {
+          onError('Failed to start QR scanner. ' + errorMessage);
+        }
+        setIsScanning(false);
       }
     };
+
     startScanner();
+
     return () => {
       stopped = true;
       if (html5QrCodeRef.current) {
@@ -70,12 +142,108 @@ const ScanByCameraPage: React.FC = () => {
         html5QrCodeRef.current = null;
       }
     };
-  }, [cameraId, showResult]);
+  }, [selectedCamera, isClient, onScanSuccess, onError, isInitializing]);
+
+  const handleCameraChange = (cameraId: string) => {
+    setSelectedCamera(cameraId);
+  };
+
+  if (!isClient) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <Spin size="large" />
+        <Text className="ml-2">Initializing camera...</Text>
+      </div>
+    );
+  }
+
+  if (isInitializing) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="text-center">
+          <Spin size="large" />
+          <Text className="block mt-2">Initializing camera...</Text>
+          <Text type="secondary" className="block text-sm">Please allow camera access if prompted</Text>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full flex flex-col items-center">
+      <div
+        id="qr-reader"
+        className="w-full max-w-xs aspect-square bg-black rounded-lg overflow-hidden mb-4"
+        style={{ minHeight: 250 }}
+      />
+      {cameras.length > 1 && (
+        <Space direction="vertical" className="w-full mb-2">
+          <label htmlFor="camera-select" className="text-xs text-gray-500">Switch Camera:</label>
+          <select
+            id="camera-select"
+            className="w-full border rounded p-2"
+            value={selectedCamera || ''}
+            onChange={e => handleCameraChange(e.target.value)}
+            disabled={isScanning}
+          >
+            {cameras.map(cam => (
+              <option key={cam.id} value={cam.id}>{cam.label || cam.id}</option>
+            ))}
+          </select>
+        </Space>
+      )}
+    </div>
+  );
+};
+
+// Dynamically import the QR Scanner component to avoid SSR issues
+const DynamicQRScanner = dynamic(() => Promise.resolve(QRScannerComponent), {
+  ssr: false,
+  loading: () => <div className="flex justify-center items-center h-64"><Spin size="large" /></div>
+});
+
+const ScanByCameraPage: React.FC = () => {
+  const [error, setError] = useState<string | null>(null);
+  const [showResult, setShowResult] = useState(false);
+  const [lastResult, setLastResult] = useState<string | null>(null);
+  const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const handleScanSuccess = (result: string) => {
+    setLastResult(result);
+    setShowResult(true);
+    message.success('QR code scanned!');
+  };
+
+  const handleScanError = (error: string) => {
+    setError(error);
+  };
+
+  const handleCameraChange = (cameras: { id: string; label: string }[]) => {
+    setCameras(cameras);
+  };
 
   const handleContinue = () => {
     setShowResult(false);
     setLastResult(null);
   };
+
+  if (!isClient) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#4f46e5] to-[#6366f1] p-2">
+        <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-4 flex flex-col items-center">
+          <div className="flex justify-center items-center h-64">
+            <Spin size="large" />
+            <Text className="ml-2">Loading...</Text>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -90,6 +258,29 @@ const ScanByCameraPage: React.FC = () => {
           <Text type="secondary" className="block text-center mb-4">
             Position the QR code within the frame. Scanning will restart after you close the result.
           </Text>
+          
+          {/* Security context warning */}
+          {typeof window !== 'undefined' && !window.isSecureContext && (
+            <Alert
+              message="Security Warning"
+              description="Camera access requires HTTPS. Please use HTTPS or localhost for full functionality."
+              type="warning"
+              showIcon
+              className="mb-4 w-full"
+            />
+          )}
+
+          {/* Mobile device info */}
+          {typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
+            <Alert
+              message="Mobile Device"
+              description="You're using a mobile device. Make sure to allow camera permissions when prompted."
+              type="info"
+              showIcon
+              className="mb-4 w-full"
+            />
+          )}
+
           {error && (
             <Alert
               message="Error"
@@ -97,32 +288,18 @@ const ScanByCameraPage: React.FC = () => {
               type="error"
               showIcon
               className="mb-4 w-full"
+              closable
+              onClose={() => setError(null)}
             />
           )}
-          <div className="w-full flex flex-col items-center">
-            <div
-              id="qr-reader"
-              className="w-full max-w-xs aspect-square bg-black rounded-lg overflow-hidden mb-4"
-              style={{ minHeight: 250 }}
-            />
-            {cameras.length > 1 && (
-              <Space direction="vertical" className="w-full mb-2">
-                <label htmlFor="camera-select" className="text-xs text-gray-500">Switch Camera:</label>
-                <select
-                  id="camera-select"
-                  className="w-full border rounded p-2"
-                  value={cameraId || ''}
-                  onChange={e => setCameraId(e.target.value)}
-                  disabled={!scanning}
-                >
-                  {cameras.map(cam => (
-                    <option key={cam.id} value={cam.id}>{cam.label || cam.id}</option>
-                  ))}
-                </select>
-              </Space>
-            )}
-          </div>
+
+          <DynamicQRScanner
+            onScanSuccess={handleScanSuccess}
+            onError={handleScanError}
+            onCameraChange={handleCameraChange}
+          />
         </div>
+        
         <Modal
           open={showResult}
           onCancel={handleContinue}
