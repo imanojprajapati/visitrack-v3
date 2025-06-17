@@ -1,10 +1,17 @@
 'use client'
 import React, { useEffect, useState, useRef } from 'react';
-import { Alert, Button, Spin, Typography, Modal, message, Card, Descriptions } from 'antd';
+import { Alert, Button, Spin, Typography, Modal, message, Card, Descriptions, Select, Space } from 'antd';
+import { CameraOutlined, LoadingOutlined } from '@ant-design/icons';
 
 const { Text } = Typography;
 
-const MinimalQRScanner: React.FC<{
+// Define the CameraDevice type
+interface CameraDevice {
+  id: string;
+  label: string;
+}
+
+const QRScanner: React.FC<{
   onScanSuccess: (result: string) => void;
   onScanError: (error: string) => void;
   isActive: boolean;
@@ -12,85 +19,100 @@ const MinimalQRScanner: React.FC<{
   const [isClient, setIsClient] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [cameras, setCameras] = useState<{ id: string; label: string }[]>([]);
+  const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
   const html5QrCodeRef = useRef<any>(null);
-  const initializedRef = useRef(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   useEffect(() => {
-    if (!isClient || !isActive || initializedRef.current) return;
-    initializedRef.current = true;
+    if (!isClient || !isActive) return;
+
     const initializeScanner = async () => {
       try {
         setIsInitializing(true);
+        setLoading(true);
+        
+        // Check for secure context
         if (!window.isSecureContext) {
-          setError('Camera access requires HTTPS.');
-          onScanError('Camera access requires HTTPS.');
-          return;
+          throw new Error('Camera access requires HTTPS or localhost.');
         }
+
+        // Check for camera support
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          setError('Camera access is not supported in this browser.');
-          onScanError('Camera access is not supported in this browser.');
-          return;
+          throw new Error('Camera access is not supported in this browser.');
         }
+
+        // Request camera permissions
         try {
           await navigator.mediaDevices.getUserMedia({ video: true });
         } catch (permError) {
-          setError('Camera permission denied.');
-          onScanError('Camera permission denied.');
-          return;
+          throw new Error('Camera permission denied. Please allow camera access and refresh the page.');
         }
-        let Html5Qrcode;
-        try {
-          Html5Qrcode = (await import('html5-qrcode')).Html5Qrcode;
-        } catch (importErr) {
-          setError('Failed to load QR code scanner library.');
-          onScanError('Failed to load QR code scanner library.');
-          return;
-        }
-        let devices;
-        try {
-          devices = await Html5Qrcode.getCameras();
-        } catch (camErr) {
-          setError('Unable to access camera devices.');
-          onScanError('Unable to access camera devices.');
-          return;
-        }
+
+        // Import Html5Qrcode
+        const { Html5Qrcode } = await import('html5-qrcode');
+        
+        // Get available cameras
+        const devices = await Html5Qrcode.getCameras();
+        
         if (!devices || devices.length === 0) {
-          setError('No cameras found on this device.');
-          onScanError('No cameras found on this device.');
-          return;
+          throw new Error('No cameras found on this device.');
         }
+
         setCameras(devices);
-        setSelectedCamera(devices[0].id);
+
+        // Try to select back camera by default on mobile
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        if (isMobile) {
+          const backCamera = devices.find(device => 
+            device.label.toLowerCase().includes('back') || 
+            device.label.toLowerCase().includes('rear')
+          );
+          setSelectedCamera(backCamera ? backCamera.id : devices[0].id);
+        } else {
+          setSelectedCamera(devices[0].id);
+        }
+
       } catch (err) {
-        setError('Failed to initialize camera.');
-        onScanError('Failed to initialize camera.');
+        const errorMsg = err instanceof Error ? err.message : 'Failed to initialize camera';
+        setError(errorMsg);
+        onScanError(errorMsg);
       } finally {
         setIsInitializing(false);
+        setLoading(false);
       }
     };
+
     initializeScanner();
-    return () => {
-      initializedRef.current = false;
-    };
   }, [isClient, isActive, onScanError]);
 
   useEffect(() => {
     if (!isClient || !selectedCamera || isInitializing || !isActive) return;
+
     let stopped = false;
-    (async () => {
+
+    const startScanner = async () => {
       try {
         const { Html5Qrcode } = await import('html5-qrcode');
         const scanner = new Html5Qrcode('qr-reader-scan-by-camera');
         html5QrCodeRef.current = scanner;
+
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
         await scanner.start(
           selectedCamera,
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          {
+            fps: isMobile ? 5 : 10,
+            qrbox: { 
+              width: isMobile ? 200 : 250,
+              height: isMobile ? 200 : 250
+            },
+            aspectRatio: 1.0
+          },
           (decodedText: string) => {
             if (!stopped) {
               onScanSuccess(decodedText);
@@ -112,10 +134,14 @@ const MinimalQRScanner: React.FC<{
           }
         );
       } catch (err) {
-        setError('Failed to start QR scanner.');
-        onScanError('Failed to start QR scanner.');
+        const errorMsg = err instanceof Error ? err.message : 'Failed to start QR scanner';
+        setError(errorMsg);
+        onScanError(errorMsg);
       }
-    })();
+    };
+
+    startScanner();
+
     return () => {
       stopped = true;
       if (html5QrCodeRef.current) {
@@ -130,18 +156,68 @@ const MinimalQRScanner: React.FC<{
     };
   }, [selectedCamera, isClient, onScanSuccess, onScanError, isInitializing, isActive]);
 
+  const handleCameraChange = (cameraId: string) => {
+    setSelectedCamera(cameraId);
+  };
+
   if (!isClient || !isActive) {
     return null;
   }
-  if (isInitializing) {
-    return <Spin size="large" />;
+
+  if (isInitializing || loading) {
+    return (
+      <div className="flex flex-col items-center justify-center">
+        <Spin indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />} />
+        <Text className="mt-2">Initializing camera...</Text>
+      </div>
+    );
   }
+
   if (error) {
-    return <Alert message="Error" description={error} type="error" showIcon />;
+    return (
+      <Alert
+        message="Error"
+        description={error}
+        type="error"
+        showIcon
+        className="mb-4"
+      />
+    );
   }
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 250, height: 250, background: '#000' }}>
-      <div id="qr-reader-scan-by-camera" style={{ width: 250, height: 250 }} />
+    <div className="flex flex-col items-center w-full max-w-md">
+      {cameras.length > 1 && (
+        <Space direction="vertical" className="w-full mb-4">
+          <Select
+            value={selectedCamera || undefined}
+            onChange={handleCameraChange}
+            style={{ width: '100%' }}
+            options={cameras.map(camera => ({
+              label: camera.label || `Camera ${camera.id}`,
+              value: camera.id
+            }))}
+          />
+        </Space>
+      )}
+      <div 
+        style={{ 
+          width: '100%',
+          maxWidth: '300px',
+          aspectRatio: '1',
+          background: '#000',
+          borderRadius: '8px',
+          overflow: 'hidden'
+        }}
+      >
+        <div 
+          id="qr-reader-scan-by-camera" 
+          style={{ 
+            width: '100%',
+            height: '100%'
+          }} 
+        />
+      </div>
     </div>
   );
 };
@@ -320,6 +396,7 @@ const MinimalScanByCameraPage: React.FC = () => {
       setLoading(false);
     }
   };
+
   const handleScanError = (err: string) => {
     const normalized = err.toLowerCase();
     if (
@@ -331,38 +408,80 @@ const MinimalScanByCameraPage: React.FC = () => {
     ) {
       setError(err);
     }
-    setIsScanning(false);
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4">
       {contextHolder}
-      {errorDebounce && <Alert message="Error" description={errorDebounce} type="error" showIcon style={{ marginBottom: 16 }} />}
+      
+      {errorDebounce && (
+        <Alert 
+          message="Error" 
+          description={errorDebounce} 
+          type="error" 
+          showIcon 
+          className="mb-4 w-full max-w-md" 
+        />
+      )}
+
       {!isScanning && !visitorInfo && (
-        <Button type="primary" size="large" onClick={() => { setIsScanning(true); setError(null); setErrorDebounce(null); setVisitorInfo(null); setAlreadyCheckedIn(false); }} loading={loading}>
+        <Button
+          type="primary"
+          size="large"
+          icon={loading ? <LoadingOutlined /> : <CameraOutlined />}
+          onClick={() => {
+            setIsScanning(true);
+            setError(null);
+            setErrorDebounce(null);
+            setVisitorInfo(null);
+            setAlreadyCheckedIn(false);
+          }}
+          loading={loading}
+        >
           Start Scanning
         </Button>
       )}
+
       {isScanning && (
-        <MinimalQRScanner
+        <QRScanner
           onScanSuccess={handleScanSuccess}
           onScanError={handleScanError}
           isActive={isScanning}
         />
       )}
+
       {visitorInfo && (
-        <div style={{ marginTop: 24, textAlign: 'center', maxWidth: 400 }}>
-          <Card title={alreadyCheckedIn ? 'Visitor Already Checked In' : 'Visitor Checked In'} bordered={true} style={{ marginBottom: 16 }}>
+        <div className="mt-6 w-full max-w-md">
+          <Card 
+            title={alreadyCheckedIn ? 'Visitor Already Checked In' : 'Visitor Checked In'} 
+            bordered={true} 
+            className="mb-4"
+          >
             <Descriptions column={1} size="small">
               <Descriptions.Item label="Name">{visitorInfo.name}</Descriptions.Item>
               <Descriptions.Item label="Company">{visitorInfo.company}</Descriptions.Item>
               <Descriptions.Item label="Event">{visitorInfo.eventName}</Descriptions.Item>
               <Descriptions.Item label="Status">{visitorInfo.status}</Descriptions.Item>
               <Descriptions.Item label="Visitor ID">{visitorInfo.visitorId || visitorInfo._id}</Descriptions.Item>
-              {visitorInfo.scanTime && <Descriptions.Item label="Scan Time">{new Date(visitorInfo.scanTime).toLocaleString('en-GB')}</Descriptions.Item>}
+              {visitorInfo.scanTime && (
+                <Descriptions.Item label="Scan Time">
+                  {new Date(visitorInfo.scanTime).toLocaleString('en-GB')}
+                </Descriptions.Item>
+              )}
             </Descriptions>
           </Card>
-          <Button type="primary" onClick={() => { setIsScanning(true); setVisitorInfo(null); setError(null); setErrorDebounce(null); setAlreadyCheckedIn(false); }}>
+          
+          <Button 
+            type="primary" 
+            block
+            onClick={() => {
+              setIsScanning(true);
+              setVisitorInfo(null);
+              setError(null);
+              setErrorDebounce(null);
+              setAlreadyCheckedIn(false);
+            }}
+          >
             Scan Another Code
           </Button>
         </div>
