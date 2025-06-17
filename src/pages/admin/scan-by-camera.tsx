@@ -133,15 +133,11 @@ const MinimalQRScanner: React.FC<{
 };
 
 const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (v: boolean) => void) => {
-  // This logic is adapted from qr-scanner.tsx
   try {
-    // Validate QR code
     const visitorId = qrData.trim();
     if (!visitorId) throw new Error('Invalid QR code data');
     const objectIdPattern = /^[0-9a-fA-F]{24}$/;
     if (!objectIdPattern.test(visitorId)) throw new Error('Invalid visitor ID format. Please scan a valid QR code.');
-
-    // Check for duplicate scan
     setLoading(true);
     const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}`);
     if (!scanCheckResponse.ok) throw new Error('Failed to check visitor scan status');
@@ -151,7 +147,7 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (
       const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
         day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
       });
-      return Modal.warning({
+      Modal.warning({
         title: 'Visitor Already Checked In',
         content: (
           <div className="text-center">
@@ -165,8 +161,8 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (
         ),
         okText: 'OK',
       });
+      return undefined;
     }
-    // Fetch visitor details
     const response = await fetch(`/api/visitors/${visitorId}`);
     if (!response.ok) {
       let errorMessage = 'Visitor not found.';
@@ -187,9 +183,9 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (
     }
     const visitorData = responseData.visitor || responseData;
     if (visitorData.status === 'Visited') {
-      return messageApi.warning('Visitor has already been checked in');
+      messageApi.warning('Visitor has already been checked in');
+      return undefined;
     }
-    // Create scan record
     const scanData = {
       visitorId: visitorData._id || visitorData.id || visitorId,
       eventId: visitorData.eventId,
@@ -211,7 +207,6 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (
       const errorData = await scanResponse.json();
       throw new Error(errorData.message || 'Failed to record scan data');
     }
-    // Update visitor status
     const updateResponse = await fetch(`/api/visitors/${visitorId}/check-in`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -265,8 +260,10 @@ const MinimalScanByCameraPage: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      await checkInVisitorByQr(result, messageApi, setLoading);
-      setLastResult(result);
+      const checkinResult = await checkInVisitorByQr(result, messageApi, setLoading);
+      if (checkinResult) {
+        setLastResult(result);
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to process QR code');
     } finally {
