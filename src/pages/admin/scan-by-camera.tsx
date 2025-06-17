@@ -25,41 +25,18 @@ const QRScanner: React.FC<{
   const html5QrCodeRef = useRef<any>(null);
   const scannerContainerId = 'qr-reader-scan-by-camera';
   const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Helper function to check if a camera device is available
-  const checkCameraAvailability = async (deviceId?: string): Promise<boolean> => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: deviceId ? { deviceId: { exact: deviceId } } : true
-      });
-      stream.getTracks().forEach(track => track.stop());
-      return true;
-    } catch (err) {
-      console.error('Camera availability check failed:', err);
-      return false;
+  // Ensure container exists
+  const ensureContainer = () => {
+    let container = document.getElementById(scannerContainerId);
+    if (!container && containerRef.current) {
+      container = document.createElement('div');
+      container.id = scannerContainerId;
+      container.style.width = '100%';
+      container.style.height = '100%';
+      containerRef.current.appendChild(container);
     }
-  };
-
-  // Helper function to get the best available camera
-  const getBestCamera = async (devices: CameraDevice[]): Promise<string | null> => {
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    if (isMobile) {
-      const backCamera = devices.find(device => 
-        device.label.toLowerCase().includes('back') || 
-        device.label.toLowerCase().includes('rear') ||
-        device.label.toLowerCase().includes('environment')
-      );
-      if (backCamera && await checkCameraAvailability(backCamera.id)) {
-        return backCamera.id;
-      }
-    }
-    for (const device of devices) {
-      if (await checkCameraAvailability(device.id)) {
-        return device.id;
-      }
-    }
-    return null;
+    return container;
   };
 
   // Cleanup function to properly stop and clear scanner
@@ -70,128 +47,70 @@ const QRScanner: React.FC<{
         await html5QrCodeRef.current.clear();
         html5QrCodeRef.current = null;
       }
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
-        videoRef.current.srcObject = null;
-      }
     } catch (err) {
-      console.error('Error cleaning up scanner:', err);
+      // ignore
     }
   };
 
   useEffect(() => {
     setIsClient(true);
-    return () => {
-      cleanupScanner();
-    };
+    return () => { cleanupScanner(); };
   }, []);
 
+  // Camera initialization
   useEffect(() => {
     if (!isClient || !isActive) return;
-    const initializeScanner = async () => {
+    let cancelled = false;
+    const initialize = async () => {
+      setIsInitializing(true);
+      setError(null);
+      setLoading(true);
+      await cleanupScanner();
       try {
-        setIsInitializing(true);
-        setLoading(true);
-        setError(null);
-        await cleanupScanner();
-        if (!window.isSecureContext) {
-          throw new Error('Camera access requires HTTPS or localhost. Please use a secure connection.');
-        }
-        if (!navigator.mediaDevices?.getUserMedia) {
-          throw new Error('Camera access is not supported in this browser. Please try using Chrome or Firefox.');
-        }
-        // Get available cameras with retry (CameraDevice[])
-        let devices: CameraDevice[] = [];
-        for (let i = 0; i < 3; i++) {
-          try {
-            const { Html5Qrcode } = await import('html5-qrcode');
-            devices = await Html5Qrcode.getCameras(); // returns CameraDevice[]
-            if (devices.length > 0) break;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          } catch (e) {
-            console.warn('Attempt', i + 1, 'to get cameras failed:', e);
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        }
-        if (!devices || devices.length === 0) {
-          throw new Error('No cameras found. Please ensure camera permissions are granted and your camera is not being used by another application.');
-        }
+        if (!window.isSecureContext) throw new Error('Camera access requires HTTPS or localhost.');
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera not supported in this browser.');
+        const { Html5Qrcode } = await import('html5-qrcode');
+        const devices = await Html5Qrcode.getCameras();
+        if (!devices || devices.length === 0) throw new Error('No cameras found.');
         setCameras(devices);
-        // Find the best available camera
-        const bestCameraId = await getBestCamera(devices);
-        if (!bestCameraId) {
-          throw new Error('No working cameras found. Please check your camera connections and permissions.');
-        }
-        setSelectedCamera(bestCameraId);
+        setSelectedCamera(devices[0].id);
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Failed to initialize camera';
-        console.error('Camera initialization error:', err);
-        setError(errorMsg);
-        onScanError(errorMsg);
+        setError((err as Error).message);
+        onScanError((err as Error).message);
       } finally {
-        setIsInitializing(false);
-        setLoading(false);
+        if (!cancelled) {
+          setIsInitializing(false);
+          setLoading(false);
+        }
       }
     };
-    initializeScanner();
-  }, [isClient, isActive, onScanError]);
+    initialize();
+    return () => { cancelled = true; };
+  }, [isClient, isActive]);
 
-  // Camera change handler: restart scanner with new camera
-  const handleCameraChange = (cameraId: string) => {
-    if (cameraId !== selectedCamera) {
-      setIsInitializing(true);
-      setSelectedCamera(cameraId);
-    }
-  };
-
-  // Track when selectedCamera changes and restart scanner
+  // Start scanner when selectedCamera changes
   useEffect(() => {
-    if (!isClient || !selectedCamera || !isActive) return;
+    if (!isClient || !isActive || !selectedCamera) return;
     let stopped = false;
     let cancelled = false;
-    let started = false;
     setIsInitializing(true);
-    const startScanner = async () => {
+    setError(null);
+    const start = async () => {
+      await cleanupScanner();
+      await new Promise(res => setTimeout(res, 100));
+      const container = ensureContainer();
+      if (!container) {
+        setError('Failed to create scanner container');
+        setIsInitializing(false);
+        return;
+      }
       try {
-        await cleanupScanner();
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const isAvailable = await checkCameraAvailability(selectedCamera);
-        if (!isAvailable) {
-          throw new Error('Selected camera is no longer available. Please try another camera or refresh the page.');
-        }
-        let container = document.getElementById(scannerContainerId);
-        if (!container && containerRef.current) {
-          container = document.createElement('div');
-          container.id = scannerContainerId;
-          container.style.width = '100%';
-          container.style.height = '100%';
-          containerRef.current.appendChild(container);
-        }
-        if (!container) {
-          throw new Error('Failed to create or find scanner container');
-        }
         const { Html5Qrcode } = await import('html5-qrcode');
         const scanner = new Html5Qrcode(scannerContainerId);
         html5QrCodeRef.current = scanner;
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
         await scanner.start(
           selectedCamera,
-          {
-            fps: isMobile ? 5 : 10,
-            qrbox: { 
-              width: isMobile ? 200 : 250,
-              height: isMobile ? 200 : 250
-            },
-            aspectRatio: 1.0,
-            disableFlip: false,
-            videoConstraints: {
-              deviceId: { exact: selectedCamera },
-              facingMode: "environment",
-              width: { ideal: 1280 },
-              height: { ideal: 720 }
-            }
-          },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
           (decodedText: string) => {
             if (!stopped) {
               onScanSuccess(decodedText);
@@ -199,52 +118,35 @@ const QRScanner: React.FC<{
             }
           },
           (errorMessage: string) => {
-            const normalized = errorMessage.toLowerCase();
+            // Only show fatal errors, not 'no qr code found'
             if (
-              !normalized.includes('notfoundexception') &&
-              !normalized.includes('no qr code found') &&
-              !normalized.includes('no multiformat readers were able to detect the code') &&
-              !normalized.includes('no qr code detected') &&
-              !normalized.includes('no barcode or no qr code detected')
+              !/notfoundexception|no qr code found|no multiformat readers were able to detect the code|no qr code detected|no barcode or no qr code detected/i.test(errorMessage)
             ) {
-              console.error('QR Scanner error:', errorMessage);
               setError(errorMessage);
               onScanError(errorMessage);
             }
           }
-        ).catch((err) => {
-          console.error('Error starting scanner:', err);
-          if (err.toString().includes('could not start video source')) {
-            setError('Could not start camera. Please ensure no other application is using your camera and try again.');
-            onScanError('Could not start camera. Please ensure no other application is using your camera and try again.');
-          } else {
-            throw err;
-          }
-        });
-        started = true;
+        );
       } catch (err) {
-        const errorMsg = err instanceof Error ? 
-          err.message : 
-          'Failed to start QR scanner. Please ensure camera permissions are granted and try again.';
-        console.error('Scanner start error:', err);
-        setError(errorMsg);
-        onScanError(errorMsg);
+        setError((err as Error).message);
+        onScanError((err as Error).message);
       } finally {
         if (!cancelled) setIsInitializing(false);
       }
     };
-    startScanner();
-    return () => {
-      stopped = true;
-      cancelled = true;
-      cleanupScanner();
-    };
-  }, [selectedCamera, isClient, onScanSuccess, onScanError, isActive]);
+    start();
+    return () => { stopped = true; cancelled = true; cleanupScanner(); };
+  }, [selectedCamera, isClient, isActive]);
 
-  if (!isClient || !isActive) {
-    return null;
-  }
+  // Camera change handler
+  const handleCameraChange = (cameraId: string) => {
+    if (cameraId !== selectedCamera) {
+      setIsInitializing(true);
+      setSelectedCamera(cameraId);
+    }
+  };
 
+  if (!isClient || !isActive) return null;
   if (isInitializing || loading) {
     return (
       <div className="flex flex-col items-center justify-center">
@@ -253,7 +155,6 @@ const QRScanner: React.FC<{
       </div>
     );
   }
-
   if (error) {
     return (
       <Alert
@@ -265,7 +166,6 @@ const QRScanner: React.FC<{
       />
     );
   }
-
   return (
     <div className="flex flex-col items-center w-full max-w-md">
       {cameras.length > 1 && (
