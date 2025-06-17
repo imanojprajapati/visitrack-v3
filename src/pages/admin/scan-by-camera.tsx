@@ -23,10 +23,24 @@ const QRScanner: React.FC<{
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const html5QrCodeRef = useRef<any>(null);
+  const scannerContainerId = 'qr-reader-scan-by-camera';
 
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Cleanup function to properly stop and clear scanner
+  const cleanupScanner = async () => {
+    if (html5QrCodeRef.current) {
+      try {
+        await html5QrCodeRef.current.stop();
+        await html5QrCodeRef.current.clear();
+        html5QrCodeRef.current = null;
+      } catch (err) {
+        console.error('Error cleaning up scanner:', err);
+      }
+    }
+  };
 
   useEffect(() => {
     if (!isClient || !isActive) return;
@@ -35,32 +49,46 @@ const QRScanner: React.FC<{
       try {
         setIsInitializing(true);
         setLoading(true);
+        setError(null);
+
+        // Ensure scanner is cleaned up before initializing
+        await cleanupScanner();
         
         // Check for secure context
         if (!window.isSecureContext) {
-          throw new Error('Camera access requires HTTPS or localhost.');
+          throw new Error('Camera access requires HTTPS or localhost. Please use a secure connection.');
         }
 
         // Check for camera support
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          throw new Error('Camera access is not supported in this browser.');
+          throw new Error('Camera access is not supported in this browser. Please try using Chrome or Firefox.');
         }
 
         // Request camera permissions
         try {
-          await navigator.mediaDevices.getUserMedia({ video: true });
+          await navigator.mediaDevices.getUserMedia({ 
+            video: { 
+              facingMode: 'environment'  // Prefer back camera
+            } 
+          });
         } catch (permError) {
-          throw new Error('Camera permission denied. Please allow camera access and refresh the page.');
+          throw new Error('Camera permission denied. Please allow camera access in your browser settings and refresh the page.');
         }
 
         // Import Html5Qrcode
         const { Html5Qrcode } = await import('html5-qrcode');
         
+        // Ensure the container element exists
+        const container = document.getElementById(scannerContainerId);
+        if (!container) {
+          throw new Error('Scanner container element not found. Please refresh the page.');
+        }
+
         // Get available cameras
         const devices = await Html5Qrcode.getCameras();
         
         if (!devices || devices.length === 0) {
-          throw new Error('No cameras found on this device.');
+          throw new Error('No cameras found on this device. Please ensure your camera is not being used by another application.');
         }
 
         setCameras(devices);
@@ -70,7 +98,8 @@ const QRScanner: React.FC<{
         if (isMobile) {
           const backCamera = devices.find(device => 
             device.label.toLowerCase().includes('back') || 
-            device.label.toLowerCase().includes('rear')
+            device.label.toLowerCase().includes('rear') ||
+            device.label.toLowerCase().includes('environment')
           );
           setSelectedCamera(backCamera ? backCamera.id : devices[0].id);
         } else {
@@ -79,6 +108,7 @@ const QRScanner: React.FC<{
 
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Failed to initialize camera';
+        console.error('Camera initialization error:', err);
         setError(errorMsg);
         onScanError(errorMsg);
       } finally {
@@ -88,6 +118,11 @@ const QRScanner: React.FC<{
     };
 
     initializeScanner();
+
+    // Cleanup on unmount or when scanner is deactivated
+    return () => {
+      cleanupScanner();
+    };
   }, [isClient, isActive, onScanError]);
 
   useEffect(() => {
@@ -97,8 +132,18 @@ const QRScanner: React.FC<{
 
     const startScanner = async () => {
       try {
+        // Ensure previous scanner instance is cleaned up
+        await cleanupScanner();
+
         const { Html5Qrcode } = await import('html5-qrcode');
-        const scanner = new Html5Qrcode('qr-reader-scan-by-camera');
+        
+        // Ensure the container element exists
+        const container = document.getElementById(scannerContainerId);
+        if (!container) {
+          throw new Error('Scanner container element not found');
+        }
+
+        const scanner = new Html5Qrcode(scannerContainerId);
         html5QrCodeRef.current = scanner;
 
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -111,7 +156,12 @@ const QRScanner: React.FC<{
               width: isMobile ? 200 : 250,
               height: isMobile ? 200 : 250
             },
-            aspectRatio: 1.0
+            aspectRatio: 1.0,
+            disableFlip: false,
+            videoConstraints: {
+              deviceId: selectedCamera,
+              facingMode: "environment"
+            }
           },
           (decodedText: string) => {
             if (!stopped) {
@@ -128,13 +178,17 @@ const QRScanner: React.FC<{
               !normalized.includes('no qr code detected') &&
               !normalized.includes('no barcode or no qr code detected')
             ) {
+              console.error('QR Scanner error:', errorMessage);
               setError(errorMessage);
               onScanError(errorMessage);
             }
           }
         );
       } catch (err) {
-        const errorMsg = err instanceof Error ? err.message : 'Failed to start QR scanner';
+        const errorMsg = err instanceof Error ? 
+          err.message : 
+          'Failed to start QR scanner. Please ensure camera permissions are granted and try again.';
+        console.error('Scanner start error:', err);
         setError(errorMsg);
         onScanError(errorMsg);
       }
@@ -144,15 +198,7 @@ const QRScanner: React.FC<{
 
     return () => {
       stopped = true;
-      if (html5QrCodeRef.current) {
-        (async () => {
-          try {
-            await html5QrCodeRef.current.stop();
-            await html5QrCodeRef.current.clear();
-          } catch {}
-          html5QrCodeRef.current = null;
-        })();
-      }
+      cleanupScanner();
     };
   }, [selectedCamera, isClient, onScanSuccess, onScanError, isInitializing, isActive]);
 
@@ -211,7 +257,7 @@ const QRScanner: React.FC<{
         }}
       >
         <div 
-          id="qr-reader-scan-by-camera" 
+          id={scannerContainerId} 
           style={{ 
             width: '100%',
             height: '100%'
