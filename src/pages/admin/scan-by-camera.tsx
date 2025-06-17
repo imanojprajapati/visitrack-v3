@@ -321,7 +321,149 @@ const ScanByCameraPage: React.FC = () => {
     console.log('[ScanByCameraPage] Mounted, setIsClient true');
   }, []);
 
-  const handleScanSuccess = async (qrData: string) => {
+  // Helper to process scan after Modal OK
+  const processScan = async (visitorId: string) => {
+    try {
+      // First check if visitor already exists in qrscans collection
+      const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}`);
+      if (!scanCheckResponse.ok) {
+        throw new Error('Failed to check visitor scan status');
+      }
+      const scanCheckData = await scanCheckResponse.json();
+      if (scanCheckData.exists) {
+        // Visitor already exists in qrscans collection
+        const existingScan = scanCheckData.scan;
+        const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+        });
+        Modal.warning({
+          title: 'Visitor Already Checked In',
+          content: (
+            <div className="text-center">
+              <p className="text-lg font-semibold mb-2">{existingScan.name}</p>
+              <p className="text-sm text-gray-600 mb-2">Company: {existingScan.company}</p>
+              <p className="text-sm text-gray-600 mb-2">Event: {existingScan.eventName}</p>
+              <p className="text-sm text-gray-600 mb-2">Entry Type: {existingScan.entryType}</p>
+              <p className="text-sm text-gray-600 mb-2">Check-in Time: {scanTime}</p>
+              <p className="text-sm text-red-600 font-semibold">This visitor has already been checked in!</p>
+            </div>
+          ),
+          okText: 'OK',
+          onOk: () => {
+            setIsProcessing(false);
+            setIsScanning(false);
+          }
+        });
+        return;
+      }
+      // If visitor doesn't exist in qrscans, proceed with normal check-in process
+      // First check if visitor exists in visitors collection
+      const response = await fetch(`/api/visitors/${visitorId}`);
+      if (!response.ok) {
+        let errorMessage = 'Visitor not found.';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+          if (response.status === 500) {
+            errorMessage = 'Server error occurred while fetching visitor data.';
+          } else if (response.status === 404) {
+            errorMessage = 'Visitor not found with the provided ID.';
+          }
+        }
+        throw new Error(errorMessage);
+      }
+      let responseData;
+      try {
+        responseData = await response.json();
+      } catch (parseError) {
+        console.error('Failed to parse visitor response:', parseError);
+        throw new Error('Invalid response format from server.');
+      }
+      const visitorData = responseData.visitor || responseData; // Handle both response formats
+      // Check if visitor is already visited
+      if (visitorData.status === 'Visited') {
+        message.warning('Visitor has already been checked in');
+        setIsProcessing(false);
+        setIsScanning(false);
+        return;
+      }
+      // Create scan record
+      const scanData: QRScan = {
+        visitorId: visitorData._id || visitorData.id || visitorId,
+        eventId: visitorData.eventId,
+        registrationId: visitorData.registrationId,
+        name: visitorData.name,
+        company: visitorData.company,
+        eventName: visitorData.eventName,
+        scanTime: new Date().toISOString(),
+        entryType: 'QR',
+        status: 'Visited',
+        deviceInfo: navigator.userAgent
+      };
+      // Store scan data
+      const scanResponse = await fetch('/api/qrscans', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(scanData),
+      });
+      if (!scanResponse.ok) {
+        const errorData = await scanResponse.json();
+        throw new Error(errorData.message || 'Failed to record scan data');
+      }
+      // Update visitor status to Visited
+      const updateResponse = await fetch(`/api/visitors/${visitorId}/check-in`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'Visited',
+          checkInTime: new Date().toISOString()
+        }),
+      });
+      if (!updateResponse.ok) {
+        const errorData = await updateResponse.json();
+        // If visitor update fails, update scan record status
+        await fetch(`/api/qrscans/${scanData.visitorId}`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            status: 'failed',
+            error: 'Failed to update visitor status'
+          }),
+        });
+        throw new Error(errorData.message || 'Failed to update visitor status');
+      }
+      // Set the scan result for display
+      setLastScanResult({
+        visitorId: visitorData._id || visitorData.id || visitorId,
+        name: visitorData.name,
+        company: visitorData.company,
+        eventName: visitorData.eventName,
+        status: 'Visited'
+      });
+      message.success(`Visitor ${visitorData.name} checked in successfully`);
+      setIsScanning(false);
+    } catch (error) {
+      console.error('Error processing visitor:', error);
+      message.error(error instanceof Error ? error.message : 'Failed to process visitor');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleScanSuccess = (qrData: string) => {
     console.log('[ScanByCameraPage] handleScanSuccess', qrData);
     try {
       // Extract visitor ID from QR code
@@ -329,16 +471,12 @@ const ScanByCameraPage: React.FC = () => {
       if (!visitorId) {
         throw new Error('Invalid QR code data');
       }
-
       // Validate that the visitor ID looks like a valid MongoDB ObjectId
       const objectIdPattern = /^[0-9a-fA-F]{24}$/;
       if (!objectIdPattern.test(visitorId)) {
         throw new Error('Invalid visitor ID format. Please scan a valid QR code.');
       }
-
       setIsProcessing(true);
-
-      // Show the scanned ID in a popup
       Modal.info({
         title: 'QR Code Scanned',
         content: (
@@ -350,163 +488,8 @@ const ScanByCameraPage: React.FC = () => {
         ),
         okText: 'Process',
         cancelText: 'Cancel',
-        onOk: async () => {
-          try {
-            // First check if visitor already exists in qrscans collection
-            const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}`);
-            if (!scanCheckResponse.ok) {
-              throw new Error('Failed to check visitor scan status');
-            }
-            
-            const scanCheckData = await scanCheckResponse.json();
-            
-            if (scanCheckData.exists) {
-              // Visitor already exists in qrscans collection
-              const existingScan = scanCheckData.scan;
-              const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                second: '2-digit',
-              });
-              
-              Modal.warning({
-                title: 'Visitor Already Checked In',
-                content: (
-                  <div className="text-center">
-                    <p className="text-lg font-semibold mb-2">{existingScan.name}</p>
-                    <p className="text-sm text-gray-600 mb-2">Company: {existingScan.company}</p>
-                    <p className="text-sm text-gray-600 mb-2">Event: {existingScan.eventName}</p>
-                    <p className="text-sm text-gray-600 mb-2">Entry Type: {existingScan.entryType}</p>
-                    <p className="text-sm text-gray-600 mb-2">Check-in Time: {scanTime}</p>
-                    <p className="text-sm text-red-600 font-semibold">This visitor has already been checked in!</p>
-                  </div>
-                ),
-                okText: 'OK',
-                onOk: () => {
-                  setIsProcessing(false);
-                  setIsScanning(false);
-                }
-              });
-              return;
-            }
-
-            // If visitor doesn't exist in qrscans, proceed with normal check-in process
-            // First check if visitor exists in visitors collection
-            const response = await fetch(`/api/visitors/${visitorId}`);
-            if (!response.ok) {
-              let errorMessage = 'Visitor not found.';
-              try {
-                const errorData = await response.json();
-                errorMessage = errorData.message || errorData.error || errorMessage;
-              } catch (parseError) {
-                console.error('Failed to parse error response:', parseError);
-                if (response.status === 500) {
-                  errorMessage = 'Server error occurred while fetching visitor data.';
-                } else if (response.status === 404) {
-                  errorMessage = 'Visitor not found with the provided ID.';
-                }
-              }
-              throw new Error(errorMessage);
-            }
-            
-            let responseData;
-            try {
-              responseData = await response.json();
-            } catch (parseError) {
-              console.error('Failed to parse visitor response:', parseError);
-              throw new Error('Invalid response format from server.');
-            }
-            
-            const visitorData = responseData.visitor || responseData; // Handle both response formats
-
-            // Check if visitor is already visited
-            if (visitorData.status === 'Visited') {
-              message.warning('Visitor has already been checked in');
-              setIsProcessing(false);
-              setIsScanning(false);
-              return;
-            }
-
-            // Create scan record
-            const scanData: QRScan = {
-              visitorId: visitorData._id || visitorData.id || visitorId,
-              eventId: visitorData.eventId,
-              registrationId: visitorData.registrationId,
-              name: visitorData.name,
-              company: visitorData.company,
-              eventName: visitorData.eventName,
-              scanTime: new Date().toISOString(),
-              entryType: 'QR',
-              status: 'Visited',
-              deviceInfo: navigator.userAgent
-            };
-
-            // Store scan data
-            const scanResponse = await fetch('/api/qrscans', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(scanData),
-            });
-
-            if (!scanResponse.ok) {
-              const errorData = await scanResponse.json();
-              throw new Error(errorData.message || 'Failed to record scan data');
-            }
-
-            // Update visitor status to Visited
-            const updateResponse = await fetch(`/api/visitors/${visitorId}/check-in`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                status: 'Visited',
-                checkInTime: new Date().toISOString()
-              }),
-            });
-
-            if (!updateResponse.ok) {
-              const errorData = await updateResponse.json();
-              // If visitor update fails, update scan record status
-              await fetch(`/api/qrscans/${scanData.visitorId}`, {
-                method: 'PATCH',
-                headers: {
-                  'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                  status: 'failed',
-                  error: 'Failed to update visitor status'
-                }),
-              });
-              throw new Error(errorData.message || 'Failed to update visitor status');
-            }
-
-            // Set the scan result for display
-            setLastScanResult({
-              visitorId: visitorData._id || visitorData.id || visitorId,
-              name: visitorData.name,
-              company: visitorData.company,
-              eventName: visitorData.eventName,
-              status: 'Visited'
-            });
-
-            message.success(`Visitor ${visitorData.name} checked in successfully`);
-            setIsScanning(false);
-          } catch (error) {
-            console.error('Error processing visitor:', error);
-            message.error(error instanceof Error ? error.message : 'Failed to process visitor');
-          } finally {
-            setIsProcessing(false);
-          }
-        },
-        onCancel: () => {
-          setIsProcessing(false);
-        }
+        onOk: () => processScan(visitorId),
+        onCancel: () => setIsProcessing(false),
       });
     } catch (error) {
       console.error('[ScanByCameraPage] Error scanning QR code:', error);
@@ -634,7 +617,7 @@ const ScanByCameraPage: React.FC = () => {
           )}
 
           {/* Show Scan Result */}
-          {lastScanResult && (
+          {lastScanResult && typeof lastScanResult === 'object' && (
             <div className="w-full text-center">
               <Card className="mb-4">
                 <div className="text-center">
