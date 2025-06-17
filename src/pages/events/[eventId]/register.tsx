@@ -1172,7 +1172,7 @@ export default function EventRegistration() {
                     </div>
 
                     <div>
-                      <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="companyName" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         Company Name *
                       </label>
                       <input
@@ -1189,7 +1189,7 @@ export default function EventRegistration() {
                     </div>
 
                     <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         Email ID *
                       </label>
                       <input
@@ -1206,7 +1206,7 @@ export default function EventRegistration() {
                     </div>
 
                     <div>
-                      <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         Phone Number *
                       </label>
                       <input
@@ -1223,7 +1223,7 @@ export default function EventRegistration() {
                     </div>
 
                     <div>
-                      <label htmlFor="interestedIn" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="interestedIn" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         Interested In *
                       </label>
                       <select
@@ -1246,7 +1246,7 @@ export default function EventRegistration() {
                     </div>
 
                     <div>
-                      <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         Address *
                       </label>
                       <input
@@ -1263,7 +1263,7 @@ export default function EventRegistration() {
                     </div>
 
                     <div>
-                      <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         City *
                       </label>
                       <input
@@ -1280,7 +1280,7 @@ export default function EventRegistration() {
                     </div>
 
                     <div>
-                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         State *
                       </label>
                       <input
@@ -1297,7 +1297,7 @@ export default function EventRegistration() {
                     </div>
 
                     <div>
-                      <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="country" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         Country *
                       </label>
                       <select
@@ -1320,7 +1320,7 @@ export default function EventRegistration() {
                     </div>
 
                     <div>
-                      <label htmlFor="pinCode" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="pinCode" className="block text-sm font-medium text-gray-700 mb-1 text-left">
                         PIN Code *
                       </label>
                       <input
@@ -1394,7 +1394,7 @@ export default function EventRegistration() {
                           key={field.id} 
                           className={isFullWidth ? 'col-span-1 md:col-span-2' : 'col-span-1'}
                         >
-                          <label htmlFor={field.id} className="block text-sm font-medium text-gray-700 mb-1">
+                          <label htmlFor={field.id} className="block text-sm font-medium text-gray-700 mb-1 text-left">
                             {field.label} {field.required && '*'}
                           </label>
                           
@@ -1863,37 +1863,6 @@ export default function EventRegistration() {
         <title>Register - {event?.title || 'Event'}</title>
         <meta name="description" content={`Register for ${event?.title || 'Event'}`} />
       </Head>
-
-      {/* Debug information - remove this in production */}
-      {process.env.NODE_ENV === 'development' && (
-        <div style={{ 
-          position: 'fixed', 
-          top: '10px', 
-          right: '10px', 
-          background: '#f0f0f0', 
-          padding: '10px', 
-          border: '1px solid #ccc', 
-          zIndex: 9999,
-          fontSize: '12px',
-          maxWidth: '300px'
-        }}>
-          <strong>DEBUG INFO:</strong><br/>
-          Current Step: {currentStep}<br/>
-          isAlreadyRegistered: {isAlreadyRegistered.toString()}<br/>
-          visitor: {visitor ? 'SET' : 'NULL'}<br/>
-          event: {event ? 'SET' : 'NULL'}<br/>
-          Condition: {(isAlreadyRegistered && Boolean(visitor) && Boolean(event)).toString()}<br/>
-          <button onClick={() => {
-            console.log('=== DEBUG STATE ===');
-            console.log('currentStep:', currentStep);
-            console.log('isAlreadyRegistered:', isAlreadyRegistered);
-            console.log('visitor:', visitor);
-            console.log('event:', event);
-            console.log('formData:', formData);
-            console.log('==================');
-          }}>Log State</button>
-        </div>
-      )}
 
       {/* Event Banner */}
       <div className="relative h-[400px] w-full">
