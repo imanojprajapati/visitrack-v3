@@ -989,32 +989,30 @@ export default function EventRegistration() {
       case 0:
         console.log('renderStepContent: Rendering email verification step');
         return (
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
-            <div className="lg:w-1/2 text-center lg:text-left">
-              <div className="mb-6">
-                <Image
-                  src="/images/email-verification.svg"
-                  alt="Email Verification"
-                  width={300}
-                  height={300}
-                  className="mx-auto lg:mx-0"
-                  onError={(e) => {
-                    // Fallback to a placeholder if image doesn't exist
-                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3EEmail Verification%3C/text%3E%3C/svg%3E";
-                  }}
-                />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Email Verification</h3>
-              <p className="text-gray-600 mb-6">
-                Enter your email address to receive a one-time password (OTP) for secure registration.
-              </p>
+          <div className="flex flex-col items-center justify-center text-center">
+            <div className="mb-6">
+              <Image
+                src="/images/email-verification.svg"
+                alt="Email Verification"
+                width={50}
+                height={50}
+                className="mx-auto"
+                onError={(e) => {
+                  // Fallback to a placeholder if image doesn't exist
+                  e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Crect width='50' height='50' fill='%23f3f4f6'/%3E%3Ctext x='25' y='25' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='8'%3EEmail%3C/text%3E%3C/svg%3E";
+                }}
+              />
             </div>
-            <div className="lg:w-1/2">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">Email Verification</h3>
+            <p className="text-gray-600 mb-6">
+              Enter your email address to receive a one-time password (OTP) for secure registration.
+            </p>
+            <div className="w-full max-w-sm">
               <Form
                 form={form}
                 onFinish={handleSendOTP}
                 layout="vertical"
-                className="w-full max-w-sm"
+                className="w-full"
               >
                 <Form.Item
                   name="email"
@@ -1039,32 +1037,30 @@ export default function EventRegistration() {
       case 1:
         console.log('renderStepContent: Rendering OTP verification step');
         return (
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
-            <div className="lg:w-1/2 text-center lg:text-left">
-              <div className="mb-6">
-                <Image
-                  src="/images/otp-verification.svg"
-                  alt="OTP Verification"
-                  width={300}
-                  height={300}
-                  className="mx-auto lg:mx-0"
-                  onError={(e) => {
-                    // Fallback to a placeholder if image doesn't exist
-                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3EOTP Verification%3C/text%3E%3C/svg%3E";
-                  }}
-                />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">OTP Verification</h3>
-              <p className="text-gray-600 mb-6">
-                Check your email for the 6-digit verification code and enter it below to continue.
-              </p>
+          <div className="flex flex-col items-center justify-center text-center">
+            <div className="mb-6">
+              <Image
+                src="/images/otp-verification.svg"
+                alt="OTP Verification"
+                width={50}
+                height={50}
+                className="mx-auto"
+                onError={(e) => {
+                  // Fallback to a placeholder if image doesn't exist
+                  e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Crect width='50' height='50' fill='%23f3f4f6'/%3E%3Ctext x='25' y='25' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='8'%3EOTP%3C/text%3E%3C/svg%3E";
+                }}
+              />
             </div>
-            <div className="lg:w-1/2">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">OTP Verification</h3>
+            <p className="text-gray-600 mb-6">
+              Check your email for the 6-digit verification code and enter it below to continue.
+            </p>
+            <div className="w-full max-w-sm">
               <Form
                 form={form}
                 onFinish={handleVerifyOTP}
                 layout="vertical"
-                className="w-full max-w-sm"
+                className="w-full"
               >
                 <Form.Item
                   name="otp"
@@ -1137,27 +1133,25 @@ export default function EventRegistration() {
         if (!event.form) {
           console.log('renderStepContent: Using basic form (no event.form configuration)');
           return (
-            <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
-              <div className="lg:w-1/2 text-center lg:text-left">
-                <div className="mb-6">
-                  <Image
-                    src="/images/registration-form.svg"
-                    alt="Registration Form"
-                    width={300}
-                    height={300}
-                    className="mx-auto lg:mx-0"
-                    onError={(e) => {
-                      // Fallback to a placeholder if image doesn't exist
-                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3ERegistration Form%3C/text%3E%3C/svg%3E";
-                    }}
-                  />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Details</h3>
-                <p className="text-gray-600 mb-6">
-                  Please fill in your personal and professional details to complete your registration.
-                </p>
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="mb-6">
+                <Image
+                  src="/images/registration-form.svg"
+                  alt="Registration Form"
+                  width={50}
+                  height={50}
+                  className="mx-auto"
+                  onError={(e) => {
+                    // Fallback to a placeholder if image doesn't exist
+                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Crect width='50' height='50' fill='%23f3f4f6'/%3E%3Ctext x='25' y='25' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='8'%3EForm%3C/text%3E%3C/svg%3E";
+                  }}
+                />
               </div>
-              <div className="lg:w-1/2">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Details</h3>
+              <p className="text-gray-600 mb-6">
+                Please fill in your personal and professional details to complete your registration.
+              </p>
+              <div className="w-full max-w-2xl">
                 <form onSubmit={handleFormSubmit} className="space-y-6" key={`form-${formRenderKey}`}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -1366,27 +1360,25 @@ export default function EventRegistration() {
         } else {
           console.log('renderStepContent: Using dynamic form (event.form configuration exists)');
           return (
-            <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
-              <div className="lg:w-1/2 text-center lg:text-left">
-                <div className="mb-6">
-                  <Image
-                    src="/images/registration-form.svg"
-                    alt="Registration Form"
-                    width={300}
-                    height={300}
-                    className="mx-auto lg:mx-0"
-                    onError={(e) => {
-                      // Fallback to a placeholder if image doesn't exist
-                      e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3ERegistration Form%3C/text%3E%3C/svg%3E";
-                    }}
-                  />
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Details</h3>
-                <p className="text-gray-600 mb-6">
-                  Please fill in your personal and professional details to complete your registration.
-                </p>
+            <div className="flex flex-col items-center justify-center text-center">
+              <div className="mb-6">
+                <Image
+                  src="/images/registration-form.svg"
+                  alt="Registration Form"
+                  width={50}
+                  height={50}
+                  className="mx-auto"
+                  onError={(e) => {
+                    // Fallback to a placeholder if image doesn't exist
+                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Crect width='50' height='50' fill='%23f3f4f6'/%3E%3Ctext x='25' y='25' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='8'%3EForm%3C/text%3E%3C/svg%3E";
+                  }}
+                />
               </div>
-              <div className="lg:w-1/2">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Details</h3>
+              <p className="text-gray-600 mb-6">
+                Please fill in your personal and professional details to complete your registration.
+              </p>
+              <div className="w-full max-w-2xl">
                 <form onSubmit={handleFormSubmit} className="space-y-6" key={`dynamic-form-${formRenderKey}`}>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {event?.form?.fields?.map((field) => {
@@ -1599,58 +1591,47 @@ export default function EventRegistration() {
           );
         }
         return (
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-8">
-            <div className="lg:w-1/2 text-center lg:text-left">
-              <div className="mb-6">
-                <Image
-                  src="/images/registration-success.svg"
-                  alt="Registration Success"
-                  width={300}
-                  height={300}
-                  className="mx-auto lg:mx-0"
-                  onError={(e) => {
-                    // Fallback to a placeholder if image doesn't exist
-                    e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' viewBox='0 0 300 300'%3E%3Crect width='300' height='300' fill='%23f3f4f6'/%3E%3Ctext x='150' y='150' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='16'%3ERegistration Success%3C/text%3E%3C/svg%3E";
-                  }}
-                />
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Complete!</h3>
-              <p className="text-gray-600 mb-6">
-                Congratulations! You have successfully registered for {event.title}. Your QR code and badge are ready for download.
-              </p>
+          <div className="flex flex-col items-center justify-center text-center">
+            <div className="mb-6">
+              <Image
+                src="/images/registration-success.svg"
+                alt="Registration Success"
+                width={50}
+                height={50}
+                className="mx-auto"
+                onError={(e) => {
+                  // Fallback to a placeholder if image doesn't exist
+                  e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='50' height='50' viewBox='0 0 50 50'%3E%3Crect width='50' height='50' fill='%23f3f4f6'/%3E%3Ctext x='25' y='25' text-anchor='middle' dy='.3em' fill='%236b7280' font-family='Arial' font-size='8'%3ERegistration%3C/text%3E%3C/svg%3E";
+                }}
+              />
             </div>
-            <div className="lg:w-1/2">
-              <div className="text-center">
-                <Result
-                  status="success"
-                  title="Registration Successful!"
-                  subTitle={`You have successfully registered for ${event.title}`}
-                />
-                <div className="mt-8">
-                  <RegistrationDetails visitor={visitor} />
-                </div>
-                <div className="mt-4">
-                  <Space size="middle">
-                    <Button type="primary" onClick={handleDownloadQR} icon={<DownloadOutlined />}>
-                      Download QR Code
-                    </Button>
-                    <Button onClick={handleDownloadPDF} icon={<DownloadOutlined />}>
-                      Download Badge
-                    </Button>
-                  </Space>
-                </div>
-                <div className="mt-4">
-                  <Space size="middle">
-                    <Button
-                      type="primary"
-                      icon={<HomeOutlined />}
-                      onClick={() => router.push('/events')}
-                    >
-                      Return to Events
-                    </Button>
-                  </Space>
-                </div>
-              </div>
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Complete!</h3>
+            <p className="text-gray-600 mb-6">
+              Congratulations! You have successfully registered for {event.title}. Your QR code and badge are ready for download.
+            </p>
+            <div className="mt-8">
+              <RegistrationDetails visitor={visitor} />
+            </div>
+            <div className="mt-4">
+              <Space size="middle">
+                <Button type="primary" onClick={handleDownloadQR} icon={<DownloadOutlined />}>
+                  Download QR Code
+                </Button>
+                <Button onClick={handleDownloadPDF} icon={<DownloadOutlined />}>
+                  Download Badge
+                </Button>
+              </Space>
+            </div>
+            <div className="mt-4">
+              <Space size="middle">
+                <Button
+                  type="primary"
+                  icon={<HomeOutlined />}
+                  onClick={() => router.push('/events')}
+                >
+                  Return to Events
+                </Button>
+              </Space>
             </div>
           </div>
         );
