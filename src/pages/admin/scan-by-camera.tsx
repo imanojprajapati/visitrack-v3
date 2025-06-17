@@ -196,12 +196,6 @@ const QRScannerComponent: React.FC<{
   );
 };
 
-// Dynamically import the QR Scanner component to avoid SSR issues
-const DynamicQRScanner = dynamic(() => Promise.resolve(QRScannerComponent), {
-  ssr: false,
-  loading: () => <div className="flex justify-center items-center h-64"><Spin size="large" /></div>
-});
-
 const ScanByCameraPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
@@ -293,7 +287,7 @@ const ScanByCameraPage: React.FC = () => {
             />
           )}
 
-          <DynamicQRScanner
+          <QRScannerComponent
             onScanSuccess={handleScanSuccess}
             onError={handleScanError}
             onCameraChange={handleCameraChange}
@@ -323,4 +317,17 @@ const ScanByCameraPage: React.FC = () => {
   );
 };
 
-export default ScanByCameraPage; 
+// Export the page with dynamic import to avoid SSR issues
+export default dynamic(() => Promise.resolve(ScanByCameraPage), {
+  ssr: false,
+  loading: () => (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#4f46e5] to-[#6366f1] p-2">
+      <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-4 flex flex-col items-center">
+        <div className="flex justify-center items-center h-64">
+          <Spin size="large" />
+          <div className="ml-2">Loading scanner...</div>
+        </div>
+      </div>
+    </div>
+  )
+}); 
