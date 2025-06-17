@@ -69,3 +69,11 @@
     @apply mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-[#4f46e5] focus:ring-[#4f46e5];
   }
 } 
+
+
+#html5-qrcode-button-camera-permission,
+#html5-qrcode-anchor-scan-type-change,
+#html5-qrcode-button-file-selection{
+  color: white !important;
+}
+

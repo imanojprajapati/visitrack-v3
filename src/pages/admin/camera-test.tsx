@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button, Alert, Typography, Space } from 'antd';
 import Head from 'next/head';
-import dynamic from 'next/dynamic';
 
 const { Title, Text } = Typography;
 
@@ -203,11 +202,4 @@ const CameraTestPage: React.FC = () => {
   );
 };
 
-export default dynamic(() => Promise.resolve(CameraTestPage), {
-  ssr: false,
-  loading: () => (
-    <div className="min-h-screen flex items-center justify-center">
-      <div>Loading camera test...</div>
-    </div>
-  )
-}); 
+export default CameraTestPage; 

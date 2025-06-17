@@ -46,9 +46,14 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     );
   }
 
-  // Don't render layout if not authenticated
+  // Show loading spinner if not authenticated (instead of returning null)
   if (!isAuthenticated) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Spin size="large" />
+        <div className="ml-2">Redirecting to login...</div>
+      </div>
+    );
   }
 
   const handleLogout = async () => {

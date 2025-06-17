@@ -7,7 +7,7 @@ import Footer from '../components/Footer';
 import { AppProvider } from '../components/AppProvider';
 import { AuthProvider } from '../context/AuthContext';
 import { useEffect, useState } from 'react';
-import { App as AntApp } from 'antd';
+import { App as AntApp, Spin } from 'antd';
 
 function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -41,8 +41,13 @@ function MyApp({ Component, pageProps }: AppProps) {
     </>
   );
 
+  // Show loading spinner instead of null during SSR
   if (!mounted) {
-    return null;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Spin size="large" />
+      </div>
+    );
   }
 
   // Only wrap with AuthProvider for admin pages
