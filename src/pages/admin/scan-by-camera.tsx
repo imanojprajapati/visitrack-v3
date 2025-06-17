@@ -1,454 +1,286 @@
 'use client'
-import React, { useEffect, useState, useRef } from 'react';
-import { Alert, Button, Spin, Typography, Modal, message, Card, Descriptions, Select, Space } from 'antd';
-import { CameraOutlined, LoadingOutlined } from '@ant-design/icons';
+import React, { useEffect, useRef, useState } from 'react';
+import { Button, Modal, message, Alert, Card, Descriptions } from 'antd';
+import { CameraOutlined } from '@ant-design/icons';
 
-const { Text } = Typography;
+const QR_SCANNER_ID = 'qr-reader';
 
-// Define the CameraDevice type
-interface CameraDevice {
-  id: string;
-  label: string;
-}
-
-const QRScanner: React.FC<{
-  onScanSuccess: (result: string) => void;
-  onScanError: (error: string) => void;
-  isActive: boolean;
-}> = ({ onScanSuccess, onScanError, isActive }) => {
-  const [isClient, setIsClient] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+const ScanByCamera: React.FC = () => {
+  const [showScanner, setShowScanner] = useState(false);
+  const [isProcessingScan, setIsProcessingScan] = useState(false);
+  const [visitorInfo, setVisitorInfo] = useState<any | null>(null);
+  const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cameras, setCameras] = useState<CameraDevice[]>([]);
-  const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [containerReady, setContainerReady] = useState(false);
-  const html5QrCodeRef = useRef<any>(null);
-  const scannerContainerId = 'qr-reader-scan-by-camera';
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [messageApi, contextHolder] = message.useMessage();
+  const scannerRef = useRef<any>(null);
 
-  // Ensure containerReady is set after the parent div is mounted
+  // Cleanup scanner on unmount or modal close
   useEffect(() => {
-    setIsClient(true);
-    if (containerRef.current) setContainerReady(true);
-  }, []);
-
-  // If the parent container is not ready, set it as soon as it is mounted
-  useEffect(() => {
-    if (!containerReady && containerRef.current) setContainerReady(true);
-  }, [containerReady, containerRef.current]);
-
-  // Cleanup function to properly stop and clear scanner
-  const cleanupScanner = async () => {
-    try {
-      if (html5QrCodeRef.current) {
-        await html5QrCodeRef.current.stop();
-        await html5QrCodeRef.current.clear();
-        html5QrCodeRef.current = null;
-      }
-    } catch {}
-  };
-
-  // Camera initialization
-  useEffect(() => {
-    if (!isClient || !isActive || !containerReady) return;
-    let cancelled = false;
-    const initialize = async () => {
-      setIsInitializing(true);
-      setError(null);
-      setLoading(true);
-      await cleanupScanner();
-      try {
-        if (!window.isSecureContext) throw new Error('Camera access requires HTTPS or localhost.');
-        if (!navigator.mediaDevices?.getUserMedia) throw new Error('Camera not supported in this browser.');
-        const { Html5Qrcode } = await import('html5-qrcode');
-        const devices = await Html5Qrcode.getCameras();
-        if (!devices || devices.length === 0) throw new Error('No cameras found.');
-        setCameras(devices);
-        setSelectedCamera(devices[0].id);
-      } catch (err) {
-        setError((err as Error).message);
-        onScanError((err as Error).message);
-      } finally {
-        if (!cancelled) {
-          setIsInitializing(false);
-          setLoading(false);
-        }
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.clear();
+        scannerRef.current = null;
       }
     };
-    initialize();
-    return () => { cancelled = true; };
-  }, [isClient, isActive, containerReady]);
+  }, []);
 
-  // Start scanner when selectedCamera changes
+  // Initialize QR scanner when modal opens
   useEffect(() => {
-    if (!isClient || !isActive || !selectedCamera || !containerReady) return;
-    let stopped = false;
+    if (!showScanner) return;
     let cancelled = false;
-    setIsInitializing(true);
-    setError(null);
-    const start = async () => {
-      await cleanupScanner();
-      await new Promise(res => setTimeout(res, 100));
-      // Ensure the container exists
-      let container = document.getElementById(scannerContainerId);
-      if (!container && containerRef.current) {
-        container = document.createElement('div');
-        container.id = scannerContainerId;
-        container.style.width = '100%';
-        container.style.height = '100%';
-        containerRef.current.appendChild(container);
-      }
-      if (!container) {
-        setError('Failed to create scanner container');
-        setIsInitializing(false);
-        return;
-      }
+
+    const initializeScanner = async () => {
       try {
-        const { Html5Qrcode } = await import('html5-qrcode');
-        const scanner = new Html5Qrcode(scannerContainerId);
-        html5QrCodeRef.current = scanner;
-        await scanner.start(
-          selectedCamera,
-          { fps: 10, qrbox: { width: 250, height: 250 } },
-          (decodedText: string) => {
-            if (!stopped) {
-              onScanSuccess(decodedText);
-              scanner.stop().catch(() => {});
+        setError(null);
+        setIsProcessingScan(false);
+        const { Html5QrcodeScanner } = await import('html5-qrcode');
+        const scanner = new Html5QrcodeScanner(
+          QR_SCANNER_ID,
+          {
+            fps: 10,
+            qrbox: { width: 250, height: 250 },
+            disableFlip: false,
+          },
+          false
+        );
+
+        scanner.render(
+          async (decodedText: string) => {
+            if (!isProcessingScan && !cancelled) {
+              setIsProcessingScan(true);
+              await handleQrCodeScan(decodedText);
             }
           },
-          (errorMessage: string) => {
+          (scanError: any) => {
             if (
-              !/notfoundexception|no qr code found|no multiformat readers were able to detect the code|no qr code detected|no barcode or no qr code detected/i.test(errorMessage)
+              !/notfoundexception|no qr code found|no multiformat readers were able to detect the code|no qr code detected|no barcode or no qr code detected/i.test(
+                String(scanError)
+              )
             ) {
-              setError(errorMessage);
-              onScanError(errorMessage);
+              setError(String(scanError));
             }
           }
         );
-      } catch (err) {
-        setError((err as Error).message);
-        onScanError((err as Error).message);
-      } finally {
-        if (!cancelled) setIsInitializing(false);
+
+        scannerRef.current = scanner;
+      } catch (err: any) {
+        setError(err.message || 'Failed to initialize QR scanner');
       }
     };
-    start();
-    return () => { stopped = true; cancelled = true; cleanupScanner(); };
-  }, [selectedCamera, isClient, isActive, containerReady]);
 
-  // Camera change handler
-  const handleCameraChange = (cameraId: string) => {
-    if (cameraId !== selectedCamera) {
-      setIsInitializing(true);
-      setSelectedCamera(cameraId);
-    }
-  };
+    initializeScanner();
 
-  if (!isClient || !isActive || !containerReady) return <div>Loading scanner...</div>;
-  if (isInitializing || loading) {
-    return (
-      <div className="flex flex-col items-center justify-center">
-        <Spin indicator={<LoadingOutlined style={{ fontSize: 24 }} spin />} />
-        <Text className="mt-2">Initializing camera...</Text>
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <Alert
-        message="Error"
-        description={error}
-        type="error"
-        showIcon
-        className="mb-4"
-      />
-    );
-  }
-  return (
-    <div className="flex flex-col items-center w-full max-w-md">
-      {cameras.length > 1 && (
-        <Space direction="vertical" className="w-full mb-4">
-          <Select
-            value={selectedCamera || undefined}
-            onChange={handleCameraChange}
-            style={{ width: '100%' }}
-            options={cameras.map(camera => ({
-              label: camera.label || `Camera ${camera.id}`,
-              value: camera.id
-            }))}
-            disabled={isInitializing || loading}
-          />
-        </Space>
-      )}
-      <div 
-        ref={containerRef}
-        style={{ 
-          width: '100%',
-          maxWidth: '300px',
-          aspectRatio: '1',
-          background: '#000',
-          borderRadius: '8px',
-          overflow: 'hidden',
-          position: 'relative'
-        }}
-      >
-        <div 
-          id={scannerContainerId}
-          style={{ 
-            width: '100%',
-            height: '100%',
-            position: 'absolute',
-            top: 0,
-            left: 0
-          }} 
-        />
-      </div>
-    </div>
-  );
-};
-
-// Helper for safe JSON parsing
-async function safeJson(response: Response) {
-  try {
-    return await response.json();
-  } catch {
-    return {};
-  }
-}
-
-const checkInVisitorByQr = async (qrData: string, messageApi: any) => {
-  try {
-    const visitorId = qrData.trim();
-    if (!visitorId) throw new Error('Invalid QR code data');
-    
-    const objectIdPattern = /^[0-9a-fA-F]{24}$/;
-    if (!objectIdPattern.test(visitorId)) {
-      messageApi.error('Invalid visitor ID format. Please scan a valid QR code.');
-      throw new Error('Invalid visitor ID format. Please scan a valid QR code.');
-    }
-
-    // Check if visitor has already been scanned
-    const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}`);
-    if (!scanCheckResponse.ok) {
-      messageApi.error('Failed to check visitor scan status');
-      throw new Error('Failed to check visitor scan status');
-    }
-    
-    const scanCheckData = await safeJson(scanCheckResponse);
-    if (scanCheckData.exists) {
-      const existingScan = scanCheckData.scan;
-      const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
-        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
-      });
-      
-      messageApi.warning('Visitor has already been checked in');
-      Modal.warning({
-        title: 'Visitor Already Checked In',
-        content: `Name: ${existingScan.name}\nCompany: ${existingScan.company}\nEvent: ${existingScan.eventName}\nEntry Type: ${existingScan.entryType}\nCheck-in Time: ${scanTime}\nThis visitor has already been checked in!`,
-        okText: 'OK',
-      });
-      return { alreadyCheckedIn: true, visitor: existingScan };
-    }
-
-    // Fetch visitor details
-    const response = await fetch(`/api/visitors/${visitorId}`);
-    if (!response.ok) {
-      let errorMessage = 'Visitor not found.';
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch {
-        if (response.status === 500) errorMessage = 'Server error occurred while fetching visitor data.';
-        else if (response.status === 404) errorMessage = 'Visitor not found with the provided ID.';
+    return () => {
+      cancelled = true;
+      if (scannerRef.current) {
+        scannerRef.current.clear();
+        scannerRef.current = null;
       }
-      messageApi.error(errorMessage);
-      throw new Error(errorMessage);
-    }
-
-    const responseData = await safeJson(response);
-    const visitorData = responseData.visitor || responseData;
-
-    if (visitorData.status === 'Visited') {
-      messageApi.warning('Visitor has already been checked in');
-      return { alreadyCheckedIn: true, visitor: visitorData };
-    }
-
-    // Create scan entry
-    const scanData = {
-      visitorId: visitorData._id || visitorData.id || visitorId,
-      eventId: visitorData.eventId,
-      registrationId: visitorData.registrationId,
-      name: visitorData.name,
-      company: visitorData.company,
-      eventName: visitorData.eventName,
-      scanTime: new Date().toISOString(),
-      entryType: 'QR',
-      status: 'Visited',
-      deviceInfo: navigator.userAgent
     };
+    // eslint-disable-next-line
+  }, [showScanner]);
 
-    messageApi.loading('Recording entry...');
-    
-    // Record scan data
-    const scanResponse = await fetch('/api/qrscans', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(scanData),
-    });
-
-    if (!scanResponse.ok) {
-      const errorData = await safeJson(scanResponse);
-      messageApi.error('Failed to record scan data');
-      throw new Error(errorData.message || 'Failed to record scan data');
-    }
-
-    // Update visitor status
-    const updateResponse = await fetch(`/api/visitors/${visitorId}/check-in`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'Visited', checkInTime: new Date().toISOString() }),
-    });
-
-    if (!updateResponse.ok) {
-      const errorData = await safeJson(updateResponse);
-      // Attempt to mark scan as failed
-      await fetch(`/api/qrscans/${scanData.visitorId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'failed', error: 'Failed to update visitor status' }),
-      });
-      messageApi.error('Failed to update visitor status');
-      throw new Error(errorData.message || 'Failed to update visitor status');
-    }
-
-    messageApi.success(`Visitor ${visitorData.name} checked in successfully`);
-    return { alreadyCheckedIn: false, visitor: { ...visitorData, ...scanData } };
-  } catch (error: any) {
-    messageApi.error(error.message || 'Failed to process QR code');
-    throw error;
-  }
-};
-
-const MinimalScanByCameraPage: React.FC = () => {
-  const [error, setError] = useState<string | null>(null);
-  const [isScanning, setIsScanning] = useState(false);
-  const [visitorInfo, setVisitorInfo] = useState<any | null>(null);
-  const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
-  const [isClient, setIsClient] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [messageApi, contextHolder] = message.useMessage();
-  const [errorDebounce, setErrorDebounce] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (error) {
-      console.error('MinimalScanByCameraPage error:', error);
-      const timeout = setTimeout(() => setErrorDebounce(error), 100);
-      return () => clearTimeout(timeout);
-    } else {
-      setErrorDebounce(null);
-    }
-  }, [error]);
-
-  useEffect(() => {
-    setIsClient(true);
-    if (typeof window !== 'undefined') {
-      window.onerror = function (msg, url, line, col, err) {
-        setError(`Global error: ${msg} at ${url}:${line}:${col} - ${err && err.stack ? err.stack : ''}`);
-        console.error('Global error:', msg, url, line, col, err);
-        return true;
-      };
-      window.onunhandledrejection = function (event) {
-        setError(`Unhandled promise rejection: ${event.reason && event.reason.stack ? event.reason.stack : event.reason}`);
-        console.error('Unhandled promise rejection:', event);
-        return true;
-      };
-      return () => {
-        window.onerror = null;
-        window.onunhandledrejection = null;
-      };
-    }
-  }, []);
-
-  const handleScanSuccess = async (result: string) => {
-    setIsScanning(false);
-    setError(null);
-    setErrorDebounce(null);
-    setLoading(true);
+  // Handle QR code scan
+  const handleQrCodeScan = async (qrData: string) => {
     try {
-      const { alreadyCheckedIn, visitor } = await checkInVisitorByQr(result, messageApi);
+      setError(null);
+      const { alreadyCheckedIn, visitor } = await checkInVisitorByQr(qrData, messageApi);
       setVisitorInfo(visitor);
       setAlreadyCheckedIn(alreadyCheckedIn);
+      setShowScanner(false);
     } catch (err: any) {
       setError(err.message || 'Failed to process QR code');
-      console.error('Scan success error:', err);
     } finally {
-      setLoading(false);
+      setIsProcessingScan(false);
     }
   };
 
-  const handleScanError = (err: string) => {
-    const normalized = err.toLowerCase();
-    if (
-      !normalized.includes('notfoundexception') &&
-      !normalized.includes('no qr code found') &&
-      !normalized.includes('no multiformat readers were able to detect the code') &&
-      !normalized.includes('no qr code detected') &&
-      !normalized.includes('no barcode or no qr code detected')
-    ) {
-      setError(err);
-      console.error('Scan error:', err);
+  // Helper for safe JSON parsing
+  async function safeJson(response: Response) {
+    try {
+      return await response.json();
+    } catch {
+      return {};
+    }
+  }
+
+  const checkInVisitorByQr = async (qrData: string, messageApi: any) => {
+    try {
+      const visitorId = qrData.trim();
+      if (!visitorId) throw new Error('Invalid QR code data');
+      
+      const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+      if (!objectIdPattern.test(visitorId)) {
+        messageApi.error('Invalid visitor ID format. Please scan a valid QR code.');
+        throw new Error('Invalid visitor ID format. Please scan a valid QR code.');
+      }
+
+      // Check if visitor has already been scanned
+      const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}`);
+      if (!scanCheckResponse.ok) {
+        messageApi.error('Failed to check visitor scan status');
+        throw new Error('Failed to check visitor scan status');
+      }
+      
+      const scanCheckData = await safeJson(scanCheckResponse);
+      if (scanCheckData.exists) {
+        const existingScan = scanCheckData.scan;
+        const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
+          day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
+        });
+        
+        messageApi.warning('Visitor has already been checked in');
+        Modal.warning({
+          title: 'Visitor Already Checked In',
+          content: `Name: ${existingScan.name}\nCompany: ${existingScan.company}\nEvent: ${existingScan.eventName}\nEntry Type: ${existingScan.entryType}\nCheck-in Time: ${scanTime}\nThis visitor has already been checked in!`,
+          okText: 'OK',
+        });
+        return { alreadyCheckedIn: true, visitor: existingScan };
+      }
+
+      // Fetch visitor details
+      const response = await fetch(`/api/visitors/${visitorId}`);
+      if (!response.ok) {
+        let errorMessage = 'Visitor not found.';
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          if (response.status === 500) errorMessage = 'Server error occurred while fetching visitor data.';
+          else if (response.status === 404) errorMessage = 'Visitor not found with the provided ID.';
+        }
+        messageApi.error(errorMessage);
+        throw new Error(errorMessage);
+      }
+
+      const responseData = await safeJson(response);
+      const visitorData = responseData.visitor || responseData;
+
+      if (visitorData.status === 'Visited') {
+        messageApi.warning('Visitor has already been checked in');
+        return { alreadyCheckedIn: true, visitor: visitorData };
+      }
+
+      // Create scan entry
+      const scanData = {
+        visitorId: visitorData._id || visitorData.id || visitorId,
+        eventId: visitorData.eventId,
+        registrationId: visitorData.registrationId,
+        name: visitorData.name,
+        company: visitorData.company,
+        eventName: visitorData.eventName,
+        scanTime: new Date().toISOString(),
+        entryType: 'QR',
+        status: 'Visited',
+        deviceInfo: navigator.userAgent
+      };
+
+      messageApi.loading('Recording entry...');
+      
+      // Record scan data
+      const scanResponse = await fetch('/api/qrscans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(scanData),
+      });
+
+      if (!scanResponse.ok) {
+        const errorData = await safeJson(scanResponse);
+        messageApi.error('Failed to record scan data');
+        throw new Error(errorData.message || 'Failed to record scan data');
+      }
+
+      // Update visitor status
+      const updateResponse = await fetch(`/api/visitors/${visitorId}/check-in`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'Visited', checkInTime: new Date().toISOString() }),
+      });
+
+      if (!updateResponse.ok) {
+        const errorData = await safeJson(updateResponse);
+        // Attempt to mark scan as failed
+        await fetch(`/api/qrscans/${scanData.visitorId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'failed', error: 'Failed to update visitor status' }),
+        });
+        messageApi.error('Failed to update visitor status');
+        throw new Error(errorData.message || 'Failed to update visitor status');
+      }
+
+      messageApi.success(`Visitor ${visitorData.name} checked in successfully`);
+      return { alreadyCheckedIn: false, visitor: { ...visitorData, ...scanData } };
+    } catch (error: any) {
+      messageApi.error(error.message || 'Failed to process QR code');
+      throw error;
     }
   };
 
-  // Always show something, even if states are not ready
-  if (!isClient) {
-    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spin size="large" /><span style={{ marginLeft: 8 }}>Loading client...</span></div>;
-  }
-  if (typeof window === 'undefined') {
-    return <div>Loading window...</div>;
-  }
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
       {contextHolder}
-      {errorDebounce && (
-        <Alert 
-          message="Error" 
-          description={errorDebounce} 
-          type="error" 
-          showIcon 
-          className="mb-4 w-full max-w-md" 
+      {error && (
+        <Alert
+          message="Error"
+          description={error}
+          type="error"
+          showIcon
+          className="mb-4 w-full max-w-md"
         />
       )}
-      {!isScanning && !visitorInfo && (
+      {!visitorInfo && (
         <Button
           type="primary"
           size="large"
-          icon={loading ? <LoadingOutlined /> : <CameraOutlined />}
+          icon={<CameraOutlined />}
           onClick={() => {
-            setIsScanning(true);
+            setShowScanner(true);
             setError(null);
-            setErrorDebounce(null);
             setVisitorInfo(null);
             setAlreadyCheckedIn(false);
           }}
-          loading={loading}
         >
-          Start Scanning
+          Start Scanner
         </Button>
       )}
-      {isScanning && (
-        <QRScanner
-          onScanSuccess={handleScanSuccess}
-          onScanError={handleScanError}
-          isActive={isScanning}
-        />
-      )}
+      <Modal
+        title="QR Code Scanner"
+        open={showScanner}
+        onCancel={() => {
+          setShowScanner(false);
+          setIsProcessingScan(false);
+        }}
+        footer={null}
+        width={400}
+        centered
+        destroyOnClose
+      >
+        <div className="flex flex-col items-center">
+          <div className="w-full aspect-square bg-black rounded-lg overflow-hidden mb-4 relative">
+            <div id={QR_SCANNER_ID} className="w-full h-full"></div>
+            {isProcessingScan && (
+              <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                <div className="text-white text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                  <p>Processing scan...</p>
+                </div>
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-gray-600 text-center mb-2">
+            Position the QR code within the frame to scan
+          </p>
+          <p className="text-xs text-gray-500 text-center">
+            {isProcessingScan ? 'Processing previous scan...' : 'Ready to scan'}
+          </p>
+        </div>
+      </Modal>
       {visitorInfo && (
         <div className="mt-6 w-full max-w-md">
-          <Card 
-            title={alreadyCheckedIn ? 'Visitor Already Checked In' : 'Visitor Checked In'} 
-            bordered={true} 
+          <Card
+            title={alreadyCheckedIn ? 'Visitor Already Checked In' : 'Visitor Checked In'}
+            bordered={true}
             className="mb-4"
           >
             <Descriptions column={1} size="small">
@@ -464,14 +296,13 @@ const MinimalScanByCameraPage: React.FC = () => {
               )}
             </Descriptions>
           </Card>
-          <Button 
-            type="primary" 
+          <Button
+            type="primary"
             block
             onClick={() => {
-              setIsScanning(true);
+              setShowScanner(true);
               setVisitorInfo(null);
               setError(null);
-              setErrorDebounce(null);
               setAlreadyCheckedIn(false);
             }}
           >
@@ -483,4 +314,4 @@ const MinimalScanByCameraPage: React.FC = () => {
   );
 };
 
-export default MinimalScanByCameraPage; 
+export default ScanByCamera; 
