@@ -22,30 +22,21 @@ const QRScanner: React.FC<{
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
   const html5QrCodeRef = useRef<any>(null);
   const scannerContainerId = 'qr-reader-scan-by-camera';
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Ensure container exists, retry if parent not ready
-  const ensureContainer = async (): Promise<HTMLElement | null> => {
-    let attempts = 0;
-    while (attempts < 10) {
-      let container = document.getElementById(scannerContainerId);
-      if (container) return container;
-      if (containerRef.current) {
-        container = document.createElement('div');
-        container.id = scannerContainerId;
-        container.style.width = '100%';
-        container.style.height = '100%';
-        containerRef.current.appendChild(container);
-        return container;
-      }
-      // Wait for parent container to be available
-      await new Promise(res => setTimeout(res, 100));
-      attempts++;
-    }
-    return null;
-  };
+  // Ensure containerReady is set after the parent div is mounted
+  useEffect(() => {
+    setIsClient(true);
+    if (containerRef.current) setContainerReady(true);
+  }, []);
+
+  // If the parent container is not ready, set it as soon as it is mounted
+  useEffect(() => {
+    if (!containerReady && containerRef.current) setContainerReady(true);
+  }, [containerReady, containerRef.current]);
 
   // Cleanup function to properly stop and clear scanner
   const cleanupScanner = async () => {
@@ -55,19 +46,12 @@ const QRScanner: React.FC<{
         await html5QrCodeRef.current.clear();
         html5QrCodeRef.current = null;
       }
-    } catch (err) {
-      // ignore
-    }
+    } catch {}
   };
-
-  useEffect(() => {
-    setIsClient(true);
-    return () => { cleanupScanner(); };
-  }, []);
 
   // Camera initialization
   useEffect(() => {
-    if (!isClient || !isActive) return;
+    if (!isClient || !isActive || !containerReady) return;
     let cancelled = false;
     const initialize = async () => {
       setIsInitializing(true);
@@ -94,11 +78,11 @@ const QRScanner: React.FC<{
     };
     initialize();
     return () => { cancelled = true; };
-  }, [isClient, isActive]);
+  }, [isClient, isActive, containerReady]);
 
   // Start scanner when selectedCamera changes
   useEffect(() => {
-    if (!isClient || !isActive || !selectedCamera) return;
+    if (!isClient || !isActive || !selectedCamera || !containerReady) return;
     let stopped = false;
     let cancelled = false;
     setIsInitializing(true);
@@ -106,7 +90,15 @@ const QRScanner: React.FC<{
     const start = async () => {
       await cleanupScanner();
       await new Promise(res => setTimeout(res, 100));
-      const container = await ensureContainer();
+      // Ensure the container exists
+      let container = document.getElementById(scannerContainerId);
+      if (!container && containerRef.current) {
+        container = document.createElement('div');
+        container.id = scannerContainerId;
+        container.style.width = '100%';
+        container.style.height = '100%';
+        containerRef.current.appendChild(container);
+      }
       if (!container) {
         setError('Failed to create scanner container');
         setIsInitializing(false);
@@ -126,7 +118,6 @@ const QRScanner: React.FC<{
             }
           },
           (errorMessage: string) => {
-            // Only show fatal errors, not 'no qr code found'
             if (
               !/notfoundexception|no qr code found|no multiformat readers were able to detect the code|no qr code detected|no barcode or no qr code detected/i.test(errorMessage)
             ) {
@@ -144,7 +135,7 @@ const QRScanner: React.FC<{
     };
     start();
     return () => { stopped = true; cancelled = true; cleanupScanner(); };
-  }, [selectedCamera, isClient, isActive]);
+  }, [selectedCamera, isClient, isActive, containerReady]);
 
   // Camera change handler
   const handleCameraChange = (cameraId: string) => {
@@ -154,7 +145,7 @@ const QRScanner: React.FC<{
     }
   };
 
-  if (!isClient || !isActive) return null;
+  if (!isClient || !isActive || !containerReady) return null;
   if (isInitializing || loading) {
     return (
       <div className="flex flex-col items-center justify-center">
