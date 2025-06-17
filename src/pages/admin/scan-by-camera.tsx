@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState, useRef } from 'react';
-import { Alert, Button, Spin, Typography, Modal, message } from 'antd';
+import { Alert, Button, Spin, Typography, Modal, message, Card, Descriptions } from 'antd';
 
 const { Text } = Typography;
 
@@ -8,8 +8,7 @@ const MinimalQRScanner: React.FC<{
   onScanSuccess: (result: string) => void;
   onScanError: (error: string) => void;
   isActive: boolean;
-  scannerKey?: string;
-}> = ({ onScanSuccess, onScanError, isActive, scannerKey }) => {
+}> = ({ onScanSuccess, onScanError, isActive }) => {
   const [isClient, setIsClient] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,17 +94,16 @@ const MinimalQRScanner: React.FC<{
           (decodedText: string) => {
             if (!stopped) {
               onScanSuccess(decodedText);
-              // Only stop once
               scanner.stop().catch(() => {});
             }
           },
           (errorMessage: string) => {
-            console.log('QR SCANNER ERROR:', errorMessage); // For debugging
             const normalized = errorMessage.toLowerCase();
             if (
               !normalized.includes('notfoundexception') &&
               !normalized.includes('no qr code found') &&
               !normalized.includes('no multiformat readers were able to detect the code') &&
+              !normalized.includes('no qr code detected') &&
               !normalized.includes('no barcode or no qr code detected')
             ) {
               setError(errorMessage);
@@ -130,7 +128,7 @@ const MinimalQRScanner: React.FC<{
         })();
       }
     };
-  }, [selectedCamera, isClient, onScanSuccess, onScanError, isInitializing, isActive, scannerKey]);
+  }, [selectedCamera, isClient, onScanSuccess, onScanError, isInitializing, isActive]);
 
   if (!isClient || !isActive) {
     return null;
@@ -148,7 +146,7 @@ const MinimalQRScanner: React.FC<{
   );
 };
 
-// Robust JSON parsing helper
+// Helper for safe JSON parsing
 async function safeJson(response: Response) {
   try {
     return await response.json();
@@ -161,23 +159,37 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any) => {
   try {
     const visitorId = qrData.trim();
     if (!visitorId) throw new Error('Invalid QR code data');
+    
     const objectIdPattern = /^[0-9a-fA-F]{24}$/;
-    if (!objectIdPattern.test(visitorId)) throw new Error('Invalid visitor ID format. Please scan a valid QR code.');
+    if (!objectIdPattern.test(visitorId)) {
+      messageApi.error('Invalid visitor ID format. Please scan a valid QR code.');
+      throw new Error('Invalid visitor ID format. Please scan a valid QR code.');
+    }
+
+    // Check if visitor has already been scanned
     const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}`);
-    if (!scanCheckResponse.ok) throw new Error('Failed to check visitor scan status');
+    if (!scanCheckResponse.ok) {
+      messageApi.error('Failed to check visitor scan status');
+      throw new Error('Failed to check visitor scan status');
+    }
+    
     const scanCheckData = await safeJson(scanCheckResponse);
     if (scanCheckData.exists) {
       const existingScan = scanCheckData.scan;
       const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
         day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit',
       });
+      
+      messageApi.warning('Visitor has already been checked in');
       Modal.warning({
         title: 'Visitor Already Checked In',
         content: `Name: ${existingScan.name}\nCompany: ${existingScan.company}\nEvent: ${existingScan.eventName}\nEntry Type: ${existingScan.entryType}\nCheck-in Time: ${scanTime}\nThis visitor has already been checked in!`,
         okText: 'OK',
       });
-      return undefined;
+      return { alreadyCheckedIn: true, visitor: existingScan };
     }
+
+    // Fetch visitor details
     const response = await fetch(`/api/visitors/${visitorId}`);
     if (!response.ok) {
       let errorMessage = 'Visitor not found.';
@@ -188,19 +200,19 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any) => {
         if (response.status === 500) errorMessage = 'Server error occurred while fetching visitor data.';
         else if (response.status === 404) errorMessage = 'Visitor not found with the provided ID.';
       }
+      messageApi.error(errorMessage);
       throw new Error(errorMessage);
     }
-    let responseData;
-    try {
-      responseData = await response.json();
-    } catch {
-      throw new Error('Invalid response format from server.');
-    }
+
+    const responseData = await safeJson(response);
     const visitorData = responseData.visitor || responseData;
+
     if (visitorData.status === 'Visited') {
       messageApi.warning('Visitor has already been checked in');
-      return undefined;
+      return { alreadyCheckedIn: true, visitor: visitorData };
     }
+
+    // Create scan entry
     const scanData = {
       visitorId: visitorData._id || visitorData.id || visitorId,
       eventId: visitorData.eventId,
@@ -213,31 +225,43 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any) => {
       status: 'Visited',
       deviceInfo: navigator.userAgent
     };
+
+    messageApi.loading('Recording entry...');
+    
+    // Record scan data
     const scanResponse = await fetch('/api/qrscans', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(scanData),
     });
+
     if (!scanResponse.ok) {
       const errorData = await safeJson(scanResponse);
+      messageApi.error('Failed to record scan data');
       throw new Error(errorData.message || 'Failed to record scan data');
     }
+
+    // Update visitor status
     const updateResponse = await fetch(`/api/visitors/${visitorId}/check-in`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'Visited', checkInTime: new Date().toISOString() }),
     });
+
     if (!updateResponse.ok) {
       const errorData = await safeJson(updateResponse);
+      // Attempt to mark scan as failed
       await fetch(`/api/qrscans/${scanData.visitorId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'failed', error: 'Failed to update visitor status' }),
       });
+      messageApi.error('Failed to update visitor status');
       throw new Error(errorData.message || 'Failed to update visitor status');
     }
+
     messageApi.success(`Visitor ${visitorData.name} checked in successfully`);
-    return visitorData;
+    return { alreadyCheckedIn: false, visitor: { ...visitorData, ...scanData } };
   } catch (error: any) {
     messageApi.error(error.message || 'Failed to process QR code');
     throw error;
@@ -247,12 +271,13 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any) => {
 const MinimalScanByCameraPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const [lastResult, setLastResult] = useState<string | null>(null);
+  const [visitorInfo, setVisitorInfo] = useState<any | null>(null);
+  const [alreadyCheckedIn, setAlreadyCheckedIn] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
   const [errorDebounce, setErrorDebounce] = useState<string | null>(null);
-  // Debounce error messages
+
   useEffect(() => {
     if (error) {
       const timeout = setTimeout(() => setErrorDebounce(error), 100);
@@ -286,10 +311,9 @@ const MinimalScanByCameraPage: React.FC = () => {
     setErrorDebounce(null);
     setLoading(true);
     try {
-      const checkinResult = await checkInVisitorByQr(result, messageApi);
-      if (checkinResult) {
-        setLastResult(result);
-      }
+      const { alreadyCheckedIn, visitor } = await checkInVisitorByQr(result, messageApi);
+      setVisitorInfo(visitor);
+      setAlreadyCheckedIn(alreadyCheckedIn);
     } catch (err: any) {
       setError(err.message || 'Failed to process QR code');
     } finally {
@@ -302,7 +326,8 @@ const MinimalScanByCameraPage: React.FC = () => {
       !normalized.includes('notfoundexception') &&
       !normalized.includes('no qr code found') &&
       !normalized.includes('no multiformat readers were able to detect the code') &&
-      !normalized.includes('no qr code detected')
+      !normalized.includes('no qr code detected') &&
+      !normalized.includes('no barcode or no qr code detected')
     ) {
       setError(err);
     }
@@ -313,31 +338,35 @@ const MinimalScanByCameraPage: React.FC = () => {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
       {contextHolder}
       {errorDebounce && <Alert message="Error" description={errorDebounce} type="error" showIcon style={{ marginBottom: 16 }} />}
-      {!isScanning && !lastResult && (
-        <Button type="primary" size="large" onClick={() => { setIsScanning(true); setError(null); setErrorDebounce(null); setLastResult(null); }} loading={loading}>
+      {!isScanning && !visitorInfo && (
+        <Button type="primary" size="large" onClick={() => { setIsScanning(true); setError(null); setErrorDebounce(null); setVisitorInfo(null); setAlreadyCheckedIn(false); }} loading={loading}>
           Start Scanning
         </Button>
       )}
       {isScanning && (
         <MinimalQRScanner
-          key={isScanning ? 'active' : 'inactive'}
           onScanSuccess={handleScanSuccess}
           onScanError={handleScanError}
           isActive={isScanning}
         />
       )}
-      {lastResult && (
-        <div style={{ marginTop: 24, textAlign: 'center' }}>
-          <Alert message="Scan Result" description={lastResult} type="success" showIcon style={{ marginBottom: 16 }} />
-          <Button type="primary" onClick={() => { setIsScanning(true); setLastResult(null); setError(null); }}>
+      {visitorInfo && (
+        <div style={{ marginTop: 24, textAlign: 'center', maxWidth: 400 }}>
+          <Card title={alreadyCheckedIn ? 'Visitor Already Checked In' : 'Visitor Checked In'} bordered={true} style={{ marginBottom: 16 }}>
+            <Descriptions column={1} size="small">
+              <Descriptions.Item label="Name">{visitorInfo.name}</Descriptions.Item>
+              <Descriptions.Item label="Company">{visitorInfo.company}</Descriptions.Item>
+              <Descriptions.Item label="Event">{visitorInfo.eventName}</Descriptions.Item>
+              <Descriptions.Item label="Status">{visitorInfo.status}</Descriptions.Item>
+              <Descriptions.Item label="Visitor ID">{visitorInfo.visitorId || visitorInfo._id}</Descriptions.Item>
+              {visitorInfo.scanTime && <Descriptions.Item label="Scan Time">{new Date(visitorInfo.scanTime).toLocaleString('en-GB')}</Descriptions.Item>}
+            </Descriptions>
+          </Card>
+          <Button type="primary" onClick={() => { setIsScanning(true); setVisitorInfo(null); setError(null); setErrorDebounce(null); setAlreadyCheckedIn(false); }}>
             Scan Another Code
           </Button>
         </div>
       )}
-      {/*
-      // If using Next.js App Router, consider:
-      // export default dynamic(() => Promise.resolve(MinimalScanByCameraPage), { ssr: false });
-      */}
     </div>
   );
 };
