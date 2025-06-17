@@ -149,16 +149,7 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (
       });
       Modal.warning({
         title: 'Visitor Already Checked In',
-        content: (
-          <div className="text-center">
-            <p className="text-lg font-semibold mb-2">{existingScan.name}</p>
-            <p className="text-sm text-gray-600 mb-2">Company: {existingScan.company}</p>
-            <p className="text-sm text-gray-600 mb-2">Event: {existingScan.eventName}</p>
-            <p className="text-sm text-gray-600 mb-2">Entry Type: {existingScan.entryType}</p>
-            <p className="text-sm text-gray-600 mb-2">Check-in Time: {scanTime}</p>
-            <p className="text-sm text-red-600 font-semibold">This visitor has already been checked in!</p>
-          </div>
-        ),
+        content: `Name: ${existingScan.name}\nCompany: ${existingScan.company}\nEvent: ${existingScan.eventName}\nEntry Type: ${existingScan.entryType}\nCheck-in Time: ${scanTime}\nThis visitor has already been checked in!`,
         okText: 'OK',
       });
       return undefined;
