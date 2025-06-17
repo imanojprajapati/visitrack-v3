@@ -8,7 +8,8 @@ const MinimalQRScanner: React.FC<{
   onScanSuccess: (result: string) => void;
   onScanError: (error: string) => void;
   isActive: boolean;
-}> = ({ onScanSuccess, onScanError, isActive }) => {
+  scannerKey?: string;
+}> = ({ onScanSuccess, onScanError, isActive, scannerKey }) => {
   const [isClient, setIsClient] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -83,7 +84,7 @@ const MinimalQRScanner: React.FC<{
   useEffect(() => {
     if (!isClient || !selectedCamera || isInitializing || !isActive) return;
     let stopped = false;
-    const startScanner = async () => {
+    (async () => {
       try {
         const { Html5Qrcode } = await import('html5-qrcode');
         const scanner = new Html5Qrcode('qr-reader-scan-by-camera');
@@ -94,6 +95,7 @@ const MinimalQRScanner: React.FC<{
           (decodedText: string) => {
             if (!stopped) {
               onScanSuccess(decodedText);
+              // Only stop once
               scanner.stop().catch(() => {});
             }
           },
@@ -108,17 +110,20 @@ const MinimalQRScanner: React.FC<{
         setError('Failed to start QR scanner.');
         onScanError('Failed to start QR scanner.');
       }
-    };
-    startScanner();
+    })();
     return () => {
       stopped = true;
       if (html5QrCodeRef.current) {
-        html5QrCodeRef.current.stop().catch(() => {});
-        html5QrCodeRef.current.clear();
-        html5QrCodeRef.current = null;
+        (async () => {
+          try {
+            await html5QrCodeRef.current.stop();
+            await html5QrCodeRef.current.clear();
+          } catch {}
+          html5QrCodeRef.current = null;
+        })();
       }
     };
-  }, [selectedCamera, isClient, onScanSuccess, onScanError, isInitializing, isActive]);
+  }, [selectedCamera, isClient, onScanSuccess, onScanError, isInitializing, isActive, scannerKey]);
 
   if (!isClient || !isActive) {
     return null;
@@ -129,19 +134,31 @@ const MinimalQRScanner: React.FC<{
   if (error) {
     return <Alert message="Error" description={error} type="error" showIcon />;
   }
-  return <div id="qr-reader-scan-by-camera" style={{ width: 250, height: 250, background: '#000' }} />;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 250, height: 250, background: '#000' }}>
+      <div id="qr-reader-scan-by-camera" style={{ width: 250, height: 250 }} />
+    </div>
+  );
 };
 
-const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (v: boolean) => void) => {
+// Robust JSON parsing helper
+async function safeJson(response: Response) {
+  try {
+    return await response.json();
+  } catch {
+    return {};
+  }
+}
+
+const checkInVisitorByQr = async (qrData: string, messageApi: any) => {
   try {
     const visitorId = qrData.trim();
     if (!visitorId) throw new Error('Invalid QR code data');
     const objectIdPattern = /^[0-9a-fA-F]{24}$/;
     if (!objectIdPattern.test(visitorId)) throw new Error('Invalid visitor ID format. Please scan a valid QR code.');
-    setLoading(true);
     const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}`);
     if (!scanCheckResponse.ok) throw new Error('Failed to check visitor scan status');
-    const scanCheckData = await scanCheckResponse.json();
+    const scanCheckData = await safeJson(scanCheckResponse);
     if (scanCheckData.exists) {
       const existingScan = scanCheckData.scan;
       const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
@@ -195,7 +212,7 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (
       body: JSON.stringify(scanData),
     });
     if (!scanResponse.ok) {
-      const errorData = await scanResponse.json();
+      const errorData = await safeJson(scanResponse);
       throw new Error(errorData.message || 'Failed to record scan data');
     }
     const updateResponse = await fetch(`/api/visitors/${visitorId}/check-in`, {
@@ -204,7 +221,7 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (
       body: JSON.stringify({ status: 'Visited', checkInTime: new Date().toISOString() }),
     });
     if (!updateResponse.ok) {
-      const errorData = await updateResponse.json();
+      const errorData = await safeJson(updateResponse);
       await fetch(`/api/qrscans/${scanData.visitorId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -217,8 +234,6 @@ const checkInVisitorByQr = async (qrData: string, messageApi: any, setLoading: (
   } catch (error: any) {
     messageApi.error(error.message || 'Failed to process QR code');
     throw error;
-  } finally {
-    setLoading(false);
   }
 };
 
@@ -229,21 +244,33 @@ const MinimalScanByCameraPage: React.FC = () => {
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(false);
   const [messageApi, contextHolder] = message.useMessage();
+  const [errorDebounce, setErrorDebounce] = useState<string | null>(null);
+  // Debounce error messages
+  useEffect(() => {
+    if (error) {
+      const timeout = setTimeout(() => setErrorDebounce(error), 100);
+      return () => clearTimeout(timeout);
+    } else {
+      setErrorDebounce(null);
+    }
+  }, [error]);
 
   useEffect(() => {
     setIsClient(true);
-    window.onerror = function (msg, url, line, col, err) {
-      setError(`Global error: ${msg} at ${url}:${line}:${col} - ${err && err.stack ? err.stack : ''}`);
-      return true;
-    };
-    window.onunhandledrejection = function (event) {
-      setError(`Unhandled promise rejection: ${event.reason && event.reason.stack ? event.reason.stack : event.reason}`);
-      return true;
-    };
-    return () => {
-      window.onerror = null;
-      window.onunhandledrejection = null;
-    };
+    if (typeof window !== 'undefined') {
+      window.onerror = function (msg, url, line, col, err) {
+        setError(`Global error: ${msg} at ${url}:${line}:${col} - ${err && err.stack ? err.stack : ''}`);
+        return true;
+      };
+      window.onunhandledrejection = function (event) {
+        setError(`Unhandled promise rejection: ${event.reason && event.reason.stack ? event.reason.stack : event.reason}`);
+        return true;
+      };
+      return () => {
+        window.onerror = null;
+        window.onunhandledrejection = null;
+      };
+    }
   }, []);
 
   const handleScanSuccess = async (result: string) => {
@@ -251,7 +278,7 @@ const MinimalScanByCameraPage: React.FC = () => {
     setError(null);
     setLoading(true);
     try {
-      const checkinResult = await checkInVisitorByQr(result, messageApi, setLoading);
+      const checkinResult = await checkInVisitorByQr(result, messageApi);
       if (checkinResult) {
         setLastResult(result);
       }
@@ -269,7 +296,7 @@ const MinimalScanByCameraPage: React.FC = () => {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
       {contextHolder}
-      {error && <Alert message="Error" description={error} type="error" showIcon style={{ marginBottom: 16 }} />}
+      {errorDebounce && <Alert message="Error" description={errorDebounce} type="error" showIcon style={{ marginBottom: 16 }} />}
       {!isScanning && !lastResult && (
         <Button type="primary" size="large" onClick={() => { setIsScanning(true); setError(null); setLastResult(null); }} loading={loading}>
           Start Scanning
@@ -277,6 +304,7 @@ const MinimalScanByCameraPage: React.FC = () => {
       )}
       {isScanning && (
         <MinimalQRScanner
+          key={isScanning ? 'active' : 'inactive'}
           onScanSuccess={handleScanSuccess}
           onScanError={handleScanError}
           isActive={isScanning}
@@ -290,6 +318,10 @@ const MinimalScanByCameraPage: React.FC = () => {
           </Button>
         </div>
       )}
+      {/*
+      // If using Next.js App Router, consider:
+      // export default dynamic(() => Promise.resolve(MinimalScanByCameraPage), { ssr: false });
+      */}
     </div>
   );
 };
