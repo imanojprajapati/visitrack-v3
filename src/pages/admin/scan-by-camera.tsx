@@ -1,3 +1,4 @@
+"use client"
 import React, { useEffect, useState, useRef } from 'react';
 import { message, Alert, Typography, Space, Modal, Button, Spin, Card } from 'antd';
 import Head from 'next/head';
@@ -47,18 +48,26 @@ const QRScannerComponent: React.FC<{
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const html5QrCodeRef = useRef<any>(null);
+  const [iosSafari, setIosSafari] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
+    // Detect iOS Safari
+    if (typeof window !== 'undefined') {
+      const ua = window.navigator.userAgent;
+      const isIOS = /iPad|iPhone|iPod/.test(ua);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(ua);
+      setIosSafari(isIOS && isSafari);
+    }
+    console.log('[QRScannerComponent] isClient:', isClient, 'isActive:', isActive);
   }, []);
 
   useEffect(() => {
     if (!isClient || !isActive) return;
-
+    console.log('[QRScannerComponent] Initializing scanner...');
     const initializeScanner = async () => {
       try {
         setIsInitializing(true);
-        
         // Check if we're in a secure context
         if (!window.isSecureContext) {
           const errorMsg = 'Camera access requires a secure connection (HTTPS). Please use HTTPS or localhost.';
@@ -66,7 +75,6 @@ const QRScannerComponent: React.FC<{
           onScanError(errorMsg);
           return;
         }
-
         // Check if getUserMedia is supported
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
           const errorMsg = 'Camera access is not supported in this browser.';
@@ -74,10 +82,8 @@ const QRScannerComponent: React.FC<{
           onScanError(errorMsg);
           return;
         }
-
         // Check if we're on mobile
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        
         if (isMobile) {
           // Request camera permissions on mobile
           try {
@@ -89,33 +95,48 @@ const QRScannerComponent: React.FC<{
             return;
           }
         }
-
         // Import and initialize Html5Qrcode
-        const { Html5Qrcode } = await import('html5-qrcode');
-        const devices = await Html5Qrcode.getCameras();
-        
-        if (devices && devices.length > 0) {
-          setCameras(devices);
-          
-          // Prefer back camera on mobile
-          let cameraId = devices[0].id;
-          if (isMobile) {
-            const backCam = devices.find((d: any) => 
-              d.label.toLowerCase().includes('back') || 
-              d.label.toLowerCase().includes('rear') ||
-              d.label.toLowerCase().includes('environment')
-            );
-            if (backCam) {
-              cameraId = backCam.id;
-            }
-          }
-          
-          setSelectedCamera(cameraId);
-        } else {
-          const errorMsg = 'No cameras found on this device.';
+        let Html5Qrcode;
+        try {
+          Html5Qrcode = (await import('html5-qrcode')).Html5Qrcode;
+        } catch (importErr) {
+          const errorMsg = 'Failed to load QR code scanner library.';
           setError(errorMsg);
           onScanError(errorMsg);
+          return;
         }
+        let devices;
+        try {
+          devices = await Html5Qrcode.getCameras();
+        } catch (camErr) {
+          const errorMsg = 'Unable to access camera devices. Please check browser permissions.';
+          setError(errorMsg);
+          onScanError(errorMsg);
+          return;
+        }
+        if (!devices || devices.length === 0) {
+          let errorMsg = 'No cameras found on this device.';
+          if (iosSafari) {
+            errorMsg += ' On iOS Safari, camera access is only available via Safari, not in-app browsers.';
+          }
+          setError(errorMsg);
+          onScanError(errorMsg);
+          return;
+        }
+        setCameras(devices);
+        // Prefer back camera on mobile
+        let cameraId = devices[0].id;
+        if (isMobile) {
+          const backCam = devices.find((d: any) => 
+            d.label.toLowerCase().includes('back') || 
+            d.label.toLowerCase().includes('rear') ||
+            d.label.toLowerCase().includes('environment')
+          );
+          if (backCam) {
+            cameraId = backCam.id;
+          }
+        }
+        setSelectedCamera(cameraId);
       } catch (err) {
         console.error('Error initializing scanner:', err);
         const errorMsg = err instanceof Error ? err.message : 'Failed to initialize camera';
@@ -125,13 +146,12 @@ const QRScannerComponent: React.FC<{
         setIsInitializing(false);
       }
     };
-
     initializeScanner();
-  }, [isClient, isActive, onScanError]);
+  }, [isClient, isActive, onScanError, iosSafari]);
 
   useEffect(() => {
     if (!isClient || !selectedCamera || isInitializing || !isActive) return;
-
+    console.log('[QRScannerComponent] Starting scanner with camera:', selectedCamera);
     let stopped = false;
     const startScanner = async () => {
       try {
@@ -192,10 +212,12 @@ const QRScannerComponent: React.FC<{
   }, [selectedCamera, isClient, onScanSuccess, onScanError, isInitializing, isActive]);
 
   if (!isClient || !isActive) {
-    return null;
+    console.log('[QRScannerComponent] Not client or not active, returning null');
+    return <div data-debug="not-client-or-not-active" />;
   }
 
   if (isInitializing) {
+    console.log('[QRScannerComponent] Initializing...');
     return (
       <div className="flex justify-center items-center h-64">
         <div className="text-center">
@@ -208,6 +230,7 @@ const QRScannerComponent: React.FC<{
   }
 
   if (error) {
+    console.log('[QRScannerComponent] Error:', error);
     return (
       <Alert
         message="Error"
@@ -295,9 +318,11 @@ const ScanByCameraPage: React.FC = () => {
 
   useEffect(() => {
     setIsClient(true);
+    console.log('[ScanByCameraPage] Mounted, setIsClient true');
   }, []);
 
   const handleScanSuccess = async (qrData: string) => {
+    console.log('[ScanByCameraPage] handleScanSuccess', qrData);
     try {
       // Extract visitor ID from QR code
       const visitorId = qrData.trim();
@@ -484,29 +509,33 @@ const ScanByCameraPage: React.FC = () => {
         }
       });
     } catch (error) {
-      console.error('Error scanning QR code:', error);
+      console.error('[ScanByCameraPage] Error scanning QR code:', error);
       message.error(error instanceof Error ? error.message : 'Failed to process QR code');
       setIsProcessing(false);
     }
   };
 
   const handleScanError = (error: string) => {
+    console.error('[ScanByCameraPage] handleScanError', error);
     setError(error);
   };
 
   const handleStartScan = () => {
+    console.log('[ScanByCameraPage] handleStartScan');
     setIsScanning(true);
     setError(null);
     setLastScanResult(null);
   };
 
   const handleScanAnother = () => {
+    console.log('[ScanByCameraPage] handleScanAnother');
     setLastScanResult(null);
     setIsScanning(true);
     setError(null);
   };
 
   if (!isClient) {
+    console.log('[ScanByCameraPage] Not client, loading spinner');
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#4f46e5] to-[#6366f1] p-2">
         <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-4 flex flex-col items-center">
