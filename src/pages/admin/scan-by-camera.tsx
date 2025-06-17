@@ -25,23 +25,77 @@ const QRScanner: React.FC<{
   const html5QrCodeRef = useRef<any>(null);
   const scannerContainerId = 'qr-reader-scan-by-camera';
   const containerRef = useRef<HTMLDivElement>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  // Helper function to check if a camera device is available
+  const checkCameraAvailability = async (deviceId?: string): Promise<boolean> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: deviceId ? { deviceId: { exact: deviceId } } : true
+      });
+      
+      // Stop the test stream immediately
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch (err) {
+      console.error('Camera availability check failed:', err);
+      return false;
+    }
+  };
+
+  // Helper function to get the best available camera
+  const getBestCamera = async (devices: CameraDevice[]): Promise<string | null> => {
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    
+    // Try back camera first on mobile
+    if (isMobile) {
+      const backCamera = devices.find(device => 
+        device.label.toLowerCase().includes('back') || 
+        device.label.toLowerCase().includes('rear') ||
+        device.label.toLowerCase().includes('environment')
+      );
+      
+      if (backCamera && await checkCameraAvailability(backCamera.id)) {
+        return backCamera.id;
+      }
+    }
+
+    // Try each camera in order until we find one that works
+    for (const device of devices) {
+      if (await checkCameraAvailability(device.id)) {
+        return device.id;
+      }
+    }
+
+    return null;
+  };
 
   // Cleanup function to properly stop and clear scanner
   const cleanupScanner = async () => {
-    if (html5QrCodeRef.current) {
-      try {
+    try {
+      if (html5QrCodeRef.current) {
         await html5QrCodeRef.current.stop();
         await html5QrCodeRef.current.clear();
         html5QrCodeRef.current = null;
-      } catch (err) {
-        console.error('Error cleaning up scanner:', err);
       }
+
+      // Cleanup any existing video streams
+      if (videoRef.current && videoRef.current.srcObject) {
+        const stream = videoRef.current.srcObject as MediaStream;
+        stream.getTracks().forEach(track => track.stop());
+        videoRef.current.srcObject = null;
+      }
+    } catch (err) {
+      console.error('Error cleaning up scanner:', err);
     }
   };
+
+  useEffect(() => {
+    setIsClient(true);
+    return () => {
+      cleanupScanner();
+    };
+  }, []);
 
   useEffect(() => {
     if (!isClient || !isActive) return;
@@ -52,7 +106,6 @@ const QRScanner: React.FC<{
         setLoading(true);
         setError(null);
 
-        // Ensure scanner is cleaned up before initializing
         await cleanupScanner();
 
         // Check for secure context
@@ -61,45 +114,44 @@ const QRScanner: React.FC<{
         }
 
         // Check for camera support
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        if (!navigator.mediaDevices?.getUserMedia) {
           throw new Error('Camera access is not supported in this browser. Please try using Chrome or Firefox.');
-        }
-
-        // Request camera permissions
-        try {
-          await navigator.mediaDevices.getUserMedia({ 
-            video: { 
-              facingMode: 'environment'  // Prefer back camera
-            } 
-          });
-        } catch (permError) {
-          throw new Error('Camera permission denied. Please allow camera access in your browser settings and refresh the page.');
         }
 
         // Import Html5Qrcode
         const { Html5Qrcode } = await import('html5-qrcode');
 
-        // Get available cameras
-        const devices = await Html5Qrcode.getCameras();
-        
+        // Get available cameras with retry
+        let devices: MediaDeviceInfo[] = [];
+        try {
+          // Try to get cameras with a retry mechanism
+          for (let i = 0; i < 3; i++) {
+            try {
+              devices = await Html5Qrcode.getCameras();
+              if (devices.length > 0) break;
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            } catch (e) {
+              console.warn('Attempt', i + 1, 'to get cameras failed:', e);
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          }
+        } catch (err) {
+          console.error('Failed to get cameras after retries:', err);
+        }
+
         if (!devices || devices.length === 0) {
-          throw new Error('No cameras found on this device. Please ensure your camera is not being used by another application.');
+          throw new Error('No cameras found. Please ensure camera permissions are granted and your camera is not being used by another application.');
         }
 
         setCameras(devices);
 
-        // Try to select back camera by default on mobile
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        if (isMobile) {
-          const backCamera = devices.find(device => 
-            device.label.toLowerCase().includes('back') || 
-            device.label.toLowerCase().includes('rear') ||
-            device.label.toLowerCase().includes('environment')
-          );
-          setSelectedCamera(backCamera ? backCamera.id : devices[0].id);
-        } else {
-          setSelectedCamera(devices[0].id);
+        // Find the best available camera
+        const bestCameraId = await getBestCamera(devices);
+        if (!bestCameraId) {
+          throw new Error('No working cameras found. Please check your camera connections and permissions.');
         }
+
+        setSelectedCamera(bestCameraId);
 
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : 'Failed to initialize camera';
@@ -113,11 +165,6 @@ const QRScanner: React.FC<{
     };
 
     initializeScanner();
-
-    // Cleanup on unmount or when scanner is deactivated
-    return () => {
-      cleanupScanner();
-    };
   }, [isClient, isActive, onScanError]);
 
   useEffect(() => {
@@ -127,11 +174,14 @@ const QRScanner: React.FC<{
 
     const startScanner = async () => {
       try {
-        // Ensure previous scanner instance is cleaned up
         await cleanupScanner();
-
-        // Wait for a short time to ensure DOM is ready
         await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Verify camera is still available
+        const isAvailable = await checkCameraAvailability(selectedCamera);
+        if (!isAvailable) {
+          throw new Error('Selected camera is no longer available. Please try another camera or refresh the page.');
+        }
 
         // Create scanner container if it doesn't exist
         let container = document.getElementById(scannerContainerId);
@@ -164,8 +214,10 @@ const QRScanner: React.FC<{
             aspectRatio: 1.0,
             disableFlip: false,
             videoConstraints: {
-              deviceId: selectedCamera,
-              facingMode: "environment"
+              deviceId: { exact: selectedCamera },
+              facingMode: "environment",
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
             }
           },
           (decodedText: string) => {
@@ -188,7 +240,16 @@ const QRScanner: React.FC<{
               onScanError(errorMessage);
             }
           }
-        );
+        ).catch((err) => {
+          console.error('Error starting scanner:', err);
+          if (err.toString().includes('could not start video source')) {
+            setError('Could not start camera. Please ensure no other application is using your camera and try again.');
+            onScanError('Could not start camera. Please ensure no other application is using your camera and try again.');
+          } else {
+            throw err;
+          }
+        });
+
       } catch (err) {
         const errorMsg = err instanceof Error ? 
           err.message : 
