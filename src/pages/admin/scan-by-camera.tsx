@@ -342,6 +342,7 @@ const MinimalScanByCameraPage: React.FC = () => {
 
   useEffect(() => {
     if (error) {
+      console.error('MinimalScanByCameraPage error:', error);
       const timeout = setTimeout(() => setErrorDebounce(error), 100);
       return () => clearTimeout(timeout);
     } else {
@@ -354,10 +355,12 @@ const MinimalScanByCameraPage: React.FC = () => {
     if (typeof window !== 'undefined') {
       window.onerror = function (msg, url, line, col, err) {
         setError(`Global error: ${msg} at ${url}:${line}:${col} - ${err && err.stack ? err.stack : ''}`);
+        console.error('Global error:', msg, url, line, col, err);
         return true;
       };
       window.onunhandledrejection = function (event) {
         setError(`Unhandled promise rejection: ${event.reason && event.reason.stack ? event.reason.stack : event.reason}`);
+        console.error('Unhandled promise rejection:', event);
         return true;
       };
       return () => {
@@ -378,6 +381,7 @@ const MinimalScanByCameraPage: React.FC = () => {
       setAlreadyCheckedIn(alreadyCheckedIn);
     } catch (err: any) {
       setError(err.message || 'Failed to process QR code');
+      console.error('Scan success error:', err);
     } finally {
       setLoading(false);
     }
@@ -393,13 +397,18 @@ const MinimalScanByCameraPage: React.FC = () => {
       !normalized.includes('no barcode or no qr code detected')
     ) {
       setError(err);
+      console.error('Scan error:', err);
     }
   };
+
+  // Always show something, even if states are not ready
+  if (!isClient) {
+    return <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Spin size="large" /><span style={{ marginLeft: 8 }}>Loading client...</span></div>;
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4">
       {contextHolder}
-      
       {errorDebounce && (
         <Alert 
           message="Error" 
@@ -409,7 +418,6 @@ const MinimalScanByCameraPage: React.FC = () => {
           className="mb-4 w-full max-w-md" 
         />
       )}
-
       {!isScanning && !visitorInfo && (
         <Button
           type="primary"
@@ -427,7 +435,6 @@ const MinimalScanByCameraPage: React.FC = () => {
           Start Scanning
         </Button>
       )}
-
       {isScanning && (
         <QRScanner
           onScanSuccess={handleScanSuccess}
@@ -435,7 +442,6 @@ const MinimalScanByCameraPage: React.FC = () => {
           isActive={isScanning}
         />
       )}
-
       {visitorInfo && (
         <div className="mt-6 w-full max-w-md">
           <Card 
@@ -456,7 +462,6 @@ const MinimalScanByCameraPage: React.FC = () => {
               )}
             </Descriptions>
           </Card>
-          
           <Button 
             type="primary" 
             block
