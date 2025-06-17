@@ -137,9 +137,17 @@ const QRScanner: React.FC<{
     initializeScanner();
   }, [isClient, isActive, onScanError]);
 
+  // Camera change handler: restart scanner with new camera
+  const handleCameraChange = (cameraId: string) => {
+    setSelectedCamera(cameraId);
+  };
+
+  // Track when selectedCamera changes and restart scanner
   useEffect(() => {
     if (!isClient || !selectedCamera || isInitializing || !isActive) return;
     let stopped = false;
+    let cancelled = false;
+    setIsInitializing(true);
     const startScanner = async () => {
       try {
         await cleanupScanner();
@@ -216,18 +224,17 @@ const QRScanner: React.FC<{
         console.error('Scanner start error:', err);
         setError(errorMsg);
         onScanError(errorMsg);
+      } finally {
+        if (!cancelled) setIsInitializing(false);
       }
     };
     startScanner();
     return () => {
       stopped = true;
+      cancelled = true;
       cleanupScanner();
     };
-  }, [selectedCamera, isClient, onScanSuccess, onScanError, isInitializing, isActive]);
-
-  const handleCameraChange = (cameraId: string) => {
-    setSelectedCamera(cameraId);
-  };
+  }, [selectedCamera, isClient, onScanSuccess, onScanError, isActive]);
 
   if (!isClient || !isActive) {
     return null;
@@ -266,6 +273,7 @@ const QRScanner: React.FC<{
               label: camera.label || `Camera ${camera.id}`,
               value: camera.id
             }))}
+            disabled={isInitializing || loading}
           />
         </Space>
       )}
