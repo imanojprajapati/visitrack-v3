@@ -100,7 +100,11 @@ const MinimalQRScanner: React.FC<{
             }
           },
           (errorMessage: string) => {
-            if (!errorMessage.includes('NotFoundException') && !errorMessage.includes('No QR code found')) {
+            if (
+              !errorMessage.includes('NotFoundException') &&
+              !errorMessage.includes('No QR code found') &&
+              !errorMessage.includes('No multiformat readers were able to detect the code')
+            ) {
               setError(errorMessage);
               onScanError(errorMessage);
             }
