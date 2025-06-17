@@ -100,14 +100,9 @@ const MinimalQRScanner: React.FC<{
             }
           },
           (errorMessage: string) => {
-            if (
-              !errorMessage.includes('NotFoundException') &&
-              !errorMessage.includes('No QR code found') &&
-              !errorMessage.includes('No multiformat readers were able to detect the code')
-            ) {
-              setError(errorMessage);
-              onScanError(errorMessage);
-            }
+            // Show all errors in the UI, including 'No multiformat readers were able to detect the code'
+            setError(errorMessage);
+            onScanError(errorMessage);
           }
         );
       } catch (err) {
@@ -302,7 +297,7 @@ const MinimalScanByCameraPage: React.FC = () => {
       {contextHolder}
       {errorDebounce && <Alert message="Error" description={errorDebounce} type="error" showIcon style={{ marginBottom: 16 }} />}
       {!isScanning && !lastResult && (
-        <Button type="primary" size="large" onClick={() => { setIsScanning(true); setError(null); setLastResult(null); }} loading={loading}>
+        <Button type="primary" size="large" onClick={() => { setIsScanning(true); setError(null); setErrorDebounce(null); setLastResult(null); }} loading={loading}>
           Start Scanning
         </Button>
       )}
