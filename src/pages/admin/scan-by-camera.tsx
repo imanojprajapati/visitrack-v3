@@ -24,6 +24,7 @@ const QRScanner: React.FC<{
   const [loading, setLoading] = useState(false);
   const html5QrCodeRef = useRef<any>(null);
   const scannerContainerId = 'qr-reader-scan-by-camera';
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -53,7 +54,7 @@ const QRScanner: React.FC<{
 
         // Ensure scanner is cleaned up before initializing
         await cleanupScanner();
-        
+
         // Check for secure context
         if (!window.isSecureContext) {
           throw new Error('Camera access requires HTTPS or localhost. Please use a secure connection.');
@@ -77,12 +78,6 @@ const QRScanner: React.FC<{
 
         // Import Html5Qrcode
         const { Html5Qrcode } = await import('html5-qrcode');
-        
-        // Ensure the container element exists
-        const container = document.getElementById(scannerContainerId);
-        if (!container) {
-          throw new Error('Scanner container element not found. Please refresh the page.');
-        }
 
         // Get available cameras
         const devices = await Html5Qrcode.getCameras();
@@ -135,14 +130,24 @@ const QRScanner: React.FC<{
         // Ensure previous scanner instance is cleaned up
         await cleanupScanner();
 
-        const { Html5Qrcode } = await import('html5-qrcode');
-        
-        // Ensure the container element exists
-        const container = document.getElementById(scannerContainerId);
-        if (!container) {
-          throw new Error('Scanner container element not found');
+        // Wait for a short time to ensure DOM is ready
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Create scanner container if it doesn't exist
+        let container = document.getElementById(scannerContainerId);
+        if (!container && containerRef.current) {
+          container = document.createElement('div');
+          container.id = scannerContainerId;
+          container.style.width = '100%';
+          container.style.height = '100%';
+          containerRef.current.appendChild(container);
         }
 
+        if (!container) {
+          throw new Error('Failed to create or find scanner container');
+        }
+
+        const { Html5Qrcode } = await import('html5-qrcode');
         const scanner = new Html5Qrcode(scannerContainerId);
         html5QrCodeRef.current = scanner;
 
@@ -247,20 +252,25 @@ const QRScanner: React.FC<{
         </Space>
       )}
       <div 
+        ref={containerRef}
         style={{ 
           width: '100%',
           maxWidth: '300px',
           aspectRatio: '1',
           background: '#000',
           borderRadius: '8px',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          position: 'relative'
         }}
       >
         <div 
-          id={scannerContainerId} 
+          id={scannerContainerId}
           style={{ 
             width: '100%',
-            height: '100%'
+            height: '100%',
+            position: 'absolute',
+            top: 0,
+            left: 0
           }} 
         />
       </div>
