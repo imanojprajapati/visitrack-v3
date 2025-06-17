@@ -100,9 +100,16 @@ const MinimalQRScanner: React.FC<{
             }
           },
           (errorMessage: string) => {
-            // Show all errors in the UI, including 'No multiformat readers were able to detect the code'
-            setError(errorMessage);
-            onScanError(errorMessage);
+            // Only show real errors, not normal 'no code found' errors
+            if (
+              !errorMessage.includes('NotFoundException') &&
+              !errorMessage.includes('No QR code found') &&
+              !errorMessage.includes('No Multiformat readers were able to detect the code') &&
+              !errorMessage.includes('No multiformat readers were able to detect the code')
+            ) {
+              setError(errorMessage);
+              onScanError(errorMessage);
+            }
           }
         );
       } catch (err) {
