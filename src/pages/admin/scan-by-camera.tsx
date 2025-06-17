@@ -106,7 +106,7 @@ const MinimalQRScanner: React.FC<{
               !normalized.includes('notfoundexception') &&
               !normalized.includes('no qr code found') &&
               !normalized.includes('no multiformat readers were able to detect the code') &&
-              !normalized.includes('no qr code detected')
+              !normalized.includes('no barcode or no qr code detected')
             ) {
               setError(errorMessage);
               onScanError(errorMessage);
@@ -297,7 +297,15 @@ const MinimalScanByCameraPage: React.FC = () => {
     }
   };
   const handleScanError = (err: string) => {
-    setError(err);
+    const normalized = err.toLowerCase();
+    if (
+      !normalized.includes('notfoundexception') &&
+      !normalized.includes('no qr code found') &&
+      !normalized.includes('no multiformat readers were able to detect the code') &&
+      !normalized.includes('no qr code detected')
+    ) {
+      setError(err);
+    }
     setIsScanning(false);
   };
 
