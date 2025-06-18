@@ -292,6 +292,15 @@ export default function VisitorsPage() {
     applyFilters();
   }, [searchText, selectedEventFilter, selectedStatusFilter, visitors]);
 
+  // Update pagination total when filtered data changes
+  useEffect(() => {
+    setPagination(prev => ({
+      ...prev,
+      current: 1, // Reset to page 1 when filters change
+      total: filteredVisitors.length,
+    }));
+  }, [filteredVisitors]);
+
   const handleSearch = (values: SearchFormValues) => {
     let filtered = [...visitors];
 
@@ -343,31 +352,6 @@ export default function VisitorsPage() {
       current: 1,
       total: visitors.length,
     }));
-  };
-
-  // Reset pagination when filtered data changes
-  useEffect(() => {
-    setPagination(prev => ({
-      ...prev,
-      current: 1,
-      total: filteredVisitors.length,
-    }));
-  }, [filteredVisitors]);
-
-  const handleTableChange = (paginationConfig: any) => {
-    console.log('Table pagination changed:', paginationConfig);
-    setPagination({
-      current: paginationConfig.current,
-      pageSize: paginationConfig.pageSize,
-      total: filteredVisitors.length,
-    });
-  };
-
-  // Calculate paginated data
-  const getPaginatedData = () => {
-    const startIndex = (pagination.current - 1) * pagination.pageSize;
-    const endIndex = startIndex + pagination.pageSize;
-    return filteredVisitors.slice(startIndex, endIndex);
   };
 
   const handleExport = async () => {
@@ -583,9 +567,14 @@ export default function VisitorsPage() {
     message.info('Edit functionality coming soon');
   };
 
-  if (!mounted) {
-    return null;
-  }
+  // Calculate paginated data
+  const getPaginatedData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return filteredVisitors.slice(startIndex, endIndex);
+  };
+
+  if (!mounted) return null;
 
   return (
     <AdminLayout>
@@ -660,20 +649,55 @@ export default function VisitorsPage() {
                 dataSource={getPaginatedData()}
                 rowKey="_id"
                 loading={loading}
-                pagination={{
-                  total: filteredVisitors.length,
-                  current: pagination.current,
-                  pageSize: pagination.pageSize,
-                  showSizeChanger: true,
-                  showQuickJumper: true,
-                  showTotal: (total, range) => 
-                    `${range[0]}-${range[1]} of ${total} visitors`,
-                  responsive: true,
-                  onChange: handleTableChange,
-                }}
+                pagination={false}
                 scroll={{ x: 'max-content' }}
-                size="middle"
               />
+              
+              {/* Custom Pagination */}
+              <div className="mt-4 flex justify-between items-center">
+                <div className="text-sm text-gray-600">
+                  Showing {((pagination.current - 1) * pagination.pageSize) + 1} to {Math.min(pagination.current * pagination.pageSize, pagination.total)} of {pagination.total} visitors
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">Show:</span>
+                  <Select
+                    value={pagination.pageSize}
+                    onChange={(size) => {
+                      setPagination(prev => ({
+                        ...prev,
+                        pageSize: size,
+                        current: 1,
+                      }));
+                    }}
+                    style={{ width: 80 }}
+                  >
+                    <Select.Option value={10}>10</Select.Option>
+                    <Select.Option value={20}>20</Select.Option>
+                    <Select.Option value={50}>50</Select.Option>
+                    <Select.Option value={100}>100</Select.Option>
+                  </Select>
+                  <span className="text-sm text-gray-600">per page</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Button
+                    size="small"
+                    disabled={pagination.current === 1}
+                    onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
+                  >
+                    Previous
+                  </Button>
+                  <span className="px-2 text-sm">
+                    Page {pagination.current} of {Math.ceil(pagination.total / pagination.pageSize)}
+                  </span>
+                  <Button
+                    size="small"
+                    disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
+                    onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
             </div>
           </Card>
 

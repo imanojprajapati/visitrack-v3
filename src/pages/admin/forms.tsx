@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Table, Space, message } from 'antd';
+import { Card, Button, Table, Space, message, Select } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import AdminLayout from './layout';
@@ -28,6 +28,11 @@ export default function FormsPage() {
   const [showFormBuilder, setShowFormBuilder] = useState(false);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
   const router = useRouter();
 
   useEffect(() => {
@@ -44,6 +49,10 @@ export default function FormsPage() {
       if (!response.ok) throw new Error('Failed to fetch forms');
       const data = await response.json();
       setForms(data);
+      setPagination(prev => ({
+        ...prev,
+        total: data.length,
+      }));
     } catch (error) {
       console.error('Error fetching forms:', error);
       message.error('Failed to load forms');
@@ -147,6 +156,13 @@ export default function FormsPage() {
     },
   ];
 
+  // Calculate paginated data
+  const getPaginatedData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return forms.slice(startIndex, endIndex);
+  };
+
   if (!mounted) {
     return null;
   }
@@ -179,17 +195,58 @@ export default function FormsPage() {
                 <div className="admin-table-responsive">
                   <Table
                     columns={columns}
-                    dataSource={forms}
+                    dataSource={getPaginatedData()}
                     rowKey="_id"
                     loading={loading}
-                    pagination={{
-                      pageSize: 10,
-                      showSizeChanger: true,
-                      showTotal: (total) => `Total ${total} forms`,
-                      responsive: true,
-                    }}
+                    pagination={false}
                     scroll={{ x: 'max-content' }}
                   />
+                  
+                  {/* Custom Pagination */}
+                  <div className="mt-4 flex justify-between items-center">
+                    <div className="text-sm text-gray-600">
+                      Showing {((pagination.current - 1) * pagination.pageSize) + 1} to {Math.min(pagination.current * pagination.pageSize, pagination.total)} of {pagination.total} forms
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-600">Show:</span>
+                      <Select
+                        value={pagination.pageSize}
+                        onChange={(size) => {
+                          setPagination(prev => ({
+                            ...prev,
+                            pageSize: size,
+                            current: 1,
+                          }));
+                        }}
+                        style={{ width: 80 }}
+                      >
+                        <Select.Option value={10}>10</Select.Option>
+                        <Select.Option value={20}>20</Select.Option>
+                        <Select.Option value={50}>50</Select.Option>
+                        <Select.Option value={100}>100</Select.Option>
+                      </Select>
+                      <span className="text-sm text-gray-600">per page</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Button
+                        size="small"
+                        disabled={pagination.current === 1}
+                        onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
+                      >
+                        Previous
+                      </Button>
+                      <span className="px-2 text-sm">
+                        Page {pagination.current} of {Math.ceil(pagination.total / pagination.pageSize)}
+                      </span>
+                      <Button
+                        size="small"
+                        disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
+                        onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </Card>
             )}

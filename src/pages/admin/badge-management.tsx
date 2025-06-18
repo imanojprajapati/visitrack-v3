@@ -88,6 +88,11 @@ const BadgeManagement: React.FC = () => {
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [isGeneratingQR, setIsGeneratingQR] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
   const badgeRef = useRef<HTMLDivElement>(null);
 
   // Define default template values
@@ -148,6 +153,10 @@ const BadgeManagement: React.FC = () => {
         const data = await response.json();
         console.log('Fetched templates data:', data);
         setTemplates(data);
+        setPagination(prev => ({
+          ...prev,
+          total: data.length,
+        }));
       }
     } catch (error) {
       console.error('Error fetching templates:', error);
@@ -531,12 +540,18 @@ const BadgeManagement: React.FC = () => {
     },
   };
 
+  // Calculate paginated data
+  const getPaginatedData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return templates.slice(startIndex, endIndex);
+  };
+
   const columns = [
     {
       title: 'Template Name',
       dataIndex: 'name',
       key: 'name',
-      render: (text: string) => <Text strong>{text}</Text>,
     },
     {
       title: 'Event',
@@ -544,7 +559,7 @@ const BadgeManagement: React.FC = () => {
       key: 'eventId',
       render: (eventId: string) => {
         const event = events.find(e => e._id === eventId);
-        return event ? event.title : 'N/A';
+        return event ? event.title : 'Unknown Event';
       },
     },
     {
@@ -558,71 +573,35 @@ const BadgeManagement: React.FC = () => {
       ),
     },
     {
-      title: 'Badge',
-      dataIndex: 'badge',
-      key: 'badge',
-      render: (badge: any, record: BadgeTemplate) => {
-        console.log('Badge column render - badge data:', badge);
-        console.log('Badge column render - full record:', record);
-        return (
-          <div>
-            {badge?.cloudinaryUrl ? (
-              <Image
-                src={badge.cloudinaryUrl}
-                alt="Badge"
-                style={{ width: 50, height: 50, objectFit: 'cover' }}
-                preview={true}
-                fallback="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
-                onError={(e) => {
-                  console.error('Image failed to load:', badge.cloudinaryUrl);
-                  console.error('Error event:', e);
-                }}
-              />
-            ) : (
-              <Text type="secondary">No badge</Text>
-            )}
-          </div>
-        );
-      },
-    },
-    {
       title: 'Actions',
       key: 'actions',
-      render: (_: any, record: BadgeTemplate) => (
-        <Space>
+      render: (record: BadgeTemplate) => (
+        <Space size="small" className="flex-wrap">
           <Button
-            type="link"
-            icon={<EditOutlined />}
-            onClick={() => handleEdit(record)}
-            size="small"
-          >
-            Edit
-          </Button>
-          <Button
-            type="link"
+            type="text"
             icon={<EyeOutlined />}
             onClick={() => handlePreview(record)}
-            size="small"
-          >
-            Preview
-          </Button>
+            title="Preview"
+          />
           <Button
-            type="link"
+            type="text"
+            icon={<EditOutlined />}
+            onClick={() => handleEdit(record)}
+            title="Edit"
+          />
+          <Button
+            type="text"
             icon={<PrinterOutlined />}
             onClick={() => handleDownload(record)}
-            size="small"
-          >
-            Download
-          </Button>
+            title="Download"
+          />
           <Button
-            type="link"
+            type="text"
             danger
             icon={<DeleteOutlined />}
             onClick={() => handleDelete(record._id!)}
-            size="small"
-          >
-            Delete
-          </Button>
+            title="Delete"
+          />
         </Space>
       ),
     },
@@ -772,17 +751,58 @@ const BadgeManagement: React.FC = () => {
           <Card title="Saved Templates" className="admin-card-responsive">
             <div className="admin-table-responsive">
               <Table
-                dataSource={templates}
+                dataSource={getPaginatedData()}
                 columns={columns}
                 rowKey="_id"
-                pagination={{
-                  pageSize: 10,
-                  showSizeChanger: true,
-                  showTotal: (total) => `Total ${total} templates`,
-                  responsive: true,
-                }}
+                pagination={false}
                 scroll={{ x: 'max-content' }}
               />
+              
+              {/* Custom Pagination */}
+              <div className="mt-4 flex justify-between items-center">
+                <div className="text-sm text-gray-600">
+                  Showing {((pagination.current - 1) * pagination.pageSize) + 1} to {Math.min(pagination.current * pagination.pageSize, pagination.total)} of {pagination.total} templates
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">Show:</span>
+                  <Select
+                    value={pagination.pageSize}
+                    onChange={(size) => {
+                      setPagination(prev => ({
+                        ...prev,
+                        pageSize: size,
+                        current: 1,
+                      }));
+                    }}
+                    style={{ width: 80 }}
+                  >
+                    <Select.Option value={10}>10</Select.Option>
+                    <Select.Option value={20}>20</Select.Option>
+                    <Select.Option value={50}>50</Select.Option>
+                    <Select.Option value={100}>100</Select.Option>
+                  </Select>
+                  <span className="text-sm text-gray-600">per page</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Button
+                    size="small"
+                    disabled={pagination.current === 1}
+                    onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
+                  >
+                    Previous
+                  </Button>
+                  <span className="px-2 text-sm">
+                    Page {pagination.current} of {Math.ceil(pagination.total / pagination.pageSize)}
+                  </span>
+                  <Button
+                    size="small"
+                    disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
+                    onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
             </div>
           </Card>
           </div>

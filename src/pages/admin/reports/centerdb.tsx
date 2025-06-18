@@ -26,9 +26,6 @@ interface CenterDBResponse {
   pagination: {
     current: number;
     total: number;
-    totalRecords: number;
-    hasNext: boolean;
-    hasPrev: boolean;
   };
 }
 
@@ -41,14 +38,13 @@ interface ImportResult {
 
 const CenterDBReport: React.FC = () => {
   const [centers, setCenters] = useState<CenterData[]>([]);
+  const [allCenters, setAllCenters] = useState<CenterData[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchText, setSearchText] = useState('');
   const [pagination, setPagination] = useState({
     current: 1,
+    pageSize: 50,
     total: 0,
-    totalRecords: 0,
-    hasNext: false,
-    hasPrev: false,
   });
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editingCenter, setEditingCenter] = useState<CenterData | null>(null);
@@ -58,12 +54,10 @@ const CenterDBReport: React.FC = () => {
   const [form] = Form.useForm();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fetchCenters = async (page = 1, search = '') => {
+  const fetchCenters = async (search = '') => {
     try {
       setLoading(true);
       const params = new URLSearchParams({
-        page: page.toString(),
-        limit: '50',
         ...(search && { search })
       });
 
@@ -73,8 +67,25 @@ const CenterDBReport: React.FC = () => {
       }
 
       const data: CenterDBResponse = await response.json();
-      setCenters(data.centers);
-      setPagination(data.pagination);
+      const centersData = data.centers || [];
+      setAllCenters(centersData);
+      
+      // Apply search filter if needed
+      const filteredCenters = search 
+        ? centersData.filter(center => 
+            center.name.toLowerCase().includes(search.toLowerCase()) ||
+            center.email.toLowerCase().includes(search.toLowerCase()) ||
+            center.company.toLowerCase().includes(search.toLowerCase()) ||
+            center.city.toLowerCase().includes(search.toLowerCase())
+          )
+        : centersData;
+      
+      setCenters(filteredCenters);
+      setPagination(prev => ({
+        ...prev,
+        current: 1,
+        total: filteredCenters.length,
+      }));
     } catch (error) {
       console.error('Error fetching centers:', error);
       message.error('Failed to load center data');
@@ -89,11 +100,32 @@ const CenterDBReport: React.FC = () => {
 
   const handleSearch = (value: string) => {
     setSearchText(value);
-    fetchCenters(1, value);
+    const filteredCenters = value 
+      ? allCenters.filter(center => 
+          center.name.toLowerCase().includes(value.toLowerCase()) ||
+          center.email.toLowerCase().includes(value.toLowerCase()) ||
+          center.company.toLowerCase().includes(value.toLowerCase()) ||
+          center.city.toLowerCase().includes(value.toLowerCase())
+        )
+      : allCenters;
+    
+    setCenters(filteredCenters);
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: filteredCenters.length,
+    }));
+  };
+
+  // Calculate paginated data
+  const getPaginatedData = () => {
+    const startIndex = (pagination.current - 1) * pagination.pageSize;
+    const endIndex = startIndex + pagination.pageSize;
+    return centers.slice(startIndex, endIndex);
   };
 
   const handleTableChange = (pagination: any) => {
-    fetchCenters(pagination.current, searchText);
+    fetchCenters(searchText);
   };
 
   const handleEdit = (record: CenterData) => {
@@ -123,7 +155,7 @@ const CenterDBReport: React.FC = () => {
       setEditModalVisible(false);
       setEditingCenter(null);
       form.resetFields();
-      fetchCenters(pagination.current, searchText);
+      fetchCenters(searchText);
     } catch (error) {
       console.error('Error updating center:', error);
       message.error('Failed to update center data');
@@ -132,9 +164,7 @@ const CenterDBReport: React.FC = () => {
 
   const handleExport = async () => {
     try {
-      setLoading(true);
       const response = await fetch('/api/centers/export');
-      
       if (!response.ok) {
         throw new Error('Failed to export data');
       }
@@ -142,19 +172,16 @@ const CenterDBReport: React.FC = () => {
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
+      a.style.display = 'none';
       a.href = url;
-      a.download = `centerdb-export-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = 'center-database.xlsx';
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
       message.success('Data exported successfully');
     } catch (error) {
       console.error('Error exporting data:', error);
       message.error('Failed to export data');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -265,7 +292,7 @@ const CenterDBReport: React.FC = () => {
       
       if (result.results.errors.length === 0) {
         message.success(`Import completed successfully! Created: ${result.results.created}, Updated: ${result.results.updated}`);
-        fetchCenters(pagination.current, searchText);
+        fetchCenters(searchText);
       } else {
         message.warning(`Import completed with ${result.results.errors.length} errors. Created: ${result.results.created}, Updated: ${result.results.updated}`);
       }
@@ -398,7 +425,7 @@ const CenterDBReport: React.FC = () => {
               </Button>
               <Button
                 icon={<ReloadOutlined />}
-                onClick={() => fetchCenters(pagination.current, searchText)}
+                onClick={() => fetchCenters(searchText)}
                 loading={loading}
                 className="w-full sm:w-auto"
               >
@@ -409,7 +436,7 @@ const CenterDBReport: React.FC = () => {
           
           <div className="flex justify-between items-center">
             <Text>
-              Total Records: <Tag color="blue">{pagination.totalRecords}</Tag>
+              Total Records: <Tag color="blue">{pagination.total}</Tag>
             </Text>
           </div>
         </div>
@@ -417,22 +444,58 @@ const CenterDBReport: React.FC = () => {
         <div className="flex-1 overflow-hidden">
           <Table
             columns={columns}
-            dataSource={centers}
+            dataSource={getPaginatedData()}
             rowKey="_id"
             loading={loading}
-            pagination={{
-              current: pagination.current,
-              total: pagination.totalRecords,
-              pageSize: 50,
-              showSizeChanger: false,
-              showQuickJumper: true,
-              showTotal: (total, range) =>
-                `${range[0]}-${range[1]} of ${total} items`,
-            }}
-            onChange={handleTableChange}
-            scroll={{ x: 1200, y: 'calc(100vh - 400px)' }}
-            size="middle"
+            pagination={false}
+            scroll={{ x: 'max-content' }}
           />
+          
+          {/* Custom Pagination */}
+          <div className="mt-4 flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              Showing {((pagination.current - 1) * pagination.pageSize) + 1} to {Math.min(pagination.current * pagination.pageSize, pagination.total)} of {pagination.total} centers
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-gray-600">Show:</span>
+              <Select
+                value={pagination.pageSize}
+                onChange={(size) => {
+                  setPagination(prev => ({
+                    ...prev,
+                    pageSize: size,
+                    current: 1,
+                  }));
+                }}
+                style={{ width: 80 }}
+              >
+                <Select.Option value={10}>10</Select.Option>
+                <Select.Option value={20}>20</Select.Option>
+                <Select.Option value={50}>50</Select.Option>
+                <Select.Option value={100}>100</Select.Option>
+              </Select>
+              <span className="text-sm text-gray-600">per page</span>
+            </div>
+            <div className="flex items-center space-x-1">
+              <Button
+                size="small"
+                disabled={pagination.current === 1}
+                onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
+              >
+                Previous
+              </Button>
+              <span className="px-2 text-sm">
+                Page {pagination.current} of {Math.ceil(pagination.total / pagination.pageSize)}
+              </span>
+              <Button
+                size="small"
+                disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
+                onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         </div>
       </Card>
 
