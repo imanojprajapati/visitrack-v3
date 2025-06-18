@@ -97,8 +97,6 @@ export default function FormsPage() {
       title: 'Form Title',
       dataIndex: 'title',
       key: 'title',
-      fixed: 'left' as const,
-      width: 200,
     },
     {
       title: 'Event ID',
@@ -129,8 +127,6 @@ export default function FormsPage() {
     {
       title: 'Actions',
       key: 'actions',
-      fixed: 'right' as const,
-      width: 120,
       render: (_: any, record: FormRecord) => (
         <Space size="small" className="flex-wrap">
           <Button
@@ -158,42 +154,46 @@ export default function FormsPage() {
   return (
     <AccessControl allowedRoles={['admin', 'manager']} pageName="Forms">
       <AdminLayout>
-        <div className="w-full max-w-screen px-2 sm:px-4 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <h1 className="text-xl sm:text-2xl font-bold">Forms</h1>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => setShowFormBuilder(true)}
-              className="w-full sm:w-auto"
-            >
-              Create New Form
-            </Button>
-          </div>
-
-          {showFormBuilder ? (
-            <Card className="mb-6">
-              <FormBuilder onSave={handleSaveForm} />
-            </Card>
-          ) : (
-            <Card>
-              <div className="overflow-x-auto">
-                <Table
-                  columns={columns}
-                  dataSource={forms}
-                  rowKey="_id"
-                  loading={loading}
-                  pagination={{
-                    pageSize: 10,
-                    showSizeChanger: true,
-                    showTotal: (total) => `Total ${total} forms`,
-                    responsive: true,
-                  }}
-                  scroll={{ x: 'max-content' }}
-                />
+        <div className="admin-responsive-container">
+          <div className="admin-content-wrapper">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <h1 className="text-responsive-xl font-bold text-gray-900">Forms</h1>
+              <div className="admin-button-group">
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => setShowFormBuilder(true)}
+                  className="w-full sm:w-auto"
+                >
+                  Create New Form
+                </Button>
               </div>
-            </Card>
-          )}
+            </div>
+
+            {showFormBuilder ? (
+              <Card className="admin-card-responsive mb-6">
+                <FormBuilder onSave={handleSaveForm} />
+              </Card>
+            ) : (
+              <Card className="admin-card-responsive">
+                <div className="admin-table-responsive">
+                  <Table
+                    columns={columns}
+                    dataSource={forms}
+                    rowKey="_id"
+                    loading={loading}
+                    pagination={{
+                      pageSize: 10,
+                      showSizeChanger: true,
+                      showTotal: (total) => `Total ${total} forms`,
+                      responsive: true,
+                    }}
+                    scroll={{ x: 'max-content' }}
+                  />
+                </div>
+              </Card>
+            )}
+          </div>
         </div>
       </AdminLayout>
     </AccessControl>

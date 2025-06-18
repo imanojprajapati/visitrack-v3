@@ -49,20 +49,23 @@ export default function ReportsPage() {
   return (
     <AccessControl allowedRoles={['admin', 'manager']} pageName="Reports">
       <AdminLayout>
-        <div className="h-full flex flex-col overflow-hidden">
-          <div className="flex-none mb-6">
-            <Title level={2}>Reports</Title>
-            <Text type="secondary">View and analyze visitor registration data and entry logs</Text>
-          </div>
+        <div className="admin-responsive-container">
+          <div className="admin-content-wrapper">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h1 className="text-responsive-xl font-bold text-gray-900">Reports</h1>
+                <Text type="secondary">View and analyze visitor registration data and entry logs</Text>
+              </div>
+            </div>
 
-          <Card className="bg-white shadow-sm flex-1 flex flex-col overflow-hidden">
-            <Tabs 
-              defaultActiveKey="registrations"
-              type="card"
-              size="large"
-              tabBarStyle={{ marginBottom: 24 }}
-              className="flex-1 flex flex-col reports-tabs"
-            >
+            <Card className="admin-card-responsive">
+              <Tabs 
+                defaultActiveKey="registrations"
+                type="card"
+                size="large"
+                tabBarStyle={{ marginBottom: 24 }}
+                className="flex-1 flex flex-col reports-tabs"
+              >
               <TabPane 
                 tab={
                   <Space>
@@ -129,9 +132,11 @@ export default function ReportsPage() {
                 </div>
               </TabPane>
             </Tabs>
-          </Card>
+            </Card>
+          </div>
+        </div>
 
-          <style jsx global>{`
+        <style jsx global>{`
             .ant-card {
               border-radius: 8px;
             }
@@ -175,7 +180,6 @@ export default function ReportsPage() {
               overflow: hidden;
             }
           `}</style>
-        </div>
       </AdminLayout>
     </AccessControl>
   );

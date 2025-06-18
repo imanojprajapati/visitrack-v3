@@ -77,3 +77,457 @@
   color: white !important;
 }
 
+html,
+body {
+  padding: 0;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Oxygen,
+    Ubuntu, Cantarell, Fira Sans, Droid Sans, Helvetica Neue, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* =================================
+   RESPONSIVE ADMIN LAYOUT UTILITIES
+   ================================= */
+
+/* Base responsive container */
+.admin-responsive-container {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  box-sizing: border-box;
+}
+
+/* Responsive table wrapper */
+.admin-table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* Responsive card */
+.admin-card-responsive {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Responsive card grid */
+.admin-card-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Responsive form layout */
+.admin-form-responsive {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Responsive button group */
+.admin-button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Responsive stats grid */
+.admin-stats-grid {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+  width: 100%;
+  max-width: 100%;
+}
+
+/* Responsive content wrapper */
+.admin-content-wrapper {
+  padding: 1rem;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+}
+
+/* Responsive chart container */
+.admin-chart-container {
+  width: 100%;
+  height: 300px;
+  overflow: hidden;
+}
+
+/* Responsive modal content */
+.admin-modal-responsive {
+  width: 95vw !important;
+  max-width: 600px !important;
+  margin: 0 auto;
+}
+
+/* Responsive drawer content */
+.admin-drawer-responsive {
+  width: 100vw !important;
+  max-width: 400px !important;
+}
+
+/* =================================
+   MOBILE FIRST BREAKPOINTS
+   ================================= */
+
+/* Small devices (phones, 576px and up) */
+@media (min-width: 576px) {
+  .admin-card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  }
+  
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .admin-content-wrapper {
+    padding: 1.5rem;
+  }
+  
+  .admin-chart-container {
+    height: 350px;
+  }
+  
+  .admin-modal-responsive {
+    width: 90vw !important;
+  }
+}
+
+/* Medium devices (tablets, 768px and up) */
+@media (min-width: 768px) {
+  .admin-card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+  
+  .admin-stats-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .admin-content-wrapper {
+    padding: 2rem;
+  }
+  
+  .admin-chart-container {
+    height: 400px;
+  }
+  
+  .admin-button-group {
+    flex-wrap: nowrap;
+  }
+  
+  .admin-modal-responsive {
+    width: 80vw !important;
+  }
+  
+  .admin-drawer-responsive {
+    width: 400px !important;
+  }
+}
+
+/* Large devices (desktops, 992px and up) */
+@media (min-width: 992px) {
+  .admin-stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .admin-card-grid {
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  }
+  
+  .admin-chart-container {
+    height: 450px;
+  }
+  
+  .admin-modal-responsive {
+    width: 70vw !important;
+  }
+}
+
+/* Extra large devices (large desktops, 1200px and up) */
+@media (min-width: 1200px) {
+  .admin-content-wrapper {
+    padding: 2.5rem;
+  }
+  
+  .admin-chart-container {
+    height: 500px;
+  }
+  
+  .admin-modal-responsive {
+    width: 60vw !important;
+  }
+}
+
+/* =================================
+   ANTD COMPONENT RESPONSIVE OVERRIDES
+   ================================= */
+
+/* Responsive Ant Design Table */
+@media (max-width: 767px) {
+  .ant-table-wrapper {
+    overflow-x: auto;
+  }
+  
+  .ant-table-thead > tr > th,
+  .ant-table-tbody > tr > td {
+    padding: 8px 4px !important;
+    font-size: 12px !important;
+  }
+  
+  .ant-table-thead > tr > th {
+    white-space: nowrap;
+  }
+  
+  .ant-btn {
+    padding: 4px 8px !important;
+    font-size: 12px !important;
+    height: auto !important;
+  }
+  
+  .ant-input {
+    font-size: 14px !important;
+  }
+  
+  .ant-select {
+    font-size: 14px !important;
+  }
+}
+
+/* Responsive Ant Design Cards */
+@media (max-width: 767px) {
+  .ant-card {
+    margin-bottom: 1rem;
+  }
+  
+  .ant-card-head-title {
+    font-size: 16px !important;
+  }
+  
+  .ant-card-body {
+    padding: 16px !important;
+  }
+}
+
+/* Responsive Ant Design Forms */
+@media (max-width: 767px) {
+  .ant-form-item-label {
+    text-align: left !important;
+  }
+  
+  .ant-form-item-label > label {
+    font-size: 14px !important;
+  }
+  
+  .ant-form-item-control-input {
+    min-height: 40px !important;
+  }
+}
+
+/* Responsive Ant Design Statistics */
+@media (max-width: 767px) {
+  .ant-statistic-title {
+    font-size: 12px !important;
+  }
+  
+  .ant-statistic-content {
+    font-size: 18px !important;
+  }
+}
+
+/* Responsive Ant Design Modals */
+@media (max-width: 767px) {
+  .ant-modal {
+    margin: 10px !important;
+    max-width: calc(100vw - 20px) !important;
+  }
+  
+  .ant-modal-content {
+    border-radius: 8px !important;
+  }
+  
+  .ant-modal-header {
+    padding: 16px !important;
+  }
+  
+  .ant-modal-body {
+    padding: 16px !important;
+  }
+  
+  .ant-modal-footer {
+    padding: 10px 16px !important;
+  }
+}
+
+/* Responsive Ant Design Drawers */
+@media (max-width: 767px) {
+  .ant-drawer-content-wrapper {
+    width: 100vw !important;
+  }
+}
+
+/* =================================
+   LAYOUT SPECIFIC RESPONSIVE STYLES
+   ================================= */
+
+/* Responsive Admin Header */
+@media (max-width: 767px) {
+  .admin-header-responsive {
+    padding: 0 8px !important;
+  }
+  
+  .admin-header-responsive .ant-typography {
+    font-size: 14px !important;
+  }
+  
+  .admin-header-responsive .ant-btn {
+    width: 48px !important;
+    height: 48px !important;
+  }
+}
+
+/* Responsive Admin Sidebar */
+@media (max-width: 767px) {
+  .admin-sidebar-responsive {
+    position: fixed !important;
+    z-index: 1000 !important;
+    height: 100vh !important;
+  }
+  
+  .admin-sidebar-responsive.collapsed {
+    width: 0 !important;
+    overflow: hidden !important;
+  }
+  
+  .admin-sidebar-responsive:not(.collapsed) {
+    width: 250px !important;
+  }
+}
+
+/* Responsive Admin Content */
+@media (max-width: 767px) {
+  .admin-content-responsive {
+    margin: 0 !important;
+    padding: 16px 8px !important;
+  }
+}
+
+/* Responsive Admin Layout */
+@media (max-width: 767px) {
+  .admin-layout-responsive {
+    overflow-x: hidden !important;
+  }
+  
+  .admin-layout-responsive .ant-layout-sider {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    z-index: 1000 !important;
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+  }
+  
+  .admin-layout-responsive .ant-layout-sider:not(.ant-layout-sider-collapsed) {
+    transform: translateX(0);
+  }
+  
+  .admin-layout-responsive .ant-layout-sider-collapsed {
+    transform: translateX(-100%);
+  }
+  
+  .admin-layout-responsive .ant-layout {
+    margin-left: 0 !important;
+  }
+}
+
+/* Mobile overlay for sidebar */
+@media (max-width: 767px) {
+  .admin-mobile-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 999;
+    display: none;
+  }
+  
+  .admin-mobile-overlay.show {
+    display: block;
+  }
+}
+
+/* =================================
+   UTILITY CLASSES
+   ================================= */
+
+/* Text responsive utilities */
+.text-responsive-xs { font-size: 12px; }
+.text-responsive-sm { font-size: 14px; }
+.text-responsive-md { font-size: 16px; }
+.text-responsive-lg { font-size: 18px; }
+.text-responsive-xl { font-size: 20px; }
+
+@media (min-width: 768px) {
+  .text-responsive-xs { font-size: 14px; }
+  .text-responsive-sm { font-size: 16px; }
+  .text-responsive-md { font-size: 18px; }
+  .text-responsive-lg { font-size: 20px; }
+  .text-responsive-xl { font-size: 24px; }
+}
+
+/* Spacing responsive utilities */
+.spacing-responsive-xs { padding: 0.5rem; }
+.spacing-responsive-sm { padding: 1rem; }
+.spacing-responsive-md { padding: 1.5rem; }
+.spacing-responsive-lg { padding: 2rem; }
+
+@media (min-width: 768px) {
+  .spacing-responsive-xs { padding: 1rem; }
+  .spacing-responsive-sm { padding: 1.5rem; }
+  .spacing-responsive-md { padding: 2rem; }
+  .spacing-responsive-lg { padding: 2.5rem; }
+}
+
+/* Hide/Show utilities for different screen sizes */
+.hide-mobile { display: block; }
+.show-mobile { display: none; }
+.hide-tablet { display: block; }
+.show-tablet { display: none; }
+.hide-desktop { display: block; }
+.show-desktop { display: none; }
+
+@media (max-width: 767px) {
+  .hide-mobile { display: none !important; }
+  .show-mobile { display: block !important; }
+}
+
+@media (min-width: 768px) and (max-width: 991px) {
+  .hide-tablet { display: none !important; }
+  .show-tablet { display: block !important; }
+}
+
+@media (min-width: 992px) {
+  .hide-desktop { display: none !important; }
+  .show-desktop { display: block !important; }
+}
+

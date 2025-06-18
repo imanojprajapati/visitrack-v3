@@ -364,33 +364,35 @@ const CenterDBReport: React.FC = () => {
     <div className="flex-1 flex flex-col overflow-hidden">
       <Card className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-none mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <div>
+          <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start mb-4">
+            <div className="mb-4 lg:mb-0">
               <Title level={3}>Center Database</Title>
               <Text type="secondary">
                 Manage and view all center data from visitor registrations
               </Text>
             </div>
-            <Space>
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <Search
                 placeholder="Search by name, email, company, city..."
                 allowClear
                 enterButton={<SearchOutlined />}
                 size="large"
                 onSearch={handleSearch}
-                style={{ width: 300 }}
+                className="w-full sm:w-80"
               />
               <Button
                 icon={<DownloadOutlined />}
                 onClick={handleExport}
                 loading={loading}
                 type="primary"
+                className="w-full sm:w-auto"
               >
                 Export All
               </Button>
               <Button
                 icon={<UploadOutlined />}
                 onClick={() => setImportModalVisible(true)}
+                className="w-full sm:w-auto"
               >
                 Import
               </Button>
@@ -398,10 +400,11 @@ const CenterDBReport: React.FC = () => {
                 icon={<ReloadOutlined />}
                 onClick={() => fetchCenters(pagination.current, searchText)}
                 loading={loading}
+                className="w-full sm:w-auto"
               >
                 Refresh
               </Button>
-            </Space>
+            </div>
           </div>
           
           <div className="flex justify-between items-center">

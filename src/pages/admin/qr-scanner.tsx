@@ -730,26 +730,29 @@ const QRScanner: React.FC = () => {
   return (
     <AdminLayout>
       {contextHolder}
-      <div className="p-4 sm:p-6">
-        <Card
-          title={<h1 className="text-xl sm:text-2xl font-bold">QR Scanner</h1>}
-          extra={
-            <Space>
+      <div className="admin-responsive-container">
+        <div className="admin-content-wrapper">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h1 className="text-responsive-xl font-bold text-gray-900">QR Scanner</h1>
+            <div className="admin-button-group">
               <Button
                 type="primary"
                 icon={<QrcodeOutlined />}
                 onClick={() => setShowScanner(true)}
+                className="w-full sm:w-auto"
               >
                 Start Scanner
               </Button>
               <Button
                 onClick={() => setShowManualEntry(true)}
+                className="w-full sm:w-auto"
               >
                 Manual Entry
               </Button>
-            </Space>
-          }
-        >
+            </div>
+          </div>
+          
+          <Card className="admin-card-responsive">
           {/* Scanner Modal */}
           <Modal
             title="QR Code Scanner"
@@ -809,61 +812,64 @@ const QRScanner: React.FC = () => {
           </Modal>
 
           {/* Scanned Visitors Table */}
-          <Table
-            dataSource={getPaginatedData()}
-            columns={columns}
-            rowKey={(record) => `${record.visitorId}-${record.scanTime}`}
-            loading={loading}
-            pagination={false}
-            scroll={{ x: 'max-content' }}
-          />
-          
-          {/* Custom Pagination */}
-          <div className="mt-4 flex justify-between items-center">
-            <div className="text-sm text-gray-600">
-              Showing {((pagination.current - 1) * pagination.pageSize) + 1} to {Math.min(pagination.current * pagination.pageSize, pagination.total)} of {pagination.total} visitors
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Show:</span>
-              <Select
-                value={pagination.pageSize}
-                onChange={(size) => {
-                  setPagination(prev => ({
-                    ...prev,
-                    pageSize: size,
-                    current: 1,
-                  }));
-                }}
-                style={{ width: 80 }}
-              >
-                <Select.Option value={10}>10</Select.Option>
-                <Select.Option value={20}>20</Select.Option>
-                <Select.Option value={50}>50</Select.Option>
-                <Select.Option value={100}>100</Select.Option>
-              </Select>
-              <span className="text-sm text-gray-600">per page</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <Button
-                size="small"
-                disabled={pagination.current === 1}
-                onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
-              >
-                Previous
-              </Button>
-              <span className="px-2 text-sm">
-                Page {pagination.current} of {Math.ceil(pagination.total / pagination.pageSize)}
-              </span>
-              <Button
-                size="small"
-                disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
-                onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
-              >
-                Next
-              </Button>
+          <div className="admin-table-responsive">
+            <Table
+              dataSource={getPaginatedData()}
+              columns={columns}
+              rowKey={(record) => `${record.visitorId}-${record.scanTime}`}
+              loading={loading}
+              pagination={false}
+              scroll={{ x: 'max-content' }}
+            />
+            
+            {/* Custom Pagination */}
+            <div className="mt-4 flex justify-between items-center">
+              <div className="text-sm text-gray-600">
+                Showing {((pagination.current - 1) * pagination.pageSize) + 1} to {Math.min(pagination.current * pagination.pageSize, pagination.total)} of {pagination.total} visitors
+              </div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Show:</span>
+                <Select
+                  value={pagination.pageSize}
+                  onChange={(size) => {
+                    setPagination(prev => ({
+                      ...prev,
+                      pageSize: size,
+                      current: 1,
+                    }));
+                  }}
+                  style={{ width: 80 }}
+                >
+                  <Select.Option value={10}>10</Select.Option>
+                  <Select.Option value={20}>20</Select.Option>
+                  <Select.Option value={50}>50</Select.Option>
+                  <Select.Option value={100}>100</Select.Option>
+                </Select>
+                <span className="text-sm text-gray-600">per page</span>
+              </div>
+              <div className="flex items-center space-x-1">
+                <Button
+                  size="small"
+                  disabled={pagination.current === 1}
+                  onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
+                >
+                  Previous
+                </Button>
+                <span className="px-2 text-sm">
+                  Page {pagination.current} of {Math.ceil(pagination.total / pagination.pageSize)}
+                </span>
+                <Button
+                  size="small"
+                  disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
+                  onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
+                >
+                  Next
+                </Button>
+              </div>
             </div>
           </div>
-        </Card>
+          </Card>
+        </div>
       </div>
     </AdminLayout>
   );

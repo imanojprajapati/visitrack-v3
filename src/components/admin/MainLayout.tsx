@@ -29,6 +29,22 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Check if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth <= 767);
+      // Auto-collapse sidebar on mobile
+      if (window.innerWidth <= 767) {
+        setCollapsed(true);
+      }
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -59,6 +75,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const handleLogout = async () => {
     await logout();
     router.push('/admin/login');
+  };
+
+  const handleMenuToggle = () => {
+    setCollapsed(!collapsed);
+  };
+
+  // Close sidebar when clicking menu item on mobile
+  const handleMenuClick = ({ key }: { key: string }) => {
+    router.push(key);
+    if (isMobile) {
+      setCollapsed(true);
+    }
   };
 
   const getMenuItems = () => {
@@ -165,61 +193,96 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   ];
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
-      <Sider 
-        trigger={null} 
-        collapsible 
-        collapsed={collapsed} 
-        width={250}
-        style={{ background: '#FFFFFF' }}
-      >
-        <div className="p-4">
-          <h1 className="text-black text-lg font-bold">Visitrack</h1>
-        </div>
-        <Menu
-          theme="light"
-          mode="inline"
-          selectedKeys={[router.pathname]}
-          items={getMenuItems()}
-          onClick={({ key }) => router.push(key)}
-          style={{ 
-            background: '#FFFFFF',
-            color: '#000000',
-            borderRight: '1px solid #f0f0f0'
-          }}
+    <>
+      {/* Mobile overlay */}
+      {isMobile && !collapsed && (
+        <div 
+          className="admin-mobile-overlay show"
+          onClick={() => setCollapsed(true)}
         />
-      </Sider>
+      )}
       
-      <Layout>
-        <Header style={{ padding: '0 16px', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Button
-            type="text"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
-            style={{ fontSize: '16px', width: 64, height: 64 }}
-          />
-          
-          <div className="flex items-center space-x-4">
-            <Text strong>{user?.name}</Text>
-            <Text type="secondary">({user?.role})</Text>
-            
-            <Dropdown
-              menu={{ items: userMenuItems }}
-              placement="bottomRight"
-              arrow
-            >
-              <Space className="cursor-pointer">
-                <Avatar icon={<UserOutlined />} />
-              </Space>
-            </Dropdown>
+      <Layout className="admin-layout-responsive" style={{ minHeight: '100vh' }}>
+        <Sider 
+          trigger={null} 
+          collapsible 
+          collapsed={collapsed} 
+          width={250}
+          className={`admin-sidebar-responsive ${collapsed ? 'collapsed' : ''}`}
+          style={{ background: '#FFFFFF' }}
+          breakpoint="lg"
+          collapsedWidth={isMobile ? 0 : 80}
+        >
+          <div className="spacing-responsive-sm">
+            <h1 className="text-black text-responsive-lg font-bold">
+              {collapsed && !isMobile ? 'VT' : 'Visitrack'}
+            </h1>
           </div>
-        </Header>
+          <Menu
+            theme="light"
+            mode="inline"
+            selectedKeys={[router.pathname]}
+            items={getMenuItems()}
+            onClick={handleMenuClick}
+            style={{ 
+              background: '#FFFFFF',
+              color: '#000000',
+              borderRight: '1px solid #f0f0f0'
+            }}
+          />
+        </Sider>
         
-        <Content style={{ margin: '24px 16px', padding: 24, background: '#fff', minHeight: 280 }}>
-          {children}
-        </Content>
+        <Layout>
+          <Header 
+            className="admin-header-responsive"
+            style={{ 
+              padding: '0 16px', 
+              background: '#fff', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between' 
+            }}
+          >
+            <Button
+              type="text"
+              icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+              onClick={handleMenuToggle}
+              style={{ fontSize: '16px', width: 64, height: 64 }}
+            />
+            
+            <div className="flex items-center space-x-2 sm:space-x-4">
+              <Text strong className="text-responsive-sm hide-mobile">{user?.name}</Text>
+              <Text type="secondary" className="text-responsive-xs hide-mobile">({user?.role})</Text>
+              
+              <Dropdown
+                menu={{ items: userMenuItems }}
+                placement="bottomRight"
+                arrow
+              >
+                <Space className="cursor-pointer">
+                  <Avatar icon={<UserOutlined />} />
+                  <span className="show-mobile text-responsive-sm">{user?.name}</span>
+                </Space>
+              </Dropdown>
+            </div>
+          </Header>
+          
+          <Content 
+            className="admin-content-responsive admin-content-wrapper"
+            style={{ 
+              margin: '24px 16px', 
+              padding: 24, 
+              background: '#fff', 
+              minHeight: 280 
+            }}
+          >
+            <div className="admin-responsive-container">
+              {children}
+            </div>
+          </Content>
+        </Layout>
       </Layout>
-    </Layout>
+    </>
   );
 };
 

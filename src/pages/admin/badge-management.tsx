@@ -658,25 +658,28 @@ const BadgeManagement: React.FC = () => {
   return (
     <AccessControl allowedRoles={['admin', 'manager']} pageName="Badge Management">
       <AdminLayout>
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <Title level={2} className="m-0">Badge Management</Title>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleNewTemplate}
-              className="w-full sm:w-auto"
-            >
-              New Template
-            </Button>
-          </div>
+        <div className="admin-responsive-container">
+          <div className="admin-content-wrapper">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <h1 className="text-responsive-xl font-bold text-gray-900">Badge Management</h1>
+              <div className="admin-button-group">
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={handleNewTemplate}
+                  className="w-full sm:w-auto"
+                >
+                  New Template
+                </Button>
+              </div>
+            </div>
 
-          <Card title={form.getFieldValue('_id') ? 'Edit Template' : 'Create New Template'}>
+          <Card title={form.getFieldValue('_id') ? 'Edit Template' : 'Create New Template'} className="admin-card-responsive mb-6">
             <Form
               form={form}
               layout="vertical"
               onFinish={handleSaveTemplate}
-              className="space-y-6"
+              className="admin-form-responsive"
             >
               <Row gutter={[24, 24]}>
                 <Col xs={24} sm={12}>
@@ -766,31 +769,34 @@ const BadgeManagement: React.FC = () => {
             </Form>
           </Card>
 
-          <Card title="Saved Templates" className="mt-6">
-            <Table
-              dataSource={templates}
-              columns={columns}
-              rowKey="_id"
-              pagination={{
-                pageSize: 10,
-                showSizeChanger: true,
-                showTotal: (total) => `Total ${total} templates`,
-                responsive: true,
-              }}
-              scroll={{ x: 'max-content' }}
-            />
+          <Card title="Saved Templates" className="admin-card-responsive">
+            <div className="admin-table-responsive">
+              <Table
+                dataSource={templates}
+                columns={columns}
+                rowKey="_id"
+                pagination={{
+                  pageSize: 10,
+                  showSizeChanger: true,
+                  showTotal: (total) => `Total ${total} templates`,
+                  responsive: true,
+                }}
+                scroll={{ x: 'max-content' }}
+              />
+            </div>
           </Card>
+          </div>
         </div>
 
         {/* Preview Drawer */}
         <Drawer
           title="Badge Preview"
           placement="right"
-          width={600}
           onClose={() => setPreviewDrawerVisible(false)}
           open={previewDrawerVisible}
+          className="admin-drawer-responsive"
           extra={
-            <Space className="flex-wrap">
+            <div className="admin-button-group">
               <Button onClick={() => setPreviewDrawerVisible(false)}>Close</Button>
               <Button
                 type="primary"
@@ -799,7 +805,7 @@ const BadgeManagement: React.FC = () => {
               >
                 Download
               </Button>
-            </Space>
+            </div>
           }
         >
           {selectedTemplate && (

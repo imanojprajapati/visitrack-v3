@@ -66,8 +66,6 @@ const Settings: React.FC = () => {
       title: 'Name',
       dataIndex: 'name',
       key: 'name',
-      fixed: 'left' as const,
-      width: 150,
     },
     {
       title: 'Email',
@@ -106,8 +104,6 @@ const Settings: React.FC = () => {
     {
       title: 'Actions',
       key: 'actions',
-      fixed: 'right' as const,
-      width: 120,
       render: (_, record) => (
         <Space size="small">
           <Button
@@ -210,11 +206,13 @@ const Settings: React.FC = () => {
   if (currentUser?.role !== 'admin') {
     return (
       <MainLayout>
-        <div className="w-full px-2 sm:px-4 lg:px-8 py-6">
-          <h1 className="text-xl sm:text-2xl font-bold mb-6">Settings</h1>
-          <Card>
-            <p className="text-center text-gray-500">Access denied. Admin privileges required.</p>
-          </Card>
+        <div className="admin-responsive-container">
+          <div className="admin-content-wrapper">
+            <h1 className="text-responsive-xl font-bold text-gray-900 mb-6">Settings</h1>
+            <Card className="admin-card-responsive">
+              <p className="text-center text-gray-500">Access denied. Admin privileges required.</p>
+            </Card>
+          </div>
         </div>
       </MainLayout>
     );
@@ -222,115 +220,113 @@ const Settings: React.FC = () => {
 
   return (
     <MainLayout>
-      <div className="w-full px-2 sm:px-4 lg:px-8 py-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-          <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
+      <div className="admin-responsive-container">
+        <div className="admin-content-wrapper">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h1 className="text-responsive-xl font-bold text-gray-900">Settings</h1>
+            <div className="admin-button-group">
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={handleAddUser}
+                className="w-full sm:w-auto"
+              >
+                Add User
+              </Button>
+            </div>
+          </div>
+          
+          <Card title="User Management" className="admin-card-responsive">
+            {fetchingUsers ? (
+              <div className="flex justify-center items-center py-8">
+                <Spin size="large" />
+              </div>
+            ) : (
+              <div className="admin-table-responsive">
+                <Table
+                  columns={userColumns}
+                  dataSource={users}
+                  rowKey="id"
+                  pagination={{ pageSize: 10 }}
+                  scroll={{ x: 'max-content' }}
+                />
+              </div>
+            )}
+          </Card>
         </div>
-        
-        <Card
-          title="User Management"
-          extra={
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={handleAddUser}
-              className="w-full sm:w-auto"
-            >
-              Add User
-            </Button>
-          }
-        >
-          {fetchingUsers ? (
-            <div className="flex justify-center items-center py-8">
-              <Spin size="large" />
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table
-                columns={userColumns}
-                dataSource={users}
-                rowKey="id"
-                pagination={{ pageSize: 10 }}
-                scroll={{ x: 'max-content' }}
-              />
-            </div>
-          )}
-        </Card>
+      </div>
 
-        {/* User Modal */}
-        <Modal
-          title={editingUser ? 'Edit User' : 'Add User'}
-          open={isUserModalVisible}
-          onOk={handleUserModalOk}
-          onCancel={() => setIsUserModalVisible(false)}
-          width={window.innerWidth < 640 ? '100%' : 600}
-          style={{ top: 24 }}
-          bodyStyle={{ padding: window.innerWidth < 640 ? 16 : 24 }}
-          confirmLoading={loading}
+      {/* User Modal */}
+      <Modal
+        title={editingUser ? 'Edit User' : 'Add User'}
+        open={isUserModalVisible}
+        onOk={handleUserModalOk}
+        onCancel={() => setIsUserModalVisible(false)}
+        className="admin-modal-responsive"
+        confirmLoading={loading}
+      >
+        <Form
+          form={userForm}
+          layout="vertical"
         >
-          <Form
-            form={userForm}
-            layout="vertical"
+          <Form.Item
+            name="name"
+            label="Full Name"
+            rules={[{ required: true, message: 'Please enter full name' }]}
           >
-            <Form.Item
-              name="name"
-              label="Full Name"
-              rules={[{ required: true, message: 'Please enter full name' }]}
-            >
-              <Input prefix={<UserOutlined />} placeholder="Full Name" />
-            </Form.Item>
+            <Input prefix={<UserOutlined />} placeholder="Full Name" />
+          </Form.Item>
 
+          <Form.Item
+            name="email"
+            label="Email"
+            rules={[
+              { required: true, message: 'Please enter email' },
+              { type: 'email', message: 'Invalid email format' }
+            ]}
+          >
+            <Input placeholder="Email" />
+          </Form.Item>
+
+          {!editingUser && (
             <Form.Item
-              name="email"
-              label="Email"
+              name="password"
+              label="Password"
               rules={[
-                { required: true, message: 'Please enter email' },
-                { type: 'email', message: 'Invalid email format' }
+                { required: true, message: 'Please enter password' },
+                { 
+                  pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/,
+                  message: 'Password must be at least 6 characters with 1 uppercase, 1 lowercase, and 1 number'
+                }
               ]}
             >
-              <Input placeholder="Email" />
+              <Input.Password placeholder="Password" />
             </Form.Item>
+          )}
 
-            {!editingUser && (
-              <Form.Item
-                name="password"
-                label="Password"
-                rules={[
-                  { required: true, message: 'Please enter password' },
-                  { 
-                    pattern: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{6,}$/,
-                    message: 'Password must be at least 6 characters with 1 uppercase, 1 lowercase, and 1 number'
-                  }
-                ]}
-              >
-                <Input.Password placeholder="Password" />
-              </Form.Item>
-            )}
+          <Form.Item
+            name="role"
+            label="Role"
+            rules={[{ required: true, message: 'Please select role' }]}
+          >
+            <Select placeholder="Select role">
+              <Option value="admin">Admin - Full Access</Option>
+              <Option value="manager">Manager - Limited Access</Option>
+              <Option value="staff">Staff - Basic Access</Option>
+            </Select>
+          </Form.Item>
 
+          {editingUser && (
             <Form.Item
-              name="role"
-              label="Role"
-              rules={[{ required: true, message: 'Please select role' }]}
+              name="isActive"
+              label="Status"
+              valuePropName="checked"
             >
-              <Select placeholder="Select role">
-                <Option value="admin">Admin - Full Access</Option>
-                <Option value="manager">Manager - Limited Access</Option>
-                <Option value="staff">Staff - Basic Access</Option>
-              </Select>
+              <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
             </Form.Item>
-
-            {editingUser && (
-              <Form.Item
-                name="isActive"
-                label="Status"
-                valuePropName="checked"
-              >
-                <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
-              </Form.Item>
-            )}
-          </Form>
-        </Modal>
-      </div>
+          )}
+        </Form>
+      </Modal>
     </MainLayout>
   );
 };

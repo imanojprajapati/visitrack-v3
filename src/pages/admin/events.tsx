@@ -402,44 +402,45 @@ export default function EventManagement() {
   return (
     <AccessControl allowedRoles={['admin', 'manager']} pageName="Event Management">
       <AdminLayout>
-        <div className="w-full max-w-screen px-2 sm:px-4 lg:px-8 py-6">
-          <Card
-            title={
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <span className="text-lg font-semibold">Events</span>
-                <Space wrap>
-                  <Button
-                    type="default"
-                    icon={<ReloadOutlined />}
-                    loading={isRefreshing}
-                    onClick={() => refreshEvents(true)}
-                  >
-                    Refresh
-                  </Button>
-                  <Button
-                    type="primary"
-                    icon={<PlusOutlined />}
-                    onClick={() => {
-                      setSelectedEvent(null);
-                      setIsViewMode(false);
-                      setModalVisible(true);
-                    }}
-                  >
-                    Add Event
-                  </Button>
-                </Space>
+        <div className="admin-responsive-container">
+          <div className="admin-content-wrapper">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <h1 className="text-responsive-xl font-bold text-gray-900">Event Management</h1>
+              <div className="admin-button-group">
+                <Button
+                  type="default"
+                  icon={<ReloadOutlined />}
+                  loading={isRefreshing}
+                  onClick={() => refreshEvents(true)}
+                  className="w-full sm:w-auto"
+                >
+                  Refresh
+                </Button>
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => {
+                    setSelectedEvent(null);
+                    setIsViewMode(false);
+                    setModalVisible(true);
+                  }}
+                  className="w-full sm:w-auto"
+                >
+                  Add Event
+                </Button>
               </div>
-            }
-            className="mb-6"
-          >
-            <div className="overflow-x-auto">
-              <Table
-                columns={columns}
-                dataSource={getPaginatedData()}
-                rowKey="_id"
-                loading={isLoading}
-                pagination={false}
-              />
+            </div>
+            
+            <Card className="admin-card-responsive">
+              <div className="admin-table-responsive">
+                <Table
+                  columns={columns}
+                  dataSource={getPaginatedData()}
+                  rowKey="_id"
+                  loading={isLoading}
+                  pagination={false}
+                  scroll={{ x: 'max-content' }}
+                />
               
               {/* Custom Pagination */}
               <div className="mt-4 flex justify-between items-center">
@@ -487,15 +488,16 @@ export default function EventManagement() {
                 </div>
               </div>
             </div>
-          </Card>
-          <Modal
+            </Card>
+          </div>
+        </div>
+        
+        <Modal
             title={isViewMode ? 'View Event' : selectedEvent ? 'Edit Event' : 'Add Event'}
             open={modalVisible}
             onCancel={handleModalClose}
             footer={null}
-            width={window.innerWidth < 640 ? '100vw' : 800}
-            style={{ top: 24, padding: 0 }}
-            bodyStyle={{ padding: window.innerWidth < 640 ? 8 : 24 }}
+            className="admin-modal-responsive"
           >
             {isViewMode && selectedEvent ? (
               <div className="p-2 sm:p-4">
@@ -771,7 +773,6 @@ export default function EventManagement() {
               </Form>
             )}
           </Modal>
-        </div>
       </AdminLayout>
     </AccessControl>
   );

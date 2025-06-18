@@ -15,7 +15,8 @@ import {
   QRCode,
   Avatar,
   Row,
-  Col
+  Col,
+  Drawer
 } from 'antd';
 import type { ColumnType } from 'antd/es/table';
 import {
@@ -26,12 +27,15 @@ import {
   EyeOutlined,
   DownloadOutlined,
   UserOutlined,
-  QrcodeOutlined
+  QrcodeOutlined,
+  EditOutlined,
+  PlusOutlined
 } from '@ant-design/icons';
 import { DatePicker } from '../../utils/date';
 import AdminLayout from './layout';
 import { useRouter } from 'next/router';
 import moment from 'moment';
+import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -63,6 +67,7 @@ interface Visitor {
   createdAt: string;
   updatedAt: string;
   qrCode?: string;
+  visited?: boolean;
 }
 
 interface SearchFormValues {
@@ -89,6 +94,11 @@ export default function VisitorsPage() {
     total: 0,
   });
   const [exportLoading, setExportLoading] = useState(false);
+  const [searchText, setSearchText] = useState('');
+  const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
+  const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
+  const [selectedEventFilter, setSelectedEventFilter] = useState<string | undefined>(undefined);
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string | undefined>(undefined);
   const router = useRouter();
 
   useEffect(() => {
@@ -161,8 +171,6 @@ export default function VisitorsPage() {
       dataIndex: 'name',
       key: 'name',
       render: (name: string, record: Visitor) => name || record.additionalData?.name?.value || '-',
-      fixed: 'left',
-      width: 200,
     },
     {
       title: 'Email',
@@ -191,7 +199,7 @@ export default function VisitorsPage() {
       dataIndex: 'eventName',
       key: 'eventName',
       render: (eventName: string) => eventName || '-',
-      responsive: ['md'],
+      responsive: ['lg'],
     },
     {
       title: 'Location',
@@ -244,14 +252,12 @@ export default function VisitorsPage() {
             icon={<EyeOutlined />}
             onClick={() => {
               setSelectedVisitor(record);
-              setShowProfile(true);
+              setIsDetailModalVisible(true);
             }}
             title="View Details"
           />
         </Space>
       ),
-      fixed: 'right',
-      width: 100,
     },
   ];
 
@@ -536,152 +542,261 @@ export default function VisitorsPage() {
     );
   };
 
+  const handleViewDetails = (visitor: Visitor) => {
+    setSelectedVisitor(visitor);
+    setIsDetailModalVisible(true);
+  };
+
+  const handleEdit = (visitor: Visitor) => {
+    // Implement edit functionality
+    message.info('Edit functionality coming soon');
+  };
+
   if (!mounted) {
     return null;
   }
 
   return (
     <AdminLayout>
-      <div className="p-4 sm:p-6">
-        <Card
-          title={<h1 className="text-xl sm:text-2xl font-bold">Visitor Management</h1>}
-          extra={
-            <Space className="flex-wrap">
-              <Button 
-                icon={<ExportOutlined />} 
-                onClick={handleExport} 
-                loading={exportLoading}
-                disabled={exportLoading}
-                className="w-full sm:w-auto"
-              >
-                Export
-              </Button>
-              <Button icon={<ImportOutlined />} onClick={handleImport} className="w-full sm:w-auto">
-                Import
-              </Button>
+      <div className="admin-responsive-container">
+        <div className="admin-content-wrapper">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h1 className="text-responsive-xl font-bold text-gray-900">Visitors Management</h1>
+            <div className="admin-button-group">
               <Button
                 icon={<FilterOutlined />}
-                onClick={() => setShowFilters(!showFilters)}
-                type={showFilters ? 'primary' : 'default'}
-                className="w-full sm:w-auto"
+                onClick={() => setIsFilterDrawerVisible(true)}
+                className="show-mobile w-full sm:w-auto"
               >
                 Filters
               </Button>
-            </Space>
-          }
-        >
-          {showFilters && (
-            <Form
-              form={form}
-              layout="vertical"
-              className="mb-6"
-              onFinish={handleSearch}
-            >
-              <Row gutter={[16, 16]}>
-                <Col xs={24} sm={12} md={6}>
-                  <Form.Item name="search" label="Search">
-                    <Input prefix={<SearchOutlined />} placeholder="Search by name, email, or phone" />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                  <Form.Item name="eventId" label="Event">
-                    <Select placeholder="Select event" allowClear>
-                      {events.map(event => (
-                        <Option key={event._id} value={event._id}>
-                          {event.title}
-                        </Option>
-                      ))}
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                  <Form.Item name="status" label="Status">
-                    <Select placeholder="Select status" allowClear>
-                      <Option value="registered">Registered</Option>
-                      <Option value="checked_in">Checked In</Option>
-                      <Option value="checked_out">Checked Out</Option>
-                      <Option value="cancelled">Cancelled</Option>
-                    </Select>
-                  </Form.Item>
-                </Col>
-                <Col xs={24} sm={12} md={6}>
-                  <Form.Item name="dateRange" label="Date Range">
-                    <RangePicker className="w-full" />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row>
-                <Col span={24} className="text-right">
-                  <Space className="flex-wrap justify-end">
-                    <Button onClick={handleReset}>Reset</Button>
-                    <Button type="primary" htmlType="submit">
-                      Apply Filters
-                    </Button>
-                  </Space>
-                </Col>
-              </Row>
-            </Form>
-          )}
-
-          <Table
-            columns={columns}
-            dataSource={getPaginatedData()}
-            rowKey="_id"
-            loading={loading}
-            pagination={false}
-            scroll={{ x: 'max-content' }}
-            className="overflow-x-auto"
-          />
-          
-          {/* Custom Pagination */}
-          <div className="mt-4 flex justify-between items-center">
-            <div className="text-sm text-gray-600">
-              Showing {((pagination.current - 1) * pagination.pageSize) + 1} to {Math.min(pagination.current * pagination.pageSize, pagination.total)} of {pagination.total} visitors
-            </div>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm text-gray-600">Show:</span>
-              <Select
-                value={pagination.pageSize}
-                onChange={(size) => {
-                  setPagination(prev => ({
-                    ...prev,
-                    pageSize: size,
-                    current: 1,
-                  }));
-                }}
-                style={{ width: 80 }}
-              >
-                <Select.Option value={10}>10</Select.Option>
-                <Select.Option value={20}>20</Select.Option>
-                <Select.Option value={50}>50</Select.Option>
-                <Select.Option value={100}>100</Select.Option>
-              </Select>
-              <span className="text-sm text-gray-600">per page</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <Button
-                size="small"
-                disabled={pagination.current === 1}
-                onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
-              >
-                Previous
-              </Button>
-              <span className="px-2 text-sm">
-                Page {pagination.current} of {Math.ceil(pagination.total / pagination.pageSize)}
-              </span>
-              <Button
-                size="small"
-                disabled={pagination.current >= Math.ceil(pagination.total / pagination.pageSize)}
-                onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
-              >
-                Next
-              </Button>
             </div>
           </div>
-        </Card>
 
-        <VisitorDetailsModal />
-        <QRCodeModal />
+          {/* Search and Filters */}
+          <Card className="admin-card-responsive mb-6">
+            <div className="admin-form-responsive">
+              <Row gutter={[16, 16]} className="items-end">
+                <Col xs={24} sm={12} md={8}>
+                  <Input.Search
+                    placeholder="Search visitors..."
+                    value={searchText}
+                    onChange={(e) => setSearchText(e.target.value)}
+                    onSearch={(value) => {
+                      setSearchText(value);
+                      // Apply search filter
+                      const filtered = visitors.filter(visitor => 
+                        visitor.name.toLowerCase().includes(value.toLowerCase()) ||
+                        visitor.email.toLowerCase().includes(value.toLowerCase()) ||
+                        visitor.phone.toLowerCase().includes(value.toLowerCase())
+                      );
+                      setFilteredVisitors(filtered);
+                    }}
+                    className="w-full"
+                    enterButton
+                  />
+                </Col>
+                <Col xs={24} sm={12} md={8} className="hide-mobile">
+                  <Select
+                    placeholder="Filter by Event"
+                    allowClear
+                    className="w-full"
+                    onChange={(value) => {
+                      if (value) {
+                        const filtered = visitors.filter(visitor => visitor.eventId === value);
+                        setFilteredVisitors(filtered);
+                      } else {
+                        setFilteredVisitors(visitors);
+                      }
+                    }}
+                  >
+                    {events.map(event => (
+                      <Option key={event._id} value={event._id}>
+                        {event.title}
+                      </Option>
+                    ))}
+                  </Select>
+                </Col>
+                <Col xs={24} sm={12} md={8} className="hide-mobile">
+                  <Select
+                    placeholder="Filter by Status"
+                    allowClear
+                    className="w-full"
+                    onChange={(value) => {
+                      if (value) {
+                        const filtered = visitors.filter(visitor => visitor.status === value);
+                        setFilteredVisitors(filtered);
+                      } else {
+                        setFilteredVisitors(visitors);
+                      }
+                    }}
+                  >
+                    <Option value="registered">Registered</Option>
+                    <Option value="checked_in">Checked In</Option>
+                    <Option value="checked_out">Checked Out</Option>
+                    <Option value="cancelled">Cancelled</Option>
+                  </Select>
+                </Col>
+              </Row>
+            </div>
+          </Card>
+
+          {/* Visitors Table */}
+          <Card className="admin-card-responsive">
+            <div className="admin-table-responsive">
+              <Table
+                columns={columns}
+                dataSource={getPaginatedData()}
+                rowKey="_id"
+                loading={loading}
+                pagination={{
+                  total: filteredVisitors.length,
+                  current: pagination.current,
+                  pageSize: pagination.pageSize,
+                  showSizeChanger: true,
+                  showQuickJumper: true,
+                  showTotal: (total, range) => 
+                    `${range[0]}-${range[1]} of ${total} visitors`,
+                  responsive: true,
+                  onChange: handleTableChange,
+                }}
+                scroll={{ x: 'max-content' }}
+                size="middle"
+              />
+            </div>
+          </Card>
+
+          {/* Detail Modal */}
+          <Modal
+            title="Visitor Details"
+            open={isDetailModalVisible}
+            onCancel={() => setIsDetailModalVisible(false)}
+            footer={null}
+            className="admin-modal-responsive"
+          >
+            {selectedVisitor && (
+              <div className="space-y-4">
+                <div>
+                  <label className="text-responsive-sm font-medium text-gray-700">Name:</label>
+                  <p className="text-responsive-md">{selectedVisitor.name}</p>
+                </div>
+                <div>
+                  <label className="text-responsive-sm font-medium text-gray-700">Email:</label>
+                  <p className="text-responsive-md">{selectedVisitor.email}</p>
+                </div>
+                {selectedVisitor.phone && (
+                  <div>
+                    <label className="text-responsive-sm font-medium text-gray-700">Phone:</label>
+                    <p className="text-responsive-md">{selectedVisitor.phone}</p>
+                  </div>
+                )}
+                {selectedVisitor.company && (
+                  <div>
+                    <label className="text-responsive-sm font-medium text-gray-700">Company:</label>
+                    <p className="text-responsive-md">{selectedVisitor.company}</p>
+                  </div>
+                )}
+                <div>
+                  <label className="text-responsive-sm font-medium text-gray-700">Registration Date:</label>
+                  <p className="text-responsive-md">
+                    {dayjs(selectedVisitor.createdAt).format('YYYY-MM-DD HH:mm')}
+                  </p>
+                </div>
+              </div>
+            )}
+          </Modal>
+
+          {/* Mobile Filter Drawer */}
+          <Drawer
+            title="Filters"
+            placement="right"
+            onClose={() => setIsFilterDrawerVisible(false)}
+            open={isFilterDrawerVisible}
+            className="admin-drawer-responsive"
+          >
+            <div className="space-y-4">
+              <div>
+                <label className="text-responsive-sm font-medium">Event:</label>
+                <Select
+                  placeholder="Select Event"
+                  allowClear
+                  className="w-full mt-2"
+                  value={selectedEventFilter}
+                  onChange={(value) => setSelectedEventFilter(value)}
+                >
+                  {events.map(event => (
+                    <Option key={event._id} value={event._id}>
+                      {event.title}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+              <div>
+                <label className="text-responsive-sm font-medium">Status:</label>
+                <Select
+                  placeholder="Select Status"
+                  allowClear
+                  className="w-full mt-2"
+                  value={selectedStatusFilter}
+                  onChange={(value) => setSelectedStatusFilter(value)}
+                >
+                  <Option value="registered">Registered</Option>
+                  <Option value="checked_in">Checked In</Option>
+                  <Option value="checked_out">Checked Out</Option>
+                  <Option value="cancelled">Cancelled</Option>
+                </Select>
+              </div>
+              <div className="pt-4">
+                <Button 
+                  type="primary" 
+                  className="w-full mb-2"
+                  onClick={() => {
+                    // Apply filters
+                    let filtered = [...visitors];
+                    
+                    // Apply search filter if exists
+                    if (searchText) {
+                      filtered = filtered.filter(visitor => 
+                        visitor.name.toLowerCase().includes(searchText.toLowerCase()) ||
+                        visitor.email.toLowerCase().includes(searchText.toLowerCase()) ||
+                        visitor.phone.toLowerCase().includes(searchText.toLowerCase())
+                      );
+                    }
+                    
+                    // Apply event filter
+                    if (selectedEventFilter) {
+                      filtered = filtered.filter(visitor => visitor.eventId === selectedEventFilter);
+                    }
+                    
+                    // Apply status filter
+                    if (selectedStatusFilter) {
+                      filtered = filtered.filter(visitor => visitor.status === selectedStatusFilter);
+                    }
+                    
+                    setFilteredVisitors(filtered);
+                    setIsFilterDrawerVisible(false);
+                  }}
+                >
+                  Apply Filters
+                </Button>
+                <Button 
+                  className="w-full"
+                  onClick={() => {
+                    // Clear filters
+                    setSelectedEventFilter(undefined);
+                    setSelectedStatusFilter(undefined);
+                    setSearchText('');
+                    setFilteredVisitors(visitors);
+                    setIsFilterDrawerVisible(false);
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
+          </Drawer>
+        </div>
       </div>
     </AdminLayout>
   );

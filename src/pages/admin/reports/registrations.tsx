@@ -705,16 +705,17 @@ export default function RegistrationReport() {
         className="bg-white shadow-sm flex-1 flex flex-col overflow-hidden"
         bodyStyle={{ padding: '24px', height: '100%', display: 'flex', flexDirection: 'column' }}
       >
-        <div className="flex-none flex items-center justify-between mb-6">
-          <div>
+        <div className="flex-none flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
+          <div className="mb-4 lg:mb-0">
             <Title level={4} className="m-0">Visitor Registrations</Title>
             <Text type="secondary">Showing all visitor registration records</Text>
           </div>
-          <Space>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
             <Button
               icon={<FilterOutlined />}
               onClick={() => setShowFilters(f => !f)}
               type={showFilters ? 'primary' : 'default'}
+              className="w-full sm:w-auto"
             >
               Filter
             </Button>
@@ -722,6 +723,7 @@ export default function RegistrationReport() {
               icon={<ImportOutlined />}
               onClick={() => setShowImportModal(true)}
               type="default"
+              className="w-full sm:w-auto"
             >
               Import
             </Button>
@@ -730,10 +732,11 @@ export default function RegistrationReport() {
               onClick={handleExport}
               type="default"
               loading={exportLoading}
+              className="w-full sm:w-auto"
             >
               Export XLSX
             </Button>
-          </Space>
+          </div>
         </div>
 
         <div className="flex-1 overflow-auto">

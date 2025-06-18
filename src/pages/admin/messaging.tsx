@@ -1048,23 +1048,25 @@ const Messaging: React.FC = () => {
   return (
     <AccessControl allowedRoles={['admin', 'manager']} pageName="Messaging">
       <AdminLayout>
-        <div className="w-full max-w-screen px-2 sm:px-4 lg:px-8 py-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-            <div>
-              <Title level={2} className="text-xl sm:text-2xl font-bold">Messaging</Title>
-              <Text type="secondary">Send messages to visitors and manage message templates</Text>
+        <div className="admin-responsive-container">
+          <div className="admin-content-wrapper">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+              <div>
+                <h1 className="text-responsive-xl font-bold text-gray-900">Messaging</h1>
+                <Text type="secondary">Send messages to visitors and manage message templates</Text>
+              </div>
             </div>
-          </div>
 
-          <Card>
-            <Tabs 
-              defaultActiveKey="compose"
-              type="card"
-              size="large"
-              tabBarStyle={{ marginBottom: 24 }}
-              items={tabItems}
-            />
-          </Card>
+            <Card className="admin-card-responsive">
+              <Tabs 
+                defaultActiveKey="compose"
+                type="card"
+                size="large"
+                tabBarStyle={{ marginBottom: 24 }}
+                items={tabItems}
+              />
+            </Card>
+          </div>
         </div>
 
         {/* Template Creation/Edit Modal */}
@@ -1077,7 +1079,7 @@ const Messaging: React.FC = () => {
             templateForm.resetFields();
           }}
           footer={null}
-          width={800}
+          className="admin-modal-responsive"
         >
           <Form
             form={templateForm}
@@ -1163,7 +1165,7 @@ const Messaging: React.FC = () => {
               Send Messages
             </Button>
           ]}
-          width={800}
+          className="admin-modal-responsive"
         >
           {previewData && (
             <div>
