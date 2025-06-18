@@ -60,7 +60,7 @@ const interests = [
 ];
 
 // QR Code component with error boundary
-const QRCode: React.FC<{ value: string; size?: number }> = ({ value, size = 200 }) => {
+const QRCode: React.FC<{ value: string; size?: number }> = ({ value, size = 80 }) => {
   const [hasError, setHasError] = useState(false);
 
   if (hasError) {
@@ -302,7 +302,7 @@ export default function EventRegistration() {
           setVisitor(checkResponse.visitor);
           setIsAlreadyRegistered(true);
           setCurrentStep(3); // Move to the final step
-          message.info('You are already registered for this event');
+          messageApi.info('You are already registered for this event');
           return;
         }
         console.log('==================');
@@ -318,11 +318,11 @@ export default function EventRegistration() {
       setFormData(prev => ({ ...prev, email: values.email }));
       
       setCurrentStep(1);
-      message.success('OTP sent to your email');
+      messageApi.success('OTP sent to your email');
     } catch (error) {
       console.error('Error:', error);
       setError(error instanceof Error ? error.message : 'Failed to process request');
-      message.error(error instanceof Error ? error.message : 'Failed to process request');
+      messageApi.error(error instanceof Error ? error.message : 'Failed to process request');
     } finally {
       setLoading(false);
     }
@@ -419,16 +419,16 @@ export default function EventRegistration() {
             console.log('Form data should now be updated, checking current state...');
           }, 100);
           
-          message.success('OTP verified successfully! Your information has been pre-filled from our database.');
+          messageApi.success('OTP verified successfully! Your information has been pre-filled from our database.');
         } else {
           console.log('No center data found for email:', email);
           // Don't update formRenderKey when no center data is found to prevent form re-rendering
-          message.success('OTP verified successfully! Please fill in your details.');
+          messageApi.success('OTP verified successfully! Please fill in your details.');
         }
       } catch (centerError) {
         console.error('Error fetching center data:', centerError);
         // Continue with registration even if center data fetch fails
-        message.success('OTP verified successfully! Please fill in your details.');
+        messageApi.success('OTP verified successfully! Please fill in your details.');
       }
 
       // Move to registration form step
@@ -443,7 +443,7 @@ export default function EventRegistration() {
     } catch (error) {
       console.error('Error:', error);
       setError(error instanceof Error ? error.message : 'Failed to verify OTP');
-      message.error(error instanceof Error ? error.message : 'Failed to verify OTP');
+      messageApi.error(error instanceof Error ? error.message : 'Failed to verify OTP');
     } finally {
       setIsVerifying(false);
     }
@@ -771,54 +771,312 @@ export default function EventRegistration() {
   const handleDownloadPDF = async () => {
     if (!visitor || !event) return;
     try {
-      // Fetch badge template for this event
-      const templates = await fetchApi(`badge-templates?eventId=${event._id}`);
-      if (!Array.isArray(templates) || templates.length === 0) {
-        message.error('No badge template found for this event.');
-        return;
-      }
-      const templateId = templates[0]._id;
-
-      // Prepare visitor data with IDs
-      const visitorData = {
-        ...visitor,
-        visitorId: visitor._id,
-        eventId: event._id,
-        eventStartDate: formatDate(visitor.eventStartDate),
-        eventEndDate: formatDate(visitor.eventEndDate),
-        eventDate: visitor.eventEndDate ? `${formatDate(visitor.eventStartDate)} - ${formatDate(visitor.eventEndDate)}` : formatDate(visitor.eventStartDate),
-        registrationDate: formatDateTime(visitor.createdAt)
-      };
-
-      // Use fetchApi to get the PDF blob directly
-      const pdfBlob = await fetchApi('badge-templates/download', {
-        method: 'POST',
-        body: JSON.stringify({
-          templateId,
-          visitorData
-        })
-      });
-
-      // Create download link for the blob
-      const url = window.URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `visitrack-badge-${visitor.name}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      
-      message.success('Badge downloaded successfully');
+      // Create badge image instead of PDF
+      await generateBadgeImage();
     } catch (error) {
-      console.error('Error downloading PDF:', error);
-      message.error(error instanceof Error ? error.message : 'Failed to download PDF');
+      console.error('Error downloading badge:', error);
+      message.error(error instanceof Error ? error.message : 'Failed to download badge');
+    }
+  };
+
+  const generateBadgeImage = async () => {
+    if (!visitor || !event) return;
+
+    try {
+      // Create canvas with specified dimensions
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Could not get canvas context');
+
+      // Set badge dimensions: 288px width, 384px height
+      canvas.width = 288;
+      canvas.height = 384;
+
+      // Fill background with white
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Add border
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, canvas.width - 2, canvas.height - 2);
+
+      // ROW 1: Event Banner (height: 80px, width: 100%) - Image only
+      const bannerHeight = 80;
+      
+      console.log('Event banner URL:', event.banner); // Debug log
+      
+      // Try to load banner image with better error handling
+      let bannerLoaded = false;
+      if (event.banner && event.banner.trim() !== '') {
+        try {
+          // Use HTMLImageElement instead of Image to avoid Next.js conflict
+          const bannerImg = document.createElement('img') as HTMLImageElement;
+          
+          // Set up the image loading promise
+          const imageLoadPromise = new Promise<boolean>((resolve) => {
+            const timeout = setTimeout(() => {
+              console.log('Banner image load timeout');
+              resolve(false);
+            }, 5000); // 5 second timeout
+            
+            bannerImg.onload = () => {
+              clearTimeout(timeout);
+              console.log('Banner image loaded successfully');
+              try {
+                // Draw the banner image to fill the entire banner area
+                ctx.drawImage(bannerImg, 0, 0, canvas.width, bannerHeight);
+                bannerLoaded = true;
+                resolve(true);
+              } catch (drawError) {
+                console.error('Error drawing banner image:', drawError);
+                resolve(false);
+              }
+            };
+            
+            bannerImg.onerror = (error) => {
+              clearTimeout(timeout);
+              console.error('Banner image failed to load:', error);
+              resolve(false);
+            };
+            
+            // Set the image source
+            bannerImg.crossOrigin = 'anonymous';
+            bannerImg.src = event.banner || '';
+          });
+          
+          bannerLoaded = await imageLoadPromise;
+        } catch (error) {
+          console.error('Error in banner image loading:', error);
+          bannerLoaded = false;
+        }
+      }
+      
+      // If banner didn't load, draw fallback
+      if (!bannerLoaded) {
+        console.log('Drawing fallback banner');
+        ctx.fillStyle = '#4338ca';
+        ctx.fillRect(0, 0, canvas.width, bannerHeight);
+        
+        // Add event title on fallback banner
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'center';
+        const eventTitle = event.title.length > 35 ? event.title.substring(0, 35) + '...' : event.title;
+        ctx.fillText(eventTitle, canvas.width / 2, bannerHeight / 2 + 5);
+      }
+
+      // ROW 2: QR Code (80px x 80px, centered) - Use actual QR library
+      const qrSize = 80;
+      const qrX = (canvas.width - qrSize) / 2;
+      const qrY = bannerHeight + 15;
+      const qrCodeValue = visitor._id ? visitor._id.toString() : visitor.email;
+      
+      console.log('Generating QR code for value:', qrCodeValue); // Debug log
+      
+      try {
+        // Import QR code library dynamically
+        const QRCode = (await import('qrcode')).default;
+        
+        // Generate QR code as data URL
+        const qrDataUrl = await QRCode.toDataURL(qrCodeValue, {
+          width: qrSize,
+          margin: 1,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        });
+        
+        // Create image from QR code data URL using HTMLImageElement
+        const qrImg = document.createElement('img') as HTMLImageElement;
+        
+        const qrLoadPromise = new Promise<boolean>((resolve) => {
+          const timeout = setTimeout(() => {
+            console.log('QR code load timeout');
+            resolve(false);
+          }, 3000);
+          
+          qrImg.onload = () => {
+            clearTimeout(timeout);
+            console.log('QR code image loaded successfully');
+            try {
+              ctx.drawImage(qrImg, qrX, qrY, qrSize, qrSize);
+              resolve(true);
+            } catch (drawError) {
+              console.error('Error drawing QR code:', drawError);
+              resolve(false);
+            }
+          };
+          
+          qrImg.onerror = (error) => {
+            clearTimeout(timeout);
+            console.error('QR code image failed to load:', error);
+            resolve(false);
+          };
+          
+          qrImg.src = qrDataUrl;
+        });
+        
+        const qrLoaded = await qrLoadPromise;
+        
+        if (!qrLoaded) {
+          // Fallback: draw simple QR placeholder
+          console.log('Drawing QR code fallback');
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(qrX, qrY, qrSize, qrSize);
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(qrX, qrY, qrSize, qrSize);
+          ctx.fillStyle = '#000000';
+          ctx.font = '12px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillText('QR CODE', qrX + qrSize/2, qrY + qrSize/2);
+        }
+        
+      } catch (qrError) {
+        console.error('Error generating QR code:', qrError);
+        // Draw fallback QR placeholder
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(qrX, qrY, qrSize, qrSize);
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(qrX, qrY, qrSize, qrSize);
+        ctx.fillStyle = '#000000';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText('QR CODE', qrX + qrSize/2, qrY + qrSize/2);
+      }
+
+      // ROW 3: Registration Details with Visitor ID
+      const detailsStartY = qrY + qrSize + 20;
+      ctx.fillStyle = '#1f2937';
+      ctx.textAlign = 'left';
+      ctx.font = '12px Arial'; // Increased from 10px to 12px
+      
+      let currentY = detailsStartY;
+      const leftMargin = 15;
+      const lineHeight = 14; // Increased line height for better spacing
+
+      // Visitor ID (new field) - Show full ID
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText('ID:', leftMargin, currentY);
+      ctx.fillStyle = '#1f2937';
+      ctx.font = 'bold 10px Arial'; // Smaller font for full ID to fit
+      const visitorId = visitor._id ? visitor._id.toString() : 'N/A';
+      ctx.fillText(visitorId, leftMargin + 25, currentY);
+      currentY += lineHeight;
+
+      // Name
+      ctx.font = '12px Arial';
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText('Name:', leftMargin, currentY);
+      ctx.fillStyle = '#1f2937';
+      ctx.font = 'bold 12px Arial';
+      const visitorName = visitor.name.length > 28 ? visitor.name.substring(0, 28) + '...' : visitor.name;
+      ctx.fillText(visitorName, leftMargin + 40, currentY);
+      currentY += lineHeight;
+
+      // Email
+      ctx.font = '12px Arial';
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText('Email:', leftMargin, currentY);
+      ctx.fillStyle = '#1f2937';
+      const email = visitor.email.length > 26 ? visitor.email.substring(0, 26) + '...' : visitor.email;
+      ctx.fillText(email, leftMargin + 40, currentY);
+      currentY += lineHeight;
+
+      // Phone
+      if (visitor.phone) {
+        ctx.fillStyle = '#6b7280';
+        ctx.fillText('Phone:', leftMargin, currentY);
+        ctx.fillStyle = '#1f2937';
+        ctx.fillText(visitor.phone, leftMargin + 40, currentY);
+        currentY += lineHeight;
+      }
+
+      // Company
+      if (visitor.company) {
+        ctx.fillStyle = '#6b7280';
+        ctx.fillText('Company:', leftMargin, currentY);
+        ctx.fillStyle = '#1f2937';
+        const company = visitor.company.length > 23 ? visitor.company.substring(0, 23) + '...' : visitor.company;
+        ctx.fillText(company, leftMargin + 55, currentY);
+        currentY += lineHeight;
+      }
+
+      // Event Name
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText('Event:', leftMargin, currentY);
+      ctx.fillStyle = '#1f2937';
+      const eventName = (visitor.eventName || event.title || 'Event').length > 26 ? 
+        (visitor.eventName || event.title || 'Event').substring(0, 26) + '...' : 
+        (visitor.eventName || event.title || 'Event');
+      ctx.fillText(eventName, leftMargin + 40, currentY);
+      currentY += lineHeight;
+
+      // Location
+      if (visitor.eventLocation) {
+        ctx.fillStyle = '#6b7280';
+        ctx.fillText('Location:', leftMargin, currentY);
+        ctx.fillStyle = '#1f2937';
+        const location = visitor.eventLocation.length > 23 ? visitor.eventLocation.substring(0, 23) + '...' : visitor.eventLocation;
+        ctx.fillText(location, leftMargin + 55, currentY);
+        currentY += lineHeight;
+      }
+
+      // Event Date
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText('Date:', leftMargin, currentY);
+      ctx.fillStyle = '#1f2937';
+      const eventDate = visitor.eventEndDate ? 
+        `${formatDate(visitor.eventStartDate)} - ${formatDate(visitor.eventEndDate)}` : 
+        formatDate(visitor.eventStartDate);
+      const dateText = eventDate.length > 26 ? eventDate.substring(0, 26) + '...' : eventDate;
+      ctx.fillText(dateText, leftMargin + 40, currentY);
+      currentY += lineHeight;
+
+      // Registration Date
+      ctx.fillStyle = '#6b7280';
+      ctx.fillText('Registered:', leftMargin, currentY);
+      ctx.fillStyle = '#1f2937';
+      const regDate = formatDateTime(visitor.createdAt);
+      ctx.fillText(regDate, leftMargin + 65, currentY);
+
+      // ROW 4: VISITOR text at bottom (28px font size, centered)
+      ctx.font = 'bold 28px Arial';
+      ctx.fillStyle = '#1f2937';
+      ctx.textAlign = 'center';
+      ctx.fillText('VISITOR', canvas.width / 2, canvas.height - 15);
+
+      // Convert canvas to blob and download
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `visitrack-badge-${visitor.name.replace(/[^a-zA-Z0-9]/g, '-')}.png`;
+          document.body.appendChild(link);
+          link.click();
+          link.remove();
+          URL.revokeObjectURL(url);
+          messageApi.success('Badge downloaded successfully');
+        }
+      }, 'image/png');
+
+    } catch (error) {
+      console.error('Error generating badge image:', error);
+      messageApi.error('Failed to generate badge image');
     }
   };
 
   const handlePrint = () => {
     // Implementation for printing the badge
     console.log('Printing badge');
+  };
+
+  const handleReturnToEvent = () => {
+    window.location.href = 'https://www.visitrack.in/events';
   };
 
   // Helper function to format date
@@ -923,6 +1181,10 @@ export default function EventRegistration() {
           <Title level={4}>Registration Details</Title>
           <Divider />
           <Space direction="vertical" size="middle" style={{ width: '100%' }} className="p-4 bg-gray-50 rounded-lg">
+            <div>
+              <Text type="secondary">Visitor ID</Text>
+              <div><Text strong style={{ fontFamily: 'monospace', fontSize: '12px' }}>{visitor._id}</Text></div>
+            </div>
             <div>
               <Text type="secondary">Name</Text>
               <div><Text strong>{visitor.name}</Text></div>
@@ -1612,26 +1874,36 @@ export default function EventRegistration() {
             <div className="mt-8">
               <RegistrationDetails visitor={visitor} />
             </div>
-            <div className="mt-4">
-              <Space size="middle">
-                <Button type="primary" onClick={handleDownloadQR} icon={<DownloadOutlined />}>
+            {/* Action Buttons - Responsive Layout */}
+            <div className="mt-6">
+              <div className="mobile-button-container">
+                <Button 
+                  type="primary" 
+                  onClick={handleDownloadQR} 
+                  icon={<DownloadOutlined />}
+                  size="large"
+                  className="w-full sm:w-auto"
+                >
                   Download QR Code
                 </Button>
-                <Button onClick={handleDownloadPDF} icon={<DownloadOutlined />}>
+                <Button 
+                  onClick={handleDownloadPDF} 
+                  icon={<DownloadOutlined />}
+                  size="large"
+                  className="w-full sm:w-auto"
+                >
                   Download Badge
                 </Button>
-              </Space>
-            </div>
-            <div className="mt-4">
-              <Space size="middle">
                 <Button
-                  type="primary"
+                  type="default"
                   icon={<HomeOutlined />}
-                  onClick={() => router.push('/events')}
+                  onClick={handleReturnToEvent}
+                  size="large"
+                  className="w-full sm:w-auto"
                 >
-                  Return to Events
+                  Return to Event
                 </Button>
-              </Space>
+              </div>
             </div>
           </div>
         );
@@ -1749,12 +2021,90 @@ export default function EventRegistration() {
   if (isAlreadyRegistered && visitor && event && currentStep === 3) {
     const eventTitle = event?.title || 'Event';
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
+      <div className="flex flex-col">
         <Head>
           <title>Already Registered - {eventTitle}</title>
         </Head>
 
-        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Custom styles for mobile-responsive buttons */}
+        <style jsx>{`
+          @media (max-width: 640px) {
+            .mobile-button-container {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              width: 100%;
+              max-width: 280px;
+              margin: 0 auto;
+            }
+            
+            .mobile-button-container .ant-btn {
+              width: 100% !important;
+              min-height: 48px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-size: 16px;
+              font-weight: 500;
+              margin-top: 10px;
+            }
+          }
+          
+          @media (min-width: 641px) {
+            .mobile-button-container {
+              display: flex;
+              flex-direction: row;
+              gap: 10px;
+              align-items: center;
+              justify-content: center;
+              flex-wrap: wrap;
+            }
+          }
+        `}</style>
+
+        {/* Event Banner */}
+        <div className="relative h-[350px] w-full">
+          <div className="absolute inset-0">
+            <div className="relative w-full h-full">
+              <Image
+                src={event?.banner || "/images/event-banner.jpg"}
+                alt="Event Banner"
+                fill
+                style={{ objectFit: 'cover' }}
+                className="opacity-90"
+                priority
+                onError={(e) => {
+                  // Fallback to default banner if event banner fails to load
+                  e.currentTarget.src = "/images/event-banner.jpg";
+                }}
+              />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-75"></div>
+          </div>
+          <div className="relative max-w-7xl mx-auto py-16 px-4 sm:py-24 sm:px-6 lg:px-8 h-full flex items-center">
+            <div className="text-center w-full">
+              <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl">
+                {event?.title || 'Event'}
+              </h1>
+              <p className="mt-6 max-w-lg mx-auto text-xl text-indigo-100 sm:max-w-3xl">
+                {event?.description || `Join us for ${event?.title || 'Event'} featuring cutting-edge innovations and industry leaders.`}
+              </p>
+              <div className="mt-4 text-indigo-100">
+                <p className="text-lg">
+                  {formatDate(event?.startDate)} - {formatDate(event?.endDate)}
+                </p>
+                {event?.location && (
+                  <p className="text-lg mt-2">
+                    📍 {event.location}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-grow max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <Card className="shadow-lg">
             <Result
               status="info"
@@ -1819,12 +2169,14 @@ export default function EventRegistration() {
                     </Space>
                   </div>
                   
-                  <Space size="middle">
+                  {/* Action Buttons - Responsive Layout */}
+                  <div className="mobile-button-container">
                     <Button
                       type="primary"
                       icon={<DownloadOutlined />}
                       onClick={handleDownloadQR}
                       size="large"
+                      className="w-full sm:w-auto"
                     >
                       Download QR Code
                     </Button>
@@ -1833,25 +2185,45 @@ export default function EventRegistration() {
                       icon={<DownloadOutlined />}
                       onClick={handleDownloadPDF}
                       size="large"
+                      className="w-full sm:w-auto"
                     >
                       Download Badge
                     </Button>
-                  </Space>
-                  
-                  <div className="mt-4">
                     <Button
-                      type="primary"
+                      type="default"
                       icon={<HomeOutlined />}
-                      onClick={() => router.push('/events')}
+                      onClick={handleReturnToEvent}
                       size="large"
+                      className="w-full sm:w-auto"
                     >
-                      Return to Events
+                      Return to Event
                     </Button>
                   </div>
                 </div>
               ]}
             />
           </Card>
+        </div>
+
+        {/* Footer Banner */}
+        <div className="relative h-[350px] w-full mt-8">
+          <div className="absolute inset-0">
+            <div className="relative w-full h-full">
+              <Image
+                src={event?.banner || "/images/event-banner.jpg"}
+                alt="Event Footer Banner"
+                fill
+                style={{ objectFit: 'cover' }}
+                className="opacity-80"
+                priority
+                onError={(e) => {
+                  // Fallback to default banner if event banner fails to load
+                  e.currentTarget.src = "/images/event-banner.jpg";
+                }}
+              />
+            </div>
+            <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-60"></div>
+          </div>
         </div>
       </div>
     );
@@ -1863,9 +2235,46 @@ export default function EventRegistration() {
         <title>Register - {event?.title || 'Event'}</title>
         <meta name="description" content={`Register for ${event?.title || 'Event'}`} />
       </Head>
+      
+      {/* Custom styles for mobile-responsive buttons */}
+      <style jsx>{`
+        @media (max-width: 640px) {
+          .mobile-button-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            max-width: 280px;
+            margin: 0 auto;
+          }
+          
+          .mobile-button-container .ant-btn {
+            width: 100% !important;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 500;
+            margin-top: 10px;
+          }
+        }
+        
+        @media (min-width: 641px) {
+          .mobile-button-container {
+            display: flex;
+            flex-direction: row;
+            gap: 10px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+          }
+        }
+      `}</style>
 
       {/* Event Banner */}
-      <div className="relative h-[400px] w-full">
+      <div className="relative h-[350px] w-full">
         <div className="absolute inset-0">
           <div className="relative w-full h-full">
             <Image
@@ -1950,6 +2359,27 @@ export default function EventRegistration() {
             {contextHolder}
             {renderStepContent()}
           </Card>
+        </div>
+      </div>
+
+      {/* Footer Banner */}
+      <div className="relative h-[350px] w-full mt-8">
+        <div className="absolute inset-0">
+          <div className="relative w-full h-full">
+            <Image
+              src={event?.banner || "/images/event-banner.jpg"}
+              alt="Event Footer Banner"
+              fill
+              style={{ objectFit: 'cover' }}
+              className="opacity-80"
+              priority
+              onError={(e) => {
+                // Fallback to default banner if event banner fails to load
+                e.currentTarget.src = "/images/event-banner.jpg";
+              }}
+            />
+          </div>
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-60"></div>
         </div>
       </div>
     </div>
