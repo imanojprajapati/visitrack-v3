@@ -261,6 +261,37 @@ export default function VisitorsPage() {
     },
   ];
 
+  // Unified filtering function
+  const applyFilters = () => {
+    let filtered = [...visitors];
+    
+    // Apply search filter
+    if (searchText) {
+      filtered = filtered.filter(visitor => 
+        visitor.name.toLowerCase().includes(searchText.toLowerCase()) ||
+        visitor.email.toLowerCase().includes(searchText.toLowerCase()) ||
+        visitor.phone.toLowerCase().includes(searchText.toLowerCase())
+      );
+    }
+    
+    // Apply event filter
+    if (selectedEventFilter) {
+      filtered = filtered.filter(visitor => visitor.eventId === selectedEventFilter);
+    }
+    
+    // Apply status filter
+    if (selectedStatusFilter) {
+      filtered = filtered.filter(visitor => visitor.status === selectedStatusFilter);
+    }
+    
+    setFilteredVisitors(filtered);
+  };
+
+  // Apply filters whenever filter states change
+  useEffect(() => {
+    applyFilters();
+  }, [searchText, selectedEventFilter, selectedStatusFilter, visitors]);
+
   const handleSearch = (values: SearchFormValues) => {
     let filtered = [...visitors];
 
@@ -583,16 +614,7 @@ export default function VisitorsPage() {
                     placeholder="Search visitors..."
                     value={searchText}
                     onChange={(e) => setSearchText(e.target.value)}
-                    onSearch={(value) => {
-                      setSearchText(value);
-                      // Apply search filter
-                      const filtered = visitors.filter(visitor => 
-                        visitor.name.toLowerCase().includes(value.toLowerCase()) ||
-                        visitor.email.toLowerCase().includes(value.toLowerCase()) ||
-                        visitor.phone.toLowerCase().includes(value.toLowerCase())
-                      );
-                      setFilteredVisitors(filtered);
-                    }}
+                    onSearch={(value) => setSearchText(value)}
                     className="w-full"
                     enterButton
                   />
@@ -602,14 +624,8 @@ export default function VisitorsPage() {
                     placeholder="Filter by Event"
                     allowClear
                     className="w-full"
-                    onChange={(value) => {
-                      if (value) {
-                        const filtered = visitors.filter(visitor => visitor.eventId === value);
-                        setFilteredVisitors(filtered);
-                      } else {
-                        setFilteredVisitors(visitors);
-                      }
-                    }}
+                    value={selectedEventFilter}
+                    onChange={(value) => setSelectedEventFilter(value)}
                   >
                     {events.map(event => (
                       <Option key={event._id} value={event._id}>
@@ -623,14 +639,8 @@ export default function VisitorsPage() {
                     placeholder="Filter by Status"
                     allowClear
                     className="w-full"
-                    onChange={(value) => {
-                      if (value) {
-                        const filtered = visitors.filter(visitor => visitor.status === value);
-                        setFilteredVisitors(filtered);
-                      } else {
-                        setFilteredVisitors(visitors);
-                      }
-                    }}
+                    value={selectedStatusFilter}
+                    onChange={(value) => setSelectedStatusFilter(value)}
                   >
                     <Option value="registered">Registered</Option>
                     <Option value="checked_in">Checked In</Option>
@@ -752,29 +762,7 @@ export default function VisitorsPage() {
                   type="primary" 
                   className="w-full mb-2"
                   onClick={() => {
-                    // Apply filters
-                    let filtered = [...visitors];
-                    
-                    // Apply search filter if exists
-                    if (searchText) {
-                      filtered = filtered.filter(visitor => 
-                        visitor.name.toLowerCase().includes(searchText.toLowerCase()) ||
-                        visitor.email.toLowerCase().includes(searchText.toLowerCase()) ||
-                        visitor.phone.toLowerCase().includes(searchText.toLowerCase())
-                      );
-                    }
-                    
-                    // Apply event filter
-                    if (selectedEventFilter) {
-                      filtered = filtered.filter(visitor => visitor.eventId === selectedEventFilter);
-                    }
-                    
-                    // Apply status filter
-                    if (selectedStatusFilter) {
-                      filtered = filtered.filter(visitor => visitor.status === selectedStatusFilter);
-                    }
-                    
-                    setFilteredVisitors(filtered);
+                    // Filters are applied automatically via useEffect
                     setIsFilterDrawerVisible(false);
                   }}
                 >
@@ -783,11 +771,10 @@ export default function VisitorsPage() {
                 <Button 
                   className="w-full"
                   onClick={() => {
-                    // Clear filters
+                    // Clear all filters
                     setSelectedEventFilter(undefined);
                     setSelectedStatusFilter(undefined);
                     setSearchText('');
-                    setFilteredVisitors(visitors);
                     setIsFilterDrawerVisible(false);
                   }}
                 >
