@@ -156,6 +156,13 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       label: 'Scan by Camera',
     });
 
+    // Quick Scanner - available for all roles
+    menuItems.push({
+      key: '/admin/quick-scanner',
+      icon: <QrcodeOutlined />,
+      label: 'Quick Scanner',
+    });
+
     // Reports - available for admin and manager
     if (user?.role === 'admin' || user?.role === 'manager') {
       menuItems.push({
