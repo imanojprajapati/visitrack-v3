@@ -106,6 +106,7 @@ export default function VisitorsPage() {
     company: '',
     eventId: '',
     location: '',
+    status: 'registered', // Default to 'registered'
   });
   
   const router = useRouter();
@@ -205,6 +206,12 @@ export default function VisitorsPage() {
       }
     }
 
+    if (filters.status.trim()) {
+      filtered = filtered.filter(visitor => 
+        visitor.status === filters.status
+      );
+    }
+
     setFilteredVisitors(filtered);
     setPagination(prev => ({
       ...prev,
@@ -263,6 +270,7 @@ export default function VisitorsPage() {
       company: '',
       eventId: '',
       location: '',
+      status: 'registered',
     });
   };
 
@@ -379,6 +387,15 @@ export default function VisitorsPage() {
             }}
             title="View Details"
           />
+          <Button
+            type="text"
+            icon={<QrcodeOutlined />}
+            onClick={() => {
+              setSelectedVisitor(record);
+              setShowQRCode(true);
+            }}
+            title="Show QR Code"
+          />
         </Space>
       ),
     },
@@ -491,7 +508,57 @@ export default function VisitorsPage() {
       return null;
     }
 
-    const visitorUrl = `${window.location.origin}/visitor/${selectedVisitor._id}`;
+    const downloadQRCode = () => {
+      const canvas = document.querySelector('#visitor-qr-code canvas') as HTMLCanvasElement;
+      if (canvas) {
+        // Create a new canvas with styled background like the modal
+        const newCanvas = document.createElement('canvas');
+        const ctx = newCanvas.getContext('2d');
+        
+        if (ctx) {
+          // Add padding around the QR code (like the modal styling)
+          const padding = 32; // 16px padding * 2 (converted to canvas units)
+          const borderWidth = 4;
+          
+          // Set canvas size to include padding and border
+          newCanvas.width = canvas.width + (padding * 2) + (borderWidth * 2);
+          newCanvas.height = canvas.height + (padding * 2) + (borderWidth * 2);
+          
+          // Fill entire canvas with light gray background (like modal background)
+          ctx.fillStyle = '#F9FAFB';
+          ctx.fillRect(0, 0, newCanvas.width, newCanvas.height);
+          
+          // Draw the border (light gray border like in modal)
+          ctx.fillStyle = '#E5E7EB';
+          ctx.fillRect(borderWidth, borderWidth, newCanvas.width - (borderWidth * 2), newCanvas.height - (borderWidth * 2));
+          
+          // Fill the inner area with white background (QR code container)
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(borderWidth * 2, borderWidth * 2, newCanvas.width - (borderWidth * 4), newCanvas.height - (borderWidth * 4));
+          
+          // Add shadow effect (simulate the shadow from modal)
+          ctx.shadowColor = 'rgba(0, 0, 0, 0.1)';
+          ctx.shadowBlur = 8;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 2;
+          
+          // Draw the QR code centered with padding
+          ctx.drawImage(canvas, padding + borderWidth, padding + borderWidth);
+          
+          // Reset shadow for clean output
+          ctx.shadowColor = 'transparent';
+          ctx.shadowBlur = 0;
+          ctx.shadowOffsetX = 0;
+          ctx.shadowOffsetY = 0;
+          
+          // Create download link
+          const link = document.createElement('a');
+          link.download = `visitor-qr-${selectedVisitor.name.replace(/\s+/g, '-')}-${selectedVisitor._id}.png`;
+          link.href = newCanvas.toDataURL('image/png');
+          link.click();
+        }
+      }
+    };
 
     return (
       <Modal
@@ -502,26 +569,55 @@ export default function VisitorsPage() {
           setSelectedVisitor(null);
         }}
         footer={null}
-        width={400}
+        width={450}
+        centered
       >
-        <div className="text-center">
-          <QRCode
-            value={visitorUrl}
-            size={256}
-            className="mx-auto mb-4"
-            errorLevel="M"
-          />
-          <p className="text-sm text-gray-600 mb-2">
-            Scan this QR code to view visitor details
-          </p>
-          <p className="text-sm font-medium">
-            {selectedVisitor.name}
-          </p>
-          <p className="text-sm text-gray-600">
-            {selectedVisitor.eventName}
-          </p>
-          <p className="text-xs text-gray-500 mt-2">
-            Opens visitor details in browser
+        <div className="flex flex-col items-center justify-center p-6">
+          {/* QR Code Container - Centered */}
+          <div className="flex flex-col items-center justify-center mb-6">
+            <div id="visitor-qr-code" className="flex items-center justify-center p-4 bg-white border-2 border-gray-200 rounded-lg shadow-sm">
+              <QRCode
+                value={selectedVisitor._id}
+                size={200}
+                errorLevel="M"
+                style={{ 
+                  height: "auto", 
+                  maxWidth: "100%", 
+                  width: "100%",
+                  display: "block"
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Visitor Information */}
+          <div className="text-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-800 mb-1">
+              {selectedVisitor.name}
+            </h3>
+            <p className="text-sm text-gray-600 mb-2">
+              {selectedVisitor.eventName}
+            </p>
+            <div className="text-xs text-gray-500 font-mono bg-gray-100 px-3 py-2 rounded-md inline-block">
+              ID: {selectedVisitor._id}
+            </div>
+          </div>
+
+          {/* Download Button */}
+          <div className="flex justify-center">
+            <Button
+              type="primary"
+              icon={<DownloadOutlined />}
+              onClick={downloadQRCode}
+              size="large"
+              className="bg-blue-600 hover:bg-blue-700 border-blue-600 hover:border-blue-700"
+            >
+              Download QR Code
+            </Button>
+          </div>
+
+          <p className="text-xs text-gray-400 mt-3 text-center">
+            QR Code contains visitor ID for identification purposes
           </p>
         </div>
       </Modal>
@@ -793,6 +889,26 @@ export default function VisitorsPage() {
                     )}
                   </div>
                 </Col>
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <div className="relative">
+                    <Select
+                      placeholder="Filter by status"
+                      value={filters.status || undefined}
+                      onChange={(value) => handleFilterChange('status', value)}
+                      allowClear
+                      style={{ width: '100%' }}
+                      className="hover:border-blue-400 focus:border-blue-400"
+                    >
+                      <Select.Option value="registered">Registered</Select.Option>
+                      <Select.Option value="Visited">Visited</Select.Option>
+                    </Select>
+                    {filters.status && (
+                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">7</span>
+                      </div>
+                    )}
+                  </div>
+                </Col>
               </Row>
               
               {/* Active Filters Summary & Filter Chain Visualization */}
@@ -944,6 +1060,9 @@ export default function VisitorsPage() {
             </div>
           </Card>
 
+          {/* QR Code Modal */}
+          <QRCodeModal />
+
           {/* Detail Modal */}
           <Modal
             title="Visitor Details"
@@ -1083,6 +1202,20 @@ export default function VisitorsPage() {
                       {event.title}
                     </Option>
                   ))}
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-responsive-sm font-medium">Status:</label>
+                <Select
+                  placeholder="Select Status"
+                  allowClear
+                  className="w-full mt-2"
+                  value={filters.status || undefined}
+                  onChange={(value) => handleFilterChange('status', value)}
+                >
+                  <Option value="registered">Registered</Option>
+                  <Option value="Visited">Visited</Option>
                 </Select>
               </div>
               
