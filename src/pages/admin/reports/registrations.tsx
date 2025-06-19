@@ -24,7 +24,8 @@ interface Visitor {
 }
 
 export default function RegistrationReport() {
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
+  const [allVisitors, setAllVisitors] = useState<Visitor[]>([]); // Store all visitors
+  const [filteredVisitors, setFilteredVisitors] = useState<Visitor[]>([]); // Store cascading filtered results
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
@@ -55,22 +56,18 @@ export default function RegistrationReport() {
   useEffect(() => {
     setMounted(true);
     fetchEvents();
-    fetchVisitors();
+    fetchAllVisitors();
     return () => {
       setMounted(false);
     };
   }, []);
 
-  // Auto-apply filters when they change (with debounce)
+  // Apply cascading filters whenever filters change
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      if (mounted) {
-        fetchVisitors();
-      }
-    }, 500); // 500ms debounce
-
-    return () => clearTimeout(timeoutId);
-  }, [filters, mounted]);
+    if (mounted) {
+      applyCascadingFilters();
+    }
+  }, [filters, allVisitors, mounted]);
 
   const fetchEvents = async () => {
     try {
@@ -84,27 +81,10 @@ export default function RegistrationReport() {
     }
   };
 
-  const fetchVisitors = async () => {
+  const fetchAllVisitors = async () => {
     setLoading(true);
     try {
-      const queryParams = new URLSearchParams();
-      
-      // Add all filters to query parameters
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value && key !== 'dateRange') {
-          if (typeof value === 'string' && value.trim() !== '') {
-            queryParams.append(key, value.trim());
-          }
-        }
-      });
-      
-      // Handle date range filter
-      if (filters.dateRange) {
-        queryParams.append('startDate', filters.dateRange[0]);
-        queryParams.append('endDate', filters.dateRange[1]);
-      }
-
-      const response = await fetch(`/api/visitors?${queryParams.toString()}`);
+      const response = await fetch('/api/visitors');
       if (!response.ok) throw new Error('Failed to fetch visitors');
       const data = await response.json();
       
@@ -117,10 +97,11 @@ export default function RegistrationReport() {
         });
       }
       
-      setVisitors(data);
+      setAllVisitors(data);
+      setFilteredVisitors(data); // Initially show all visitors
       setPagination(prev => ({
         ...prev,
-        current: 1, // Reset to first page when filtering
+        current: 1,
         total: data.length,
       }));
     } catch (error) {
@@ -129,6 +110,172 @@ export default function RegistrationReport() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Cascading filter function
+  const applyCascadingFilters = () => {
+    let filtered = [...allVisitors];
+
+    // Apply filters in sequence (cascading)
+    if (filters.name.trim()) {
+      filtered = filtered.filter(visitor => 
+        visitor.name.toLowerCase().includes(filters.name.toLowerCase())
+      );
+    }
+
+    if (filters.email.trim()) {
+      filtered = filtered.filter(visitor => 
+        visitor.email.toLowerCase().includes(filters.email.toLowerCase())
+      );
+    }
+
+    if (filters.phone.trim()) {
+      filtered = filtered.filter(visitor => 
+        visitor.phone.includes(filters.phone)
+      );
+    }
+
+    if (filters.company.trim()) {
+      filtered = filtered.filter(visitor => {
+        const company = visitor.company || visitor.additionalData?.company?.value || '';
+        return company.toLowerCase().includes(filters.company.toLowerCase());
+      });
+    }
+
+    if (filters.city.trim()) {
+      filtered = filtered.filter(visitor => {
+        const city = visitor.additionalData?.city?.value || '';
+        return city.toLowerCase().includes(filters.city.toLowerCase());
+      });
+    }
+
+    if (filters.state.trim()) {
+      filtered = filtered.filter(visitor => {
+        const state = visitor.additionalData?.state?.value || '';
+        return state.toLowerCase().includes(filters.state.toLowerCase());
+      });
+    }
+
+    if (filters.country.trim()) {
+      filtered = filtered.filter(visitor => {
+        const country = visitor.additionalData?.country?.value || '';
+        return country.toLowerCase().includes(filters.country.toLowerCase());
+      });
+    }
+
+    if (filters.pincode.trim()) {
+      filtered = filtered.filter(visitor => {
+        const pincode = visitor.additionalData?.pinCode?.value || visitor.additionalData?.pincode?.value || '';
+        return pincode.includes(filters.pincode);
+      });
+    }
+
+    if (filters.source) {
+      filtered = filtered.filter(visitor => {
+        const source = visitor.additionalData?.source?.value || '';
+        return source === filters.source;
+      });
+    }
+
+    if (filters.location.trim()) {
+      filtered = filtered.filter(visitor => 
+        visitor.eventLocation.toLowerCase().includes(filters.location.toLowerCase())
+      );
+    }
+
+    if (filters.eventId) {
+      const selectedEvent = events.find(e => e._id === filters.eventId);
+      if (selectedEvent) {
+        filtered = filtered.filter(visitor => 
+          visitor.eventName === selectedEvent.title
+        );
+      }
+    }
+
+    if (filters.status) {
+      filtered = filtered.filter(visitor => 
+        visitor.status === filters.status
+      );
+    }
+
+    if (filters.dateRange) {
+      filtered = filtered.filter(visitor => {
+        const eventDate = visitor.eventStartDate || visitor.eventEndDate;
+        if (!eventDate) return false;
+        
+        try {
+          let dateToCompare: Date;
+          
+          // Handle DD-MM-YYYY format
+          if (/^\d{2}-\d{2}-\d{4}$/.test(eventDate)) {
+            const [day, month, year] = eventDate.split('-');
+            dateToCompare = new Date(`${year}-${month}-${day}`);
+          } else {
+            dateToCompare = new Date(eventDate);
+          }
+          
+          if (isNaN(dateToCompare.getTime())) return false;
+          
+          const startDate = new Date(filters.dateRange![0]);
+          const endDate = new Date(filters.dateRange![1]);
+          
+          return dateToCompare >= startDate && dateToCompare <= endDate;
+        } catch (error) {
+          return false;
+        }
+      });
+    }
+
+    setFilteredVisitors(filtered);
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: filtered.length,
+    }));
+  };
+
+  // Get unique values from currently filtered data for dropdown options
+  const getUniqueValues = (field: string) => {
+    const values = new Set<string>();
+    
+    filteredVisitors.forEach(visitor => {
+      let value = '';
+      
+      switch (field) {
+        case 'source':
+          value = visitor.additionalData?.source?.value || '';
+          break;
+        case 'status':
+          value = visitor.status || '';
+          break;
+        case 'city':
+          value = visitor.additionalData?.city?.value || '';
+          break;
+        case 'state':
+          value = visitor.additionalData?.state?.value || '';
+          break;
+        case 'country':
+          value = visitor.additionalData?.country?.value || '';
+          break;
+        case 'eventName':
+          value = visitor.eventName || '';
+          break;
+        default:
+          return;
+      }
+      
+      if (value.trim()) {
+        values.add(value);
+      }
+    });
+    
+    return Array.from(values).sort();
+  };
+
+  // Get available events from currently filtered data
+  const getAvailableEvents = () => {
+    const availableEventNames = new Set(filteredVisitors.map(v => v.eventName));
+    return events.filter(event => availableEventNames.has(event.title));
   };
 
   const handleFilterChange = (key: string, value: string | null) => {
@@ -162,21 +309,19 @@ export default function RegistrationReport() {
       status: '',
       dateRange: null,
     });
-    // Fetch all visitors after reset
-    setTimeout(() => fetchVisitors(), 100);
   };
 
-  // Calculate paginated data
+  // Calculate paginated data from filtered results
   const getPaginatedData = () => {
     const startIndex = (pagination.current - 1) * pagination.pageSize;
     const endIndex = startIndex + pagination.pageSize;
-    return visitors.slice(startIndex, endIndex);
+    return filteredVisitors.slice(startIndex, endIndex);
   };
 
-  const allAdditionalKeys = Array.from(new Set(visitors.flatMap(v => Object.keys(v.additionalData || {}))));
+  const allAdditionalKeys = Array.from(new Set(filteredVisitors.flatMap(v => Object.keys(v.additionalData || {}))));
 
   const additionalDataColumns = allAdditionalKeys.map(key => ({
-    title: visitors[0]?.additionalData?.[key]?.label || key,
+    title: filteredVisitors[0]?.additionalData?.[key]?.label || key,
     dataIndex: ['additionalData', key, 'value'],
     key,
     render: (_: any, record: Visitor) => record.additionalData?.[key]?.value || '-',
@@ -458,7 +603,7 @@ export default function RegistrationReport() {
 
   const handleImportSuccess = () => {
     setShowImportModal(false);
-    fetchVisitors(); // Refresh the data after import
+    fetchAllVisitors(); // Refresh the data after import
     message.success('Registrations imported successfully!');
   };
 
@@ -490,7 +635,7 @@ export default function RegistrationReport() {
                   </Button>
                   <Button
                     type="primary"
-                    onClick={fetchVisitors}
+                    onClick={fetchAllVisitors}
                     icon={<SearchOutlined />}
                     loading={loading}
                   >
@@ -501,147 +646,344 @@ export default function RegistrationReport() {
             </Space>
           </div>
 
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-1">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <Text className="text-sm font-medium text-gray-700">Cascading Filters</Text>
+                </div>
+                <Text className="text-xs text-gray-500">
+                  (Each filter narrows down from previous results)
+                </Text>
+              </div>
+              <div className="text-sm text-gray-600">
+                Showing {filteredVisitors.length} of {allVisitors.length} total visitors
+              </div>
+            </div>
+            
+            {/* How it works explanation */}
+            <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mb-3">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-blue-700">
+                    <strong>How it works:</strong> Apply filters in sequence. Each new filter only shows options available from the current filtered results.
+                  </p>
+                  <p className="text-xs text-blue-600 mt-1">
+                    Example: Filter by "State: California" → then "Event" dropdown will only show events that have visitors from California.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <Row gutter={[16, 16]}>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by name"
-                value={filters.name}
-                onChange={(e) => handleFilterChange('name', e.target.value)}
-                prefix={<SearchOutlined className="text-gray-400" />}
-                allowClear
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div className="relative">
+                <Input
+                  placeholder="Search by name"
+                  value={filters.name}
+                  onChange={(e) => handleFilterChange('name', e.target.value)}
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  allowClear
+                  className="hover:border-blue-400 focus:border-blue-400"
+                />
+                {filters.name && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">1</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by email"
-                value={filters.email}
-                onChange={(e) => handleFilterChange('email', e.target.value)}
-                prefix={<SearchOutlined className="text-gray-400" />}
-                allowClear
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div className="relative">
+                <Input
+                  placeholder="Search by email"
+                  value={filters.email}
+                  onChange={(e) => handleFilterChange('email', e.target.value)}
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  allowClear
+                  className="hover:border-blue-400 focus:border-blue-400"
+                />
+                {filters.email && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">2</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by phone"
-                value={filters.phone}
-                onChange={(e) => handleFilterChange('phone', e.target.value)}
-                prefix={<SearchOutlined className="text-gray-400" />}
-                allowClear
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div className="relative">
+                <Input
+                  placeholder="Search by phone"
+                  value={filters.phone}
+                  onChange={(e) => handleFilterChange('phone', e.target.value)}
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  allowClear
+                  className="hover:border-blue-400 focus:border-blue-400"
+                />
+                {filters.phone && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">3</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by company"
-                value={filters.company}
-                onChange={(e) => handleFilterChange('company', e.target.value)}
-                prefix={<SearchOutlined className="text-gray-400" />}
-                allowClear
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div className="relative">
+                <Input
+                  placeholder="Search by company"
+                  value={filters.company}
+                  onChange={(e) => handleFilterChange('company', e.target.value)}
+                  prefix={<SearchOutlined className="text-gray-400" />}
+                  allowClear
+                  className="hover:border-blue-400 focus:border-blue-400"
+                />
+                {filters.company && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">4</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by city"
-                value={filters.city}
-                onChange={(e) => handleFilterChange('city', e.target.value)}
-                allowClear
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div className="relative">
+                <Select
+                  placeholder="Filter by city"
+                  value={filters.city || undefined}
+                  onChange={(value) => handleFilterChange('city', value)}
+                  allowClear
+                  style={{ width: '100%' }}
+                  className="hover:border-blue-400 focus:border-blue-400"
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+                  }
+                >
+                  {getUniqueValues('city').map(city => (
+                    <Select.Option key={city} value={city}>
+                      {city}
+                    </Select.Option>
+                  ))}
+                </Select>
+                {filters.city && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">5</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by state"
-                value={filters.state}
-                onChange={(e) => handleFilterChange('state', e.target.value)}
-                allowClear
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div className="relative">
+                <Select
+                  placeholder="Filter by state"
+                  value={filters.state || undefined}
+                  onChange={(value) => handleFilterChange('state', value)}
+                  allowClear
+                  style={{ width: '100%' }}
+                  className="hover:border-blue-400 focus:border-blue-400"
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+                  }
+                >
+                  {getUniqueValues('state').map(state => (
+                    <Select.Option key={state} value={state}>
+                      {state}
+                    </Select.Option>
+                  ))}
+                </Select>
+                {filters.state && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">6</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by country"
-                value={filters.country}
-                onChange={(e) => handleFilterChange('country', e.target.value)}
-                allowClear
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div className="relative">
+                <Select
+                  placeholder="Filter by country"
+                  value={filters.country || undefined}
+                  onChange={(value) => handleFilterChange('country', value)}
+                  allowClear
+                  style={{ width: '100%' }}
+                  className="hover:border-blue-400 focus:border-blue-400"
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+                  }
+                >
+                  {getUniqueValues('country').map(country => (
+                    <Select.Option key={country} value={country}>
+                      {country}
+                    </Select.Option>
+                  ))}
+                </Select>
+                {filters.country && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">7</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by pincode"
-                value={filters.pincode}
-                onChange={(e) => handleFilterChange('pincode', e.target.value)}
-                allowClear
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div className="relative">
+                <Input
+                  placeholder="Search by pincode"
+                  value={filters.pincode}
+                  onChange={(e) => handleFilterChange('pincode', e.target.value)}
+                  allowClear
+                  className="hover:border-blue-400 focus:border-blue-400"
+                />
+                {filters.pincode && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">8</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Select
-                placeholder="Filter by source"
-                value={filters.source || undefined}
-                onChange={(value) => handleFilterChange('source', value)}
-                allowClear
-                style={{ width: '100%' }}
-                className="hover:border-blue-400 focus:border-blue-400"
-              >
-                <Select.Option value="Website">Website</Select.Option>
-                <Select.Option value="manual">Manual</Select.Option>
-                <Select.Option value="scan">Scan</Select.Option>
-              </Select>
+              <div className="relative">
+                <Select
+                  placeholder="Filter by source"
+                  value={filters.source || undefined}
+                  onChange={(value) => handleFilterChange('source', value)}
+                  allowClear
+                  style={{ width: '100%' }}
+                  className="hover:border-blue-400 focus:border-blue-400"
+                  dropdownRender={(menu) => (
+                    <div>
+                      {getUniqueValues('source').length === 0 ? (
+                        <div className="p-2 text-center text-gray-500">
+                          No sources available from current filters
+                        </div>
+                      ) : (
+                        menu
+                      )}
+                    </div>
+                  )}
+                >
+                  {getUniqueValues('source').map(source => (
+                    <Select.Option key={source} value={source}>
+                      {source}
+                    </Select.Option>
+                  ))}
+                </Select>
+                {filters.source && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">9</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Input
-                placeholder="Search by location"
-                value={filters.location}
-                onChange={(e) => handleFilterChange('location', e.target.value)}
-                allowClear
-                className="hover:border-blue-400 focus:border-blue-400"
-              />
+              <div className="relative">
+                <Input
+                  placeholder="Search by location"
+                  value={filters.location}
+                  onChange={(e) => handleFilterChange('location', e.target.value)}
+                  allowClear
+                  className="hover:border-blue-400 focus:border-blue-400"
+                />
+                {filters.location && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">10</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Select
-                placeholder="Filter by status"
-                value={filters.status || undefined}
-                onChange={(value) => handleFilterChange('status', value)}
-                allowClear
-                style={{ width: '100%' }}
-                className="hover:border-blue-400 focus:border-blue-400"
-              >
-                <Select.Option value="registered">Registered</Select.Option>
-                <Select.Option value="checked_in">Checked In</Select.Option>
-                <Select.Option value="checked_out">Checked Out</Select.Option>
-                <Select.Option value="Visited">Visited</Select.Option>
-                <Select.Option value="cancelled">Cancelled</Select.Option>
-              </Select>
+              <div className="relative">
+                <Select
+                  placeholder="Filter by status"
+                  value={filters.status || undefined}
+                  onChange={(value) => handleFilterChange('status', value)}
+                  allowClear
+                  style={{ width: '100%' }}
+                  className="hover:border-blue-400 focus:border-blue-400"
+                  dropdownRender={(menu) => (
+                    <div>
+                      {getUniqueValues('status').length === 0 ? (
+                        <div className="p-2 text-center text-gray-500">
+                          No statuses available from current filters
+                        </div>
+                      ) : (
+                        menu
+                      )}
+                    </div>
+                  )}
+                >
+                  {getUniqueValues('status').map(status => (
+                    <Select.Option key={status} value={status}>
+                      {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+                    </Select.Option>
+                  ))}
+                </Select>
+                {filters.status && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">11</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <Select
-                placeholder="Filter by event"
-                value={filters.eventId || undefined}
-                onChange={(value) => handleFilterChange('eventId', value)}
-                allowClear
-                style={{ width: '100%' }}
-                suffixIcon={<FilterOutlined className="text-gray-400" />}
-                className="hover:border-blue-400 focus:border-blue-400"
-              >
-                {events.map(event => (
-                  <Select.Option key={event._id} value={event._id}>
-                    {event.title}
-                  </Select.Option>
-                ))}
-              </Select>
+              <div className="relative">
+                <Select
+                  placeholder="Filter by event"
+                  value={filters.eventId || undefined}
+                  onChange={(value) => handleFilterChange('eventId', value)}
+                  allowClear
+                  style={{ width: '100%' }}
+                  suffixIcon={<FilterOutlined className="text-gray-400" />}
+                  className="hover:border-blue-400 focus:border-blue-400"
+                  showSearch
+                  filterOption={(input, option) =>
+                    (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+                  }
+                  dropdownRender={(menu) => (
+                    <div>
+                      {getAvailableEvents().length === 0 ? (
+                        <div className="p-2 text-center text-gray-500">
+                          No events available from current filters
+                        </div>
+                      ) : (
+                        menu
+                      )}
+                    </div>
+                  )}
+                >
+                  {getAvailableEvents().map(event => (
+                    <Select.Option key={event._id} value={event._id}>
+                      {event.title}
+                    </Select.Option>
+                  ))}
+                </Select>
+                {filters.eventId && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">12</span>
+                  </div>
+                )}
+              </div>
             </Col>
             <Col xs={24} sm={12} md={8} lg={6}>
-              <div>
+              <div className="relative">
                 <RangePicker
                   onChange={handleDateRangeChange}
                   style={{ width: '100%' }}
                   placeholder={['Event Start Date', 'Event End Date']}
                   className="hover:border-blue-400 focus:border-blue-400"
                 />
+                {filters.dateRange && (
+                  <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">13</span>
+                  </div>
+                )}
                 <div className="text-xs text-gray-500 mt-1">
                   Filter by when events occur (not registration date)
                 </div>
@@ -649,13 +991,13 @@ export default function RegistrationReport() {
             </Col>
           </Row>
           
-          {/* Active Filters Summary */}
-          {Object.entries(filters).some(([key, value]) => value && key !== 'dateRange') && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center justify-between">
+          {/* Active Filters Summary & Filter Chain Visualization */}
+          {(Object.entries(filters).some(([key, value]) => value && key !== 'dateRange') || filters.dateRange) && (
+            <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center">
                   <FilterOutlined className="text-blue-600 mr-2" />
-                  <Text strong className="text-blue-800">Active Filters:</Text>
+                  <Text strong className="text-blue-800">Active Cascading Filters:</Text>
                 </div>
                 <Button 
                   size="small" 
@@ -666,33 +1008,58 @@ export default function RegistrationReport() {
                   Clear All
                 </Button>
               </div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {Object.entries(filters).map(([key, value]) => {
-                  if (value && key !== 'dateRange') {
-                    const label = key.charAt(0).toUpperCase() + key.slice(1);
-                    return (
+              
+              {/* Filter Chain Visualization */}
+              <div className="mb-3">
+                <div className="flex items-center text-sm text-gray-600 mb-2">
+                  <span className="font-medium">Filter Chain:</span>
+                  <span className="ml-2 text-xs bg-white px-2 py-1 rounded border">
+                    {allVisitors.length} total → {filteredVisitors.length} filtered
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {Object.entries(filters).map(([key, value], index) => {
+                    if (value && key !== 'dateRange') {
+                      const label = key.charAt(0).toUpperCase() + key.slice(1);
+                      return (
+                        <div key={key} className="flex items-center">
+                          {index > 0 && <span className="text-gray-400 mx-1">→</span>}
+                          <Tag 
+                            color="blue" 
+                            closable 
+                            onClose={() => handleFilterChange(key, '')}
+                            className="text-xs"
+                          >
+                            {label}: {typeof value === 'string' && value.length > 20 ? value.substring(0, 20) + '...' : value}
+                          </Tag>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+                  {filters.dateRange && (
+                    <div className="flex items-center">
+                      {Object.values(filters).filter(v => v && v !== filters.dateRange).length > 0 && (
+                        <span className="text-gray-400 mx-1">→</span>
+                      )}
                       <Tag 
-                        key={key} 
                         color="blue" 
                         closable 
-                        onClose={() => handleFilterChange(key, '')}
+                        onClose={() => handleDateRangeChange(null)}
                         className="text-xs"
                       >
-                        {label}: {value}
+                        Date: {filters.dateRange[0]} to {filters.dateRange[1]}
                       </Tag>
-                    );
-                  }
-                  return null;
-                })}
-                {filters.dateRange && (
-                  <Tag 
-                    color="blue" 
-                    closable 
-                    onClose={() => handleDateRangeChange(null)}
-                    className="text-xs"
-                  >
-                    Event Occurrence: {filters.dateRange[0]} to {filters.dateRange[1]}
-                  </Tag>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Results Summary */}
+              <div className="text-sm text-gray-700 bg-white p-2 rounded border">
+                <span className="font-medium">Results:</span> Showing {filteredVisitors.length} visitors 
+                {filteredVisitors.length !== allVisitors.length && (
+                  <span className="text-gray-500"> (filtered from {allVisitors.length} total)</span>
                 )}
               </div>
             </div>

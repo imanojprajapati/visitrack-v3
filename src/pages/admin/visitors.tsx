@@ -16,7 +16,8 @@ import {
   Avatar,
   Row,
   Col,
-  Drawer
+  Drawer,
+  Typography
 } from 'antd';
 import type { ColumnType } from 'antd/es/table';
 import {
@@ -39,6 +40,7 @@ import dayjs from 'dayjs';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
+const { Text } = Typography;
 
 interface Event {
   _id: string;
@@ -73,7 +75,6 @@ interface Visitor {
 interface SearchFormValues {
   search?: string;
   eventId?: string;
-  status?: Visitor['status'];
   dateRange?: [moment.Moment, moment.Moment];
 }
 
@@ -83,9 +84,9 @@ export default function VisitorsPage() {
   const [showProfile, setShowProfile] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [selectedVisitor, setSelectedVisitor] = useState<Visitor | null>(null);
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
+  const [allVisitors, setAllVisitors] = useState<Visitor[]>([]); // Store all visitors
+  const [filteredVisitors, setFilteredVisitors] = useState<Visitor[]>([]); // Store cascading filtered results
   const [events, setEvents] = useState<Event[]>([]);
-  const [filteredVisitors, setFilteredVisitors] = useState<Visitor[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
   const [pagination, setPagination] = useState({
@@ -94,21 +95,36 @@ export default function VisitorsPage() {
     total: 0,
   });
   const [exportLoading, setExportLoading] = useState(false);
-  const [searchText, setSearchText] = useState('');
   const [isDetailModalVisible, setIsDetailModalVisible] = useState(false);
   const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
-  const [selectedEventFilter, setSelectedEventFilter] = useState<string | undefined>(undefined);
-  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string | undefined>(undefined);
+  
+  // Cascading filters state
+  const [filters, setFilters] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    company: '',
+    eventId: '',
+    location: '',
+  });
+  
   const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
-    fetchVisitors();
+    fetchAllVisitors();
     fetchEvents();
     return () => {
       setMounted(false);
     };
   }, []);
+
+  // Apply cascading filters whenever filters change
+  useEffect(() => {
+    if (mounted) {
+      applyCascadingFilters();
+    }
+  }, [filters, allVisitors, mounted]);
 
   const fetchEvents = async () => {
     try {
@@ -122,17 +138,18 @@ export default function VisitorsPage() {
     }
   };
 
-  const fetchVisitors = async () => {
+  const fetchAllVisitors = async () => {
     try {
       setLoading(true);
       const response = await fetch('/api/visitors');
       if (!response.ok) throw new Error('Failed to fetch visitors');
       const data = await response.json();
       console.log('Fetched visitors:', data); // Debug log
-      setVisitors(data);
-      setFilteredVisitors(data);
+      setAllVisitors(data);
+      setFilteredVisitors(data); // Initially show all visitors
       setPagination(prev => ({
         ...prev,
+        current: 1,
         total: data.length,
       }));
     } catch (error) {
@@ -141,6 +158,112 @@ export default function VisitorsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Cascading filter function
+  const applyCascadingFilters = () => {
+    let filtered = [...allVisitors];
+
+    // Apply filters in sequence (cascading)
+    if (filters.name.trim()) {
+      filtered = filtered.filter(visitor => 
+        visitor.name.toLowerCase().includes(filters.name.toLowerCase())
+      );
+    }
+
+    if (filters.email.trim()) {
+      filtered = filtered.filter(visitor => 
+        visitor.email.toLowerCase().includes(filters.email.toLowerCase())
+      );
+    }
+
+    if (filters.phone.trim()) {
+      filtered = filtered.filter(visitor => 
+        visitor.phone.includes(filters.phone)
+      );
+    }
+
+    if (filters.company.trim()) {
+      filtered = filtered.filter(visitor => {
+        const company = visitor.company || visitor.additionalData?.company?.value || '';
+        return company.toLowerCase().includes(filters.company.toLowerCase());
+      });
+    }
+
+    if (filters.location.trim()) {
+      filtered = filtered.filter(visitor => 
+        visitor.eventLocation.toLowerCase().includes(filters.location.toLowerCase())
+      );
+    }
+
+    if (filters.eventId) {
+      const selectedEvent = events.find(e => e._id === filters.eventId);
+      if (selectedEvent) {
+        filtered = filtered.filter(visitor => 
+          visitor.eventName === selectedEvent.title
+        );
+      }
+    }
+
+    setFilteredVisitors(filtered);
+    setPagination(prev => ({
+      ...prev,
+      current: 1,
+      total: filtered.length,
+    }));
+  };
+
+  // Get unique values from currently filtered data for dropdown options
+  const getUniqueValues = (field: string) => {
+    const values = new Set<string>();
+    
+    filteredVisitors.forEach(visitor => {
+      let value = '';
+      
+      switch (field) {
+        case 'location':
+          value = visitor.eventLocation || '';
+          break;
+        case 'phone':
+          value = visitor.phone || '';
+          break;
+        case 'company':
+          value = visitor.company || visitor.additionalData?.company?.value || '';
+          break;
+        case 'eventName':
+          value = visitor.eventName || '';
+          break;
+        default:
+          return;
+      }
+      
+      if (value.trim()) {
+        values.add(value);
+      }
+    });
+    
+    return Array.from(values).sort();
+  };
+
+  // Get available events from currently filtered data
+  const getAvailableEvents = () => {
+    const availableEventNames = new Set(filteredVisitors.map(v => v.eventName));
+    return events.filter(event => availableEventNames.has(event.title));
+  };
+
+  const handleFilterChange = (key: string, value: string | null) => {
+    setFilters(prev => ({ ...prev, [key]: value || '' }));
+  };
+
+  const handleReset = () => {
+    setFilters({
+      name: '',
+      email: '',
+      phone: '',
+      company: '',
+      eventId: '',
+      location: '',
+    });
   };
 
   const getStatusColor = (status: Visitor['status']) => {
@@ -260,158 +383,6 @@ export default function VisitorsPage() {
       ),
     },
   ];
-
-  // Unified filtering function
-  const applyFilters = () => {
-    let filtered = [...visitors];
-    
-    // Apply search filter
-    if (searchText) {
-      filtered = filtered.filter(visitor => 
-        visitor.name.toLowerCase().includes(searchText.toLowerCase()) ||
-        visitor.email.toLowerCase().includes(searchText.toLowerCase()) ||
-        visitor.phone.toLowerCase().includes(searchText.toLowerCase())
-      );
-    }
-    
-    // Apply event filter
-    if (selectedEventFilter) {
-      filtered = filtered.filter(visitor => visitor.eventId === selectedEventFilter);
-    }
-    
-    // Apply status filter
-    if (selectedStatusFilter) {
-      filtered = filtered.filter(visitor => visitor.status === selectedStatusFilter);
-    }
-    
-    setFilteredVisitors(filtered);
-  };
-
-  // Apply filters whenever filter states change
-  useEffect(() => {
-    applyFilters();
-  }, [searchText, selectedEventFilter, selectedStatusFilter, visitors]);
-
-  // Update pagination total when filtered data changes
-  useEffect(() => {
-    setPagination(prev => ({
-      ...prev,
-      current: 1, // Reset to page 1 when filters change
-      total: filteredVisitors.length,
-    }));
-  }, [filteredVisitors]);
-
-  const handleSearch = (values: SearchFormValues) => {
-    let filtered = [...visitors];
-
-    // Filter by search term (name, email, or phone)
-    if (values.search) {
-      const searchTerm = values.search.toLowerCase();
-      filtered = filtered.filter(visitor => 
-        visitor.name.toLowerCase().includes(searchTerm) ||
-        visitor.email.toLowerCase().includes(searchTerm) ||
-        visitor.phone.toLowerCase().includes(searchTerm)
-      );
-    }
-
-    // Filter by event
-    if (values.eventId) {
-      filtered = filtered.filter(visitor => 
-        visitor.eventId === values.eventId
-      );
-    }
-
-    // Filter by date range
-    if (values.dateRange && values.dateRange[0] && values.dateRange[1]) {
-      const startDate = values.dateRange[0].startOf('day').toDate();
-      const endDate = values.dateRange[1].endOf('day').toDate();
-      filtered = filtered.filter(visitor => {
-        const visitorDate = new Date(visitor.createdAt);
-        return visitorDate >= startDate && visitorDate <= endDate;
-      });
-    }
-
-    // Filter by status
-    if (values.status) {
-      filtered = filtered.filter(visitor => visitor.status === values.status);
-    }
-
-    setFilteredVisitors(filtered);
-    setPagination(prev => ({
-      ...prev,
-      current: 1,
-      total: filtered.length,
-    }));
-  };
-
-  const handleReset = () => {
-    form.resetFields();
-    setFilteredVisitors(visitors);
-    setPagination(prev => ({
-      ...prev,
-      current: 1,
-      total: visitors.length,
-    }));
-  };
-
-  const handleExport = async () => {
-    try {
-      setExportLoading(true);
-      
-      // Build query parameters based on current filters
-      const params = new URLSearchParams();
-      
-      if (form.getFieldValue('eventId')) {
-        params.append('eventId', form.getFieldValue('eventId'));
-      }
-      
-      if (form.getFieldValue('status')) {
-        params.append('status', form.getFieldValue('status'));
-      }
-      
-      if (form.getFieldValue('dateRange')) {
-        const [startDate, endDate] = form.getFieldValue('dateRange');
-        params.append('startDate', startDate.format('YYYY-MM-DD'));
-        params.append('endDate', endDate.format('YYYY-MM-DD'));
-      }
-      
-      // Add format parameter (default to xlsx for better formatting)
-      params.append('format', 'xlsx');
-      
-      // Call the API endpoint
-      const response = await fetch(`/api/visitors/export?${params.toString()}`);
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Export failed');
-      }
-      
-      // Get the file blob
-      const blob = await response.blob();
-      
-      // Create download link
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `visitors-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      message.success('Export completed successfully');
-    } catch (error) {
-      console.error('Error exporting data:', error);
-      message.error(error instanceof Error ? error.message : 'Failed to export data');
-    } finally {
-      setExportLoading(false);
-    }
-  };
-
-  const handleImport = () => {
-    // Implement import functionality
-    message.success('Importing visitor data...');
-  };
 
   const VisitorDetailsModal = () => (
     <Modal
@@ -567,7 +538,7 @@ export default function VisitorsPage() {
     message.info('Edit functionality coming soon');
   };
 
-  // Calculate paginated data
+  // Calculate paginated data from filtered results
   const getPaginatedData = () => {
     const startIndex = (pagination.current - 1) * pagination.pageSize;
     const endIndex = startIndex + pagination.pageSize;
@@ -586,56 +557,328 @@ export default function VisitorsPage() {
             <div className="admin-button-group">
               <Button
                 icon={<FilterOutlined />}
-                onClick={() => setIsFilterDrawerVisible(true)}
+                onClick={() => setShowFilters(f => !f)}
+                type={showFilters ? 'primary' : 'default'}
                 className="show-mobile w-full sm:w-auto"
               >
-                Filters
+                {showFilters ? 'Hide Filters' : 'Show Filters'}
               </Button>
             </div>
           </div>
 
-          {/* Search and Filters */}
+          {/* Cascading Filters */}
+          {showFilters && (
+            <Card 
+              bordered={false} 
+              className="bg-white shadow-sm mb-6 flex-none"
+              bodyStyle={{ padding: '24px' }}
+            >
+              <div className="mb-6">
+                <Space direction="vertical" size="small" style={{ width: '100%' }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center space-x-2 mb-2">
+                        <div className="flex items-center space-x-1">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <Text className="text-sm font-medium text-gray-700">Cascading Filters</Text>
+                        </div>
+                        <Text className="text-xs text-gray-500">
+                          (Each filter narrows down from previous results)
+                        </Text>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Showing {filteredVisitors.length} of {allVisitors.length} total visitors
+                      </div>
+                    </div>
+                    <Space>
+                      <Button
+                        onClick={handleReset}
+                      >
+                        Reset Filters
+                      </Button>
+                      <Button
+                        type="primary"
+                        onClick={fetchAllVisitors}
+                        loading={loading}
+                      >
+                        Refresh
+                      </Button>
+                    </Space>
+                  </div>
+                </Space>
+              </div>
+
+              {/* How it works explanation */}
+              <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-blue-700">
+                      <strong>How it works:</strong> Apply filters in sequence. Each new filter only shows options available from the current filtered results.
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      Example: Filter by "Name: John" → then "Location" dropdown will only show locations where visitors named John are registered.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <Row gutter={[16, 16]}>
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <div className="relative">
+                    <Input
+                      placeholder="Search by name"
+                      value={filters.name}
+                      onChange={(e) => handleFilterChange('name', e.target.value)}
+                      prefix={<SearchOutlined className="text-gray-400" />}
+                      allowClear
+                      className="hover:border-blue-400 focus:border-blue-400"
+                    />
+                    {filters.name && (
+                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">1</span>
+                      </div>
+                    )}
+                  </div>
+                </Col>
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <div className="relative">
+                    <Input
+                      placeholder="Search by email"
+                      value={filters.email}
+                      onChange={(e) => handleFilterChange('email', e.target.value)}
+                      prefix={<SearchOutlined className="text-gray-400" />}
+                      allowClear
+                      className="hover:border-blue-400 focus:border-blue-400"
+                    />
+                    {filters.email && (
+                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">2</span>
+                      </div>
+                    )}
+                  </div>
+                </Col>
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <div className="relative">
+                    <Select
+                      placeholder="Filter by phone"
+                      value={filters.phone || undefined}
+                      onChange={(value) => handleFilterChange('phone', value)}
+                      allowClear
+                      style={{ width: '100%' }}
+                      className="hover:border-blue-400 focus:border-blue-400"
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+                      }
+                      dropdownRender={(menu) => (
+                        <div>
+                          {getUniqueValues('phone').length === 0 ? (
+                            <div className="p-2 text-center text-gray-500">
+                              No phone numbers available from current filters
+                            </div>
+                          ) : (
+                            menu
+                          )}
+                        </div>
+                      )}
+                    >
+                      {getUniqueValues('phone').map(phone => (
+                        <Select.Option key={phone} value={phone}>
+                          {phone}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                    {filters.phone && (
+                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">3</span>
+                      </div>
+                    )}
+                  </div>
+                </Col>
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <div className="relative">
+                    <Input
+                      placeholder="Search by company"
+                      value={filters.company}
+                      onChange={(e) => handleFilterChange('company', e.target.value)}
+                      allowClear
+                      className="hover:border-blue-400 focus:border-blue-400"
+                    />
+                    {filters.company && (
+                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">4</span>
+                      </div>
+                    )}
+                  </div>
+                </Col>
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <div className="relative">
+                    <Select
+                      placeholder="Filter by location"
+                      value={filters.location || undefined}
+                      onChange={(value) => handleFilterChange('location', value)}
+                      allowClear
+                      style={{ width: '100%' }}
+                      className="hover:border-blue-400 focus:border-blue-400"
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+                      }
+                      dropdownRender={(menu) => (
+                        <div>
+                          {getUniqueValues('location').length === 0 ? (
+                            <div className="p-2 text-center text-gray-500">
+                              No locations available from current filters
+                            </div>
+                          ) : (
+                            menu
+                          )}
+                        </div>
+                      )}
+                    >
+                      {getUniqueValues('location').map(location => (
+                        <Select.Option key={location} value={location}>
+                          {location}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                    {filters.location && (
+                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">5</span>
+                      </div>
+                    )}
+                  </div>
+                </Col>
+                <Col xs={24} sm={12} md={8} lg={6}>
+                  <div className="relative">
+                    <Select
+                      placeholder="Filter by event"
+                      value={filters.eventId || undefined}
+                      onChange={(value) => handleFilterChange('eventId', value)}
+                      allowClear
+                      style={{ width: '100%' }}
+                      suffixIcon={<FilterOutlined className="text-gray-400" />}
+                      className="hover:border-blue-400 focus:border-blue-400"
+                      showSearch
+                      filterOption={(input, option) =>
+                        (option?.children as unknown as string).toLowerCase().includes(input.toLowerCase())
+                      }
+                      dropdownRender={(menu) => (
+                        <div>
+                          {getAvailableEvents().length === 0 ? (
+                            <div className="p-2 text-center text-gray-500">
+                              No events available from current filters
+                            </div>
+                          ) : (
+                            menu
+                          )}
+                        </div>
+                      )}
+                    >
+                      {getAvailableEvents().map(event => (
+                        <Select.Option key={event._id} value={event._id}>
+                          {event.title}
+                        </Select.Option>
+                      ))}
+                    </Select>
+                    {filters.eventId && (
+                      <div className="absolute -top-2 -right-2 w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center">
+                        <span className="text-white text-xs">6</span>
+                      </div>
+                    )}
+                  </div>
+                </Col>
+              </Row>
+              
+              {/* Active Filters Summary & Filter Chain Visualization */}
+              {(Object.entries(filters).some(([key, value]) => value)) && (
+                <div className="mt-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center">
+                      <FilterOutlined className="text-blue-600 mr-2" />
+                      <Text strong className="text-blue-800">Active Cascading Filters:</Text>
+                    </div>
+                    <Button 
+                      size="small" 
+                      type="link" 
+                      onClick={handleReset}
+                      className="text-blue-600 hover:text-blue-800"
+                    >
+                      Clear All
+                    </Button>
+                  </div>
+                  
+                  {/* Filter Chain Visualization */}
+                  <div className="mb-3">
+                    <div className="flex items-center text-sm text-gray-600 mb-2">
+                      <span className="font-medium">Filter Chain:</span>
+                      <span className="ml-2 text-xs bg-white px-2 py-1 rounded border">
+                        {allVisitors.length} total → {filteredVisitors.length} filtered
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {Object.entries(filters).map(([key, value], index) => {
+                        if (value) {
+                          const label = key.charAt(0).toUpperCase() + key.slice(1);
+                          return (
+                            <div key={key} className="flex items-center">
+                              {index > 0 && <span className="text-gray-400 mx-1">→</span>}
+                              <Tag 
+                                color="blue" 
+                                closable 
+                                onClose={() => handleFilterChange(key, '')}
+                                className="text-xs"
+                              >
+                                {label}: {typeof value === 'string' && value.length > 20 ? value.substring(0, 20) + '...' : value}
+                              </Tag>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  </div>
+                  
+                  {/* Results Summary */}
+                  <div className="text-sm text-gray-700 bg-white p-2 rounded border">
+                    <span className="font-medium">Results:</span> Showing {filteredVisitors.length} visitors 
+                    {filteredVisitors.length !== allVisitors.length && (
+                      <span className="text-gray-500"> (filtered from {allVisitors.length} total)</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </Card>
+          )}
+
+          {/* Quick Search Bar */}
           <Card className="admin-card-responsive mb-6">
             <div className="admin-form-responsive">
               <Row gutter={[16, 16]} className="items-end">
-                <Col xs={24} sm={12} md={8}>
+                <Col xs={24} sm={16}>
                   <Input.Search
-                    placeholder="Search visitors..."
-                    value={searchText}
-                    onChange={(e) => setSearchText(e.target.value)}
-                    onSearch={(value) => setSearchText(value)}
+                    placeholder="Quick search by name..."
+                    value={filters.name}
+                    onChange={(e) => handleFilterChange('name', e.target.value)}
+                    onSearch={(value) => handleFilterChange('name', value)}
                     className="w-full"
                     enterButton
                   />
                 </Col>
-                <Col xs={24} sm={12} md={8} className="hide-mobile">
-                  <Select
-                    placeholder="Filter by Event"
-                    allowClear
+                <Col xs={24} sm={8}>
+                  <Button
+                    icon={<FilterOutlined />}
+                    onClick={() => setShowFilters(f => !f)}
+                    type={showFilters ? 'primary' : 'default'}
                     className="w-full"
-                    value={selectedEventFilter}
-                    onChange={(value) => setSelectedEventFilter(value)}
                   >
-                    {events.map(event => (
-                      <Option key={event._id} value={event._id}>
-                        {event.title}
-                      </Option>
-                    ))}
-                  </Select>
-                </Col>
-                <Col xs={24} sm={12} md={8} className="hide-mobile">
-                  <Select
-                    placeholder="Filter by Status"
-                    allowClear
-                    className="w-full"
-                    value={selectedStatusFilter}
-                    onChange={(value) => setSelectedStatusFilter(value)}
-                  >
-                    <Option value="registered">Registered</Option>
-                    <Option value="checked_in">Checked In</Option>
-                    <Option value="checked_out">Checked Out</Option>
-                    <Option value="cancelled">Cancelled</Option>
-                  </Select>
+                    {showFilters ? 'Hide Filters' : 'Advanced Filters'}
+                  </Button>
                 </Col>
               </Row>
             </div>
@@ -743,44 +986,106 @@ export default function VisitorsPage() {
 
           {/* Mobile Filter Drawer */}
           <Drawer
-            title="Filters"
+            title="Cascading Filters"
             placement="right"
             onClose={() => setIsFilterDrawerVisible(false)}
             open={isFilterDrawerVisible}
             className="admin-drawer-responsive"
           >
             <div className="space-y-4">
+              <div className="bg-blue-50 border-l-4 border-blue-400 p-3 mb-4">
+                <p className="text-sm text-blue-700">
+                  <strong>Cascading Filters:</strong> Each filter narrows down options from previous results.
+                </p>
+                <p className="text-xs text-blue-600 mt-1">
+                  Showing {filteredVisitors.length} of {allVisitors.length} visitors
+                </p>
+              </div>
+              
+              <div>
+                <label className="text-responsive-sm font-medium">Name:</label>
+                <Input
+                  placeholder="Search by name"
+                  value={filters.name}
+                  onChange={(e) => handleFilterChange('name', e.target.value)}
+                  className="w-full mt-2"
+                />
+              </div>
+              
+              <div>
+                <label className="text-responsive-sm font-medium">Email:</label>
+                <Input
+                  placeholder="Search by email"
+                  value={filters.email}
+                  onChange={(e) => handleFilterChange('email', e.target.value)}
+                  className="w-full mt-2"
+                />
+              </div>
+              
+              <div>
+                <label className="text-responsive-sm font-medium">Phone:</label>
+                <Select
+                  placeholder="Select Phone"
+                  allowClear
+                  className="w-full mt-2"
+                  value={filters.phone || undefined}
+                  onChange={(value) => handleFilterChange('phone', value)}
+                  showSearch
+                >
+                  {getUniqueValues('phone').map(phone => (
+                    <Option key={phone} value={phone}>
+                      {phone}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+              
+              <div>
+                <label className="text-responsive-sm font-medium">Company:</label>
+                <Input
+                  placeholder="Search by company"
+                  value={filters.company}
+                  onChange={(e) => handleFilterChange('company', e.target.value)}
+                  className="w-full mt-2"
+                />
+              </div>
+              
+              <div>
+                <label className="text-responsive-sm font-medium">Location:</label>
+                <Select
+                  placeholder="Select Location"
+                  allowClear
+                  className="w-full mt-2"
+                  value={filters.location || undefined}
+                  onChange={(value) => handleFilterChange('location', value)}
+                  showSearch
+                >
+                  {getUniqueValues('location').map(location => (
+                    <Option key={location} value={location}>
+                      {location}
+                    </Option>
+                  ))}
+                </Select>
+              </div>
+              
               <div>
                 <label className="text-responsive-sm font-medium">Event:</label>
                 <Select
                   placeholder="Select Event"
                   allowClear
                   className="w-full mt-2"
-                  value={selectedEventFilter}
-                  onChange={(value) => setSelectedEventFilter(value)}
+                  value={filters.eventId || undefined}
+                  onChange={(value) => handleFilterChange('eventId', value)}
+                  showSearch
                 >
-                  {events.map(event => (
+                  {getAvailableEvents().map(event => (
                     <Option key={event._id} value={event._id}>
                       {event.title}
                     </Option>
                   ))}
                 </Select>
               </div>
-              <div>
-                <label className="text-responsive-sm font-medium">Status:</label>
-                <Select
-                  placeholder="Select Status"
-                  allowClear
-                  className="w-full mt-2"
-                  value={selectedStatusFilter}
-                  onChange={(value) => setSelectedStatusFilter(value)}
-                >
-                  <Option value="registered">Registered</Option>
-                  <Option value="checked_in">Checked In</Option>
-                  <Option value="checked_out">Checked Out</Option>
-                  <Option value="cancelled">Cancelled</Option>
-                </Select>
-              </div>
+              
               <div className="pt-4">
                 <Button 
                   type="primary" 
@@ -796,13 +1101,11 @@ export default function VisitorsPage() {
                   className="w-full"
                   onClick={() => {
                     // Clear all filters
-                    setSelectedEventFilter(undefined);
-                    setSelectedStatusFilter(undefined);
-                    setSearchText('');
+                    handleReset();
                     setIsFilterDrawerVisible(false);
                   }}
                 >
-                  Clear Filters
+                  Clear All Filters
                 </Button>
               </div>
             </div>
