@@ -41,6 +41,17 @@ const QuickScanner: React.FC = () => {
     
     try {
       console.log('Getting cameras...');
+      
+      // First request permission to access cameras
+      try {
+        await navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+          stream.getTracks().forEach(track => track.stop());
+        });
+      } catch (permError) {
+        console.warn('Permission request failed:', permError);
+        throw new Error('Camera permission required. Please allow camera access and refresh the page.');
+      }
+
       const { Html5Qrcode } = await import('html5-qrcode');
       const devices = await Html5Qrcode.getCameras();
       console.log('Available cameras:', devices);
@@ -51,18 +62,21 @@ const QuickScanner: React.FC = () => {
         const backCamera = devices.find(device => 
           device.label.toLowerCase().includes('back') || 
           device.label.toLowerCase().includes('rear') ||
-          device.label.toLowerCase().includes('environment')
+          device.label.toLowerCase().includes('environment') ||
+          device.label.toLowerCase().includes('0')
         );
         const defaultCamera = backCamera ? backCamera.id : devices[0].id;
         setSelectedCamera(defaultCamera);
         console.log('Selected camera:', defaultCamera);
+        messageApi.success(`📷 Found ${devices.length} camera(s). Ready to scan!`, 2);
       } else {
         throw new Error('No cameras found on this device.');
       }
     } catch (err) {
       console.error('Error getting cameras:', err);
-      setError('Unable to access device cameras. Please ensure camera permissions are granted.');
-      messageApi.error('Unable to access device cameras. Please ensure camera permissions are granted.');
+      const errorMsg = err instanceof Error ? err.message : 'Unable to access device cameras.';
+      setError(errorMsg);
+      messageApi.error(`❌ ${errorMsg}`);
     }
   }, [isClient, messageApi]);
 
@@ -74,21 +88,59 @@ const QuickScanner: React.FC = () => {
 
   // Start QR scanner
   const startScanning = async () => {
-    if (!isClient || !selectedCamera) return;
+    if (!isClient || !selectedCamera) {
+      messageApi.error('❌ Camera not selected or client not ready');
+      return;
+    }
     
     try {
       setLoading(true);
       setError(null);
       console.log('Starting continuous scanner with camera:', selectedCamera);
-      messageApi.loading('Initializing camera...', 1);
+      messageApi.loading('Initializing camera...', 2);
 
       // Check for secure context
       if (typeof window !== 'undefined' && !window.isSecureContext) {
-        throw new Error('Camera access requires a secure connection (HTTPS) or localhost');
+        throw new Error('Camera access requires a secure connection (HTTPS) or localhost. Please use https:// or localhost');
       }
 
+      // Check if browser supports getUserMedia
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error('Camera access not supported by this browser');
+      }
+
+      // Request camera permission first
+      try {
+        console.log('Requesting camera permission...');
+        await navigator.mediaDevices.getUserMedia({ 
+          video: { deviceId: selectedCamera } 
+        }).then(stream => {
+          // Stop the stream immediately, we just needed permission
+          stream.getTracks().forEach(track => track.stop());
+          console.log('Camera permission granted');
+        });
+      } catch (permissionError) {
+        console.error('Camera permission error:', permissionError);
+        throw new Error('Camera permission denied. Please allow camera access and try again.');
+      }
+
+      // Wait a moment for any cleanup
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Check if QR reader element exists
+      const qrReaderElement = document.getElementById('qr-reader');
+      if (!qrReaderElement) {
+        throw new Error('QR reader element not found in DOM');
+      }
+
+      // Clear any existing content
+      qrReaderElement.innerHTML = '';
+
       // Import and create scanner
+      console.log('Importing HTML5-QRCode library...');
       const { Html5Qrcode } = await import('html5-qrcode');
+      
+      console.log('Creating scanner instance...');
       const scanner = new Html5Qrcode('qr-reader');
       html5QrCodeRef.current = scanner;
 
@@ -96,16 +148,21 @@ const QuickScanner: React.FC = () => {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
       const config = {
-        fps: isMobile ? 5 : 10,
+        fps: isMobile ? 5 : 8,
         qrbox: { 
-          width: isMobile ? 200 : 250, 
-          height: isMobile ? 200 : 250 
+          width: isMobile ? 180 : 220, 
+          height: isMobile ? 180 : 220 
         },
         aspectRatio: 1.0,
         disableFlip: false,
+        videoConstraints: {
+          facingMode: "environment", // Use back camera
+          deviceId: selectedCamera
+        }
       };
 
       console.log('Scanner config:', config);
+      console.log('Starting scanner with camera ID:', selectedCamera);
 
       await scanner.start(
         selectedCamera,
@@ -130,16 +187,47 @@ const QuickScanner: React.FC = () => {
       setIsScanning(true);
       setLoading(false);
       messageApi.destroy();
-      messageApi.success('🎯 Quick Scanner started! Ready to scan QR codes continuously.', 2);
+      messageApi.success('🎯 Quick Scanner started! Ready to scan QR codes continuously.', 3);
       console.log('Continuous scanner started successfully');
     } catch (err) {
       console.error('Error starting scanner:', err);
-      const errorMsg = err instanceof Error ? err.message : 'Failed to start QR scanner';
+      let errorMsg = 'Failed to start QR scanner';
+      
+      if (err instanceof Error) {
+        errorMsg = err.message;
+      } else if (typeof err === 'string') {
+        errorMsg = err;
+      }
+
+      // Provide specific error messages for common issues
+      if (errorMsg.includes('Permission denied') || errorMsg.includes('NotAllowedError')) {
+        errorMsg = 'Camera permission denied. Please allow camera access in your browser settings and try again.';
+      } else if (errorMsg.includes('NotFoundError') || errorMsg.includes('DeviceNotFoundError')) {
+        errorMsg = 'Camera not found. Please check if your camera is connected and not being used by another application.';
+      } else if (errorMsg.includes('NotReadableError') || errorMsg.includes('TrackStartError')) {
+        errorMsg = 'Camera is busy or being used by another application. Please close other camera apps and try again.';
+      } else if (errorMsg.includes('OverconstrainedError')) {
+        errorMsg = 'Camera configuration not supported. Try selecting a different camera.';
+      } else if (errorMsg.includes('secure context') || errorMsg.includes('HTTPS')) {
+        errorMsg = 'Camera requires HTTPS or localhost. Please use https:// or run on localhost.';
+      }
+
       setError(errorMsg);
       messageApi.destroy();
-      messageApi.error(`❌ Failed to start scanner: ${errorMsg}`);
+      messageApi.error(`❌ ${errorMsg}`);
       setLoading(false);
       setIsScanning(false);
+      
+      // Cleanup on error
+      if (html5QrCodeRef.current) {
+        try {
+          html5QrCodeRef.current.stop().catch(console.error);
+          html5QrCodeRef.current.clear();
+          html5QrCodeRef.current = null;
+        } catch (cleanupError) {
+          console.error('Error during cleanup:', cleanupError);
+        }
+      }
     }
   };
 
@@ -515,7 +603,7 @@ const QuickScanner: React.FC = () => {
         </Card>
 
         {/* Instructions */}
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full max-w-2xl mb-4">
           <Title level={4}>How to Use Quick Scanner:</Title>
           <div className="space-y-2 text-sm">
             <div className="flex items-start gap-2">
@@ -537,6 +625,53 @@ const QuickScanner: React.FC = () => {
             <div className="flex items-start gap-2">
               <span className="flex-shrink-0 w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xs font-bold">5</span>
               <span>Already visited visitors will show warning messages but scanning continues</span>
+            </div>
+          </div>
+        </Card>
+
+        {/* Troubleshooting */}
+        <Card className="w-full max-w-2xl">
+          <Title level={4}>Troubleshooting:</Title>
+          <div className="space-y-3 text-sm">
+            <div>
+              <Text strong className="text-red-600">❌ "Camera permission denied"</Text>
+              <ul className="mt-1 ml-4 list-disc space-y-1">
+                <li>Click the camera icon in your browser's address bar and allow camera access</li>
+                <li>Refresh the page after granting permission</li>
+                <li>Check if another app is using the camera</li>
+              </ul>
+            </div>
+            <div>
+              <Text strong className="text-red-600">❌ "Camera requires HTTPS"</Text>
+              <ul className="mt-1 ml-4 list-disc space-y-1">
+                <li>Use https:// instead of http:// in the URL</li>
+                <li>Or access via localhost (e.g., localhost:3000)</li>
+              </ul>
+            </div>
+            <div>
+              <Text strong className="text-red-600">❌ "Camera is busy"</Text>
+              <ul className="mt-1 ml-4 list-disc space-y-1">
+                <li>Close other camera apps (Zoom, Skype, etc.)</li>
+                <li>Close other browser tabs using the camera</li>
+                <li>Restart your browser</li>
+              </ul>
+            </div>
+            <div>
+              <Text strong className="text-red-600">❌ "No cameras found"</Text>
+              <ul className="mt-1 ml-4 list-disc space-y-1">
+                <li>Check if your camera is properly connected</li>
+                <li>Try a different browser (Chrome, Firefox, Safari)</li>
+                <li>Restart your device if necessary</li>
+              </ul>
+            </div>
+            <div className="bg-green-50 p-3 rounded-lg border border-green-200 mt-4">
+              <Text strong className="text-green-700">💡 Best Practices:</Text>
+              <ul className="mt-1 ml-4 list-disc space-y-1 text-green-700">
+                <li>Use Chrome or Firefox for best compatibility</li>
+                <li>Ensure good lighting for better QR code scanning</li>
+                <li>Hold QR codes steady within the camera frame</li>
+                <li>Use the back camera for better scanning (if available)</li>
+              </ul>
             </div>
           </div>
         </Card>
