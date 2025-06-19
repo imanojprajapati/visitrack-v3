@@ -127,14 +127,11 @@ const QuickScanner: React.FC = () => {
       // Wait a moment for any cleanup
       await new Promise(resolve => setTimeout(resolve, 500));
 
-      // Check if QR reader element exists
+      // Clear any existing content from QR reader
       const qrReaderElement = document.getElementById('qr-reader');
-      if (!qrReaderElement) {
-        throw new Error('QR reader element not found in DOM');
+      if (qrReaderElement) {
+        qrReaderElement.innerHTML = '';
       }
-
-      // Clear any existing content
-      qrReaderElement.innerHTML = '';
 
       // Import and create scanner
       console.log('Importing HTML5-QRCode library...');
@@ -552,49 +549,54 @@ const QuickScanner: React.FC = () => {
               </Button>
             )}
 
-            {/* QR Scanner Display */}
+                        {/* QR Scanner Display */}
             <div className="w-full">
+              {/* Status Display */}
               {isScanning && (
-                <div className="mb-4">
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                      <Text strong className="text-green-700">Scanner Active</Text>
-                    </div>
-                    <Text type="secondary" className="text-sm">
-                      {isProcessingScan 
-                        ? 'Processing scan...' 
-                        : 'Ready to scan QR codes continuously'
-                      }
-                    </Text>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center justify-center gap-2 mb-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                    <Text strong className="text-green-700">Scanner Active</Text>
                   </div>
-                  
-                  {/* Scanner Container */}
-                  <div className="w-full aspect-square bg-black rounded-lg overflow-hidden relative max-w-md mx-auto">
-                    <div id="qr-reader" className="w-full h-full"></div>
-                    {isProcessingScan && (
-                      <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                        <div className="text-white text-center">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
-                          <p>Processing scan...</p>
-                        </div>
-                      </div>
-                                         )}
-                   </div>
-                   
-                   {/* Scanner Instructions */}
-                   <div className="text-center mt-4">
-                     <Text type="secondary" className="text-sm">
-                       Position QR codes within the camera view to scan automatically
-                     </Text>
-                   </div>
-                 </div>
-               )}
+                  <Text type="secondary" className="text-sm">
+                    {isProcessingScan 
+                      ? 'Processing scan...' 
+                      : 'Ready to scan QR codes continuously'
+                    }
+                  </Text>
+                </div>
+              )}
               
               {!isScanning && !loading && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-4">
                   <Text type="secondary">
                     Click "Start Quick Scanning" to begin continuous scanning
+                  </Text>
+                </div>
+              )}
+
+              {/* Scanner Container - Always present in DOM */}
+              <div 
+                className={`w-full aspect-square bg-black rounded-lg overflow-hidden relative max-w-md mx-auto ${
+                  isScanning ? 'block' : 'hidden'
+                }`}
+              >
+                <div id="qr-reader" className="w-full h-full"></div>
+                {isProcessingScan && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                    <div className="text-white text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+                      <p>Processing scan...</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Scanner Instructions */}
+              {isScanning && (
+                <div className="text-center mt-4">
+                  <Text type="secondary" className="text-sm">
+                    Position QR codes within the camera view to scan automatically
                   </Text>
                 </div>
               )}
