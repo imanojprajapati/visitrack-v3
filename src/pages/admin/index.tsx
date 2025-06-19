@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Row, Col, Statistic, Select, DatePicker, Space, Spin, Alert } from 'antd';
+import { Card, Row, Col, Statistic, Select, Space, Spin, Alert } from 'antd';
 import { Line, Column } from '@ant-design/plots';
 import {
   UserOutlined,
@@ -12,7 +12,6 @@ import {
 import AdminLayout from './layout';
 import dayjs from 'dayjs';
 
-const { RangePicker } = DatePicker;
 const { Option } = Select;
 
 interface DashboardStats {
@@ -38,7 +37,6 @@ export default function AdminDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState({
     eventId: '',
-    dateRange: null as [dayjs.Dayjs, dayjs.Dayjs] | null,
   });
 
   useEffect(() => {
@@ -67,11 +65,6 @@ export default function AdminDashboard() {
       
       if (filters.eventId) {
         queryParams.append('eventId', filters.eventId);
-      }
-      
-      if (filters.dateRange) {
-        queryParams.append('startDate', filters.dateRange[0].format('YYYY-MM-DD'));
-        queryParams.append('endDate', filters.dateRange[1].format('YYYY-MM-DD'));
       }
 
       const response = await fetch(`/api/dashboard/stats?${queryParams.toString()}`);
@@ -165,14 +158,6 @@ export default function AdminDashboard() {
                   </Option>
                 ))}
               </Select>
-              <RangePicker
-                value={filters.dateRange}
-                onChange={(dates) => handleFilterChange('dateRange', dates)}
-                placeholder={['Start Date', 'End Date']}
-                disabled
-                title="Date filtering is currently disabled due to data format limitations"
-                className="w-full sm:w-auto"
-              />
               <button
                 onClick={handleRefresh}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
