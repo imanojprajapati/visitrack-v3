@@ -23,22 +23,31 @@ export default async function handler(
   }
 
   try {
+    console.log('=== EMAIL SERVICE REQUEST ===');
+    console.log('Request body:', req.body);
+    console.log('Environment check:', {
+      NODE_ENV: process.env.NODE_ENV,
+      GMAIL_USER: process.env.GMAIL_USER ? 'Set' : 'Not Set',
+      GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD ? 'Set' : 'Not Set'
+    });
+    
     const { visitorId, testMode } = req.body;
 
     if (!visitorId && !testMode) {
+      console.error('❌ No visitorId provided and not in test mode');
       return res.status(400).json({ message: 'Visitor ID is required' });
     }
 
     // Check if Gmail credentials are configured
     if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
-      console.error('Gmail credentials not configured:', {
+      console.error('❌ Gmail credentials not configured:', {
         GMAIL_USER: process.env.GMAIL_USER ? 'Set' : 'Not Set',
         GMAIL_APP_PASSWORD: process.env.GMAIL_APP_PASSWORD ? 'Set' : 'Not Set'
       });
       return res.status(500).json({ message: 'Email service not configured' });
     }
 
-    console.log('Email service configuration check passed');
+    console.log('✅ Email service configuration check passed');
 
     // Test mode for email verification
     if (testMode) {
@@ -73,19 +82,26 @@ export default async function handler(
     }
 
     // Connect to database
+    console.log('📊 Connecting to database...');
     await connectToDatabase();
 
     // Get visitor details
+    console.log('👤 Looking for visitor with ID:', visitorId);
     const visitor = await Visitor.findById(visitorId).lean();
     if (!visitor) {
+      console.error('❌ Visitor not found with ID:', visitorId);
       return res.status(404).json({ message: 'Visitor not found' });
     }
+    console.log('✅ Visitor found:', { name: visitor.name, email: visitor.email });
 
     // Get event details
+    console.log('📅 Looking for event with ID:', visitor.eventId);
     const event = await Event.findById(visitor.eventId).lean();
     if (!event) {
+      console.error('❌ Event not found with ID:', visitor.eventId);
       return res.status(404).json({ message: 'Event not found' });
     }
+    console.log('✅ Event found:', event.title);
 
     // Type assertion for event
     const eventData = event as any;
@@ -238,9 +254,18 @@ export default async function handler(
       attachments: pdfAttachment ? [pdfAttachment] : undefined
     };
 
+    console.log('📧 Preparing to send email with options:', {
+      from: mailOptions.from,
+      to: mailOptions.to,
+      subject: mailOptions.subject,
+      hasAttachment: !!pdfAttachment,
+      emailSize: emailHtml.length
+    });
+
     try {
+      console.log('📤 Sending email...');
       await transporter.sendMail(mailOptions);
-      console.log('Registration success email sent to:', visitor.email, 'for event:', eventData.title, {
+      console.log('✅ Registration success email sent successfully to:', visitor.email, 'for event:', eventData.title, {
         visitorId: visitor._id,
         pdfAttached: !!pdfAttachment,
         emailSize: emailHtml.length

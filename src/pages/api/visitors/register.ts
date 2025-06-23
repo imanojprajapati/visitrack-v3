@@ -336,7 +336,13 @@ export default async function handler(
       try {
         console.log('Attempting to send registration success email for visitor:', visitor[0]._id);
         
-        const emailResponse = await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/visitors/send-registration-success`, {
+        // Construct the API URL more reliably
+        const baseUrl = process.env.NEXTAUTH_URL || process.env.VERCEL_URL || 'http://localhost:3000';
+        const apiUrl = `${baseUrl}/api/visitors/send-registration-success`;
+        
+        console.log('Email API URL:', apiUrl);
+        
+        const emailResponse = await fetch(apiUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -345,6 +351,8 @@ export default async function handler(
             visitorId: (visitor[0]._id as any).toString()
           })
         });
+
+        console.log('Email API response status:', emailResponse.status);
 
         if (emailResponse.ok) {
           const emailResult = await emailResponse.json();
@@ -361,12 +369,23 @@ export default async function handler(
             statusText: emailResponse.statusText,
             error: errorText,
             visitorId: visitor[0]._id,
-            visitorEmail: visitor[0].email
+            visitorEmail: visitor[0].email,
+            apiUrl: apiUrl
+          });
+          
+          // Log additional debugging information
+          console.error('Email service debugging info:', {
+            baseUrl,
+            NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'Not Set',
+            VERCEL_URL: process.env.VERCEL_URL || 'Not Set',
+            NODE_ENV: process.env.NODE_ENV
           });
         }
       } catch (emailError) {
         console.error('Error sending registration success email:', {
           error: emailError,
+          message: emailError instanceof Error ? emailError.message : 'Unknown error',
+          stack: emailError instanceof Error ? emailError.stack : undefined,
           visitorId: visitor[0]._id,
           visitorEmail: visitor[0].email,
           eventTitle: visitor[0].eventName
