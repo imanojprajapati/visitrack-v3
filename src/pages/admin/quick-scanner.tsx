@@ -53,8 +53,12 @@ const QuickScanner: React.FC = () => {
   const [selectedCamera, setSelectedCamera] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [isClient, setIsClient] = useState(false);
+  const [lastScannedQR, setLastScannedQR] = useState<string>('');
+  const [scanCooldown, setScanCooldown] = useState(false);
 
   const html5QrCodeRef = useRef<any>(null);
+  const lastScanTimeRef = useRef<number>(0);
+  const scanCooldownRef = useRef<boolean>(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -204,9 +208,39 @@ const QuickScanner: React.FC = () => {
           config,
           async (decodedText: string) => {
             console.log('QR code detected:', decodedText);
-            if (!isProcessingScan) {
-              setIsProcessingScan(true);
+            
+            const currentTime = Date.now();
+            
+            // Check if we're already processing a scan
+            if (isProcessingScan || scanCooldownRef.current) {
+              console.log('Already processing a scan or in cooldown, ignoring...');
+              return;
+            }
+
+            // Check if this is the same QR code scanned recently (within 3 seconds)
+            if (lastScannedQR === decodedText && (currentTime - lastScanTimeRef.current) < 3000) {
+              console.log('Same QR code scanned recently, ignoring duplicate...');
+              return;
+            }
+
+            // Set processing state and cooldown
+            setIsProcessingScan(true);
+            setScanCooldown(true);
+            scanCooldownRef.current = true;
+            setLastScannedQR(decodedText);
+            lastScanTimeRef.current = currentTime;
+
+            try {
               await handleQrCodeScan(decodedText);
+            } catch (error) {
+              console.error('Error in QR scan handler:', error);
+            } finally {
+              // Reset cooldown after a delay
+              setTimeout(() => {
+                setScanCooldown(false);
+                scanCooldownRef.current = false;
+                console.log('Scan cooldown reset, ready for next scan');
+              }, 2000); // 2 second cooldown between scans
             }
           },
           (errorMessage: string) => {
@@ -352,6 +386,10 @@ const QuickScanner: React.FC = () => {
       
       setIsScanning(false);
       setIsProcessingScan(false);
+      setScanCooldown(false);
+      scanCooldownRef.current = false;
+      setLastScannedQR('');
+      lastScanTimeRef.current = 0;
       messageApi.destroy();
       messageApi.success('🛑 Scanner stopped successfully!', 2);
       console.log('Scanner cleanup completed');
@@ -362,6 +400,10 @@ const QuickScanner: React.FC = () => {
       html5QrCodeRef.current = null;
       setIsScanning(false);
       setIsProcessingScan(false);
+      setScanCooldown(false);
+      scanCooldownRef.current = false;
+      setLastScannedQR('');
+      lastScanTimeRef.current = 0;
       
       const qrReaderElement = document.getElementById('qr-reader');
       if (qrReaderElement) {
@@ -429,8 +471,8 @@ const QuickScanner: React.FC = () => {
 
       messageApi.loading('🔍 Checking visitor status...', 1);
 
-      // Check if visitor has already been scanned
-      const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}`);
+      // Check if visitor has already been scanned (with better duplicate detection)
+      const scanCheckResponse = await fetch(`/api/qrscans/check-visitor?visitorId=${visitorId}&detailed=true`);
       if (!scanCheckResponse.ok) {
         messageApi.destroy();
         throw new Error('Failed to check visitor scan status');
@@ -444,6 +486,8 @@ const QuickScanner: React.FC = () => {
           day: '2-digit', month: '2-digit', year: 'numeric', 
           hour: '2-digit', minute: '2-digit',
         });
+        
+        console.log('Visitor already scanned:', existingScan.name, 'at', scanTime);
         
         return { 
           alreadyCheckedIn: true, 
@@ -510,6 +554,26 @@ const QuickScanner: React.FC = () => {
         messageApi.destroy();
         const errorData = await safeJson(scanResponse);
         throw new Error(errorData.message || 'Failed to record scan data');
+      }
+
+      const scanResponseData = await scanResponse.json();
+      
+      // If it's a duplicate, return early with already checked in status
+      if (scanResponseData.isDuplicate) {
+        messageApi.destroy();
+        console.log('Duplicate scan detected and prevented by API');
+        return { 
+          alreadyCheckedIn: true, 
+          visitor: { 
+            name: scanResponseData.scan.name,
+            company: scanResponseData.scan.company,
+            eventName: scanResponseData.scan.eventName,
+            displayTime: new Date(scanResponseData.scan.scanTime).toLocaleString('en-GB', {
+              day: '2-digit', month: '2-digit', year: 'numeric', 
+              hour: '2-digit', minute: '2-digit',
+            })
+          } 
+        };
       }
 
       // Update visitor status
@@ -732,13 +796,21 @@ const QuickScanner: React.FC = () => {
             <div className="w-full">
               {/* Status Display */}
               {isScanning && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                <div className={`border rounded-lg p-3 mb-4 ${
+                  scanCooldown ? 'bg-yellow-50 border-yellow-200' : 'bg-green-50 border-green-200'
+                }`}>
                   <div className="flex items-center justify-center gap-2 mb-2">
-                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                    <Text strong className="text-green-700">Scanner Active</Text>
+                    <div className={`w-3 h-3 rounded-full animate-pulse ${
+                      scanCooldown ? 'bg-yellow-500' : 'bg-green-500'
+                    }`}></div>
+                    <Text strong className={scanCooldown ? 'text-yellow-700' : 'text-green-700'}>
+                      {scanCooldown ? 'Processing...' : 'Scanner Active'}
+                    </Text>
                   </div>
                   <Text type="secondary" className="text-sm">
-                    {isProcessingScan 
+                    {scanCooldown 
+                      ? 'Processing previous scan - please wait...'
+                      : isProcessingScan 
                       ? 'Processing scan...' 
                       : 'Ready to scan QR codes continuously'
                     }

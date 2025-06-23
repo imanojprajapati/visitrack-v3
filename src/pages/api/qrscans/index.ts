@@ -45,6 +45,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ message: 'Missing required field: visitorId' });
       }
 
+      // Check if a scan record already exists for this visitor (prevent duplicates)
+      const existingScan = await db.collection('qrscans').findOne({ 
+        visitorId: visitorId 
+      });
+
+      if (existingScan) {
+        console.log('Duplicate scan attempt prevented for visitor:', visitorId);
+        return res.status(200).json({ 
+          message: 'Visitor already scanned - duplicate prevented',
+          scanId: existingScan._id,
+          scan: existingScan,
+          isDuplicate: true
+        });
+      }
+
       // Set defaults for optional fields
       const now = new Date();
       const scanRecord = {
@@ -68,10 +83,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         throw new Error('Failed to create scan record');
       }
 
+      console.log('New scan record created for visitor:', visitorId);
+
       return res.status(201).json({ 
         message: 'Scan record created successfully',
         scanId: result.insertedId,
-        scan: scanRecord
+        scan: scanRecord,
+        isDuplicate: false
       });
     } catch (error) {
       console.error('Error creating scan record:', error);
