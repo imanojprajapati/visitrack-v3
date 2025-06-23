@@ -157,14 +157,14 @@ const QuickScanner: React.FC = () => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Clear any existing content from QR reader
-      const qrReaderElement = document.getElementById('qr-reader');
-      if (qrReaderElement) {
-        qrReaderElement.innerHTML = '';
+      const qrReaderEl = document.getElementById('qr-reader');
+      if (qrReaderEl) {
+        qrReaderEl.innerHTML = '';
         // Ensure the element is visible and properly sized
-        qrReaderElement.style.display = 'block';
-        qrReaderElement.style.width = '100%';
-        qrReaderElement.style.height = '100%';
-        qrReaderElement.style.minHeight = '300px';
+        qrReaderEl.style.display = 'block';
+        qrReaderEl.style.width = '100%';
+        qrReaderEl.style.height = '100%';
+        qrReaderEl.style.minHeight = '300px';
       }
 
       // Import and create scanner
@@ -172,70 +172,105 @@ const QuickScanner: React.FC = () => {
       const { Html5Qrcode } = await import('html5-qrcode');
       
       console.log('Creating scanner instance...');
+      
+      // Ensure the qr-reader element exists and is ready
+      const qrElement = document.getElementById('qr-reader');
+      if (!qrElement) {
+        throw new Error('QR reader element not found. Please refresh the page.');
+      }
+      
       const scanner = new Html5Qrcode('qr-reader');
       html5QrCodeRef.current = scanner;
 
-      // Mobile-optimized configuration
+      // Simplified configuration for better compatibility
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
       const config = {
         fps: isMobile ? 5 : 10,
-        qrbox: function(viewfinderWidth: number, viewfinderHeight: number) {
-          let minEdgePercentage = 0.7; // 70% of the smaller edge
-          let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-          let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
-          return {
-            width: qrboxSize,
-            height: qrboxSize,
-          };
-        },
+        qrbox: { width: 250, height: 250 }, // Fixed size for better compatibility
         aspectRatio: 1.0,
         disableFlip: false,
-        videoConstraints: {
-          facingMode: "environment", // Use back camera
-          deviceId: selectedCamera
-        },
-        rememberLastUsedCamera: true,
-        supportedScanTypes: [0, 1, 2, 3, 4], // Support all QR code formats
+        showTorchButtonIfSupported: true,
+        showZoomSliderIfSupported: true,
+        defaultZoomValueIfSupported: 2,
       };
 
       console.log('Scanner config:', config);
       console.log('Starting scanner with camera ID:', selectedCamera);
 
-      await scanner.start(
-        selectedCamera,
-        config,
-        async (decodedText: string) => {
-          console.log('QR code detected:', decodedText);
-          if (!isProcessingScan) {
-            setIsProcessingScan(true);
-            await handleQrCodeScan(decodedText);
+      try {
+        await scanner.start(
+          selectedCamera,
+          config,
+          async (decodedText: string) => {
+            console.log('QR code detected:', decodedText);
+            if (!isProcessingScan) {
+              setIsProcessingScan(true);
+              await handleQrCodeScan(decodedText);
+            }
+          },
+          (errorMessage: string) => {
+            // Only log errors that are not continuous scanning errors
+            if (!errorMessage.includes('NotFoundException') && 
+                !errorMessage.includes('No QR code found') &&
+                !errorMessage.includes('No MultiFormat Readers')) {
+              console.debug('QR scan error:', errorMessage);
+            }
           }
-        },
-        (errorMessage: string) => {
-          // Only log errors that are not continuous scanning errors
-          if (!errorMessage.includes('NotFoundException') && 
-              !errorMessage.includes('No QR code found') &&
-              !errorMessage.includes('No MultiFormat Readers')) {
-            console.debug('QR scan error:', errorMessage);
-          }
-        }
-      );
-
-      // Additional check to ensure camera is displaying
-      setTimeout(() => {
-        const qrReaderElement = document.getElementById('qr-reader');
-        if (qrReaderElement) {
-          const videoElement = qrReaderElement.querySelector('video');
-          if (videoElement) {
-            console.log('Video element found:', videoElement);
-            console.log('Video dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
-            console.log('Video ready state:', videoElement.readyState);
+        );
+        
+        console.log('Scanner started successfully');
+        
+        // Check camera display after a short delay
+        setTimeout(() => {
+          const qrReaderElement = document.getElementById('qr-reader');
+          if (qrReaderElement) {
+            const videoElement = qrReaderElement.querySelector('video');
+            const canvasElement = qrReaderElement.querySelector('canvas');
+            
+            console.log('QR Reader element:', qrReaderElement);
+            console.log('Video element found:', !!videoElement);
+            console.log('Canvas element found:', !!canvasElement);
+            
+            if (videoElement) {
+              console.log('Video dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+              console.log('Video ready state:', videoElement.readyState);
+              console.log('Video src object:', !!videoElement.srcObject);
+              
+              // Force video display if needed
+              videoElement.style.display = 'block';
+              videoElement.style.width = '100%';
+              videoElement.style.height = '100%';
+              
+              if (videoElement.readyState === 0) {
+                console.warn('Video not ready, trying to load...');
+                videoElement.load();
+              }
+            }
+            
+            if (canvasElement) {
+              canvasElement.style.display = 'block';
+              canvasElement.style.width = '100%';
+              canvasElement.style.height = '100%';
+            }
+            
+            // Check if the scanner region is visible
+            const scanRegion = document.getElementById('qr-reader__scan_region');
+            if (scanRegion) {
+              console.log('Scan region found:', scanRegion);
+              scanRegion.style.display = 'block';
+            } else {
+              console.warn('Scan region not found');
+            }
           } else {
-            console.warn('No video element found in QR reader');
+            console.error('QR reader element not found after scanner start');
           }
-        }
-      }, 2000);
+        }, 1500);
+        
+      } catch (startError) {
+        console.error('Error starting scanner:', startError);
+        throw startError;
+      }
 
       setIsScanning(true);
       setLoading(false);
@@ -291,19 +326,50 @@ const QuickScanner: React.FC = () => {
       messageApi.loading('Stopping scanner...', 1);
       
       if (html5QrCodeRef.current) {
-        await html5QrCodeRef.current.stop();
-        html5QrCodeRef.current.clear();
+        try {
+          // Try to stop the scanner
+          await html5QrCodeRef.current.stop();
+          console.log('Scanner stopped successfully');
+        } catch (stopError) {
+          console.warn('Error stopping scanner, but continuing cleanup:', stopError);
+          // Try alternative cleanup
+          try {
+            html5QrCodeRef.current.clear();
+          } catch (clearError) {
+            console.warn('Error clearing scanner:', clearError);
+          }
+        }
+        
+        // Always clean up the reference
         html5QrCodeRef.current = null;
       }
+      
+      // Clean up the DOM element
+      const qrReaderElement = document.getElementById('qr-reader');
+      if (qrReaderElement) {
+        qrReaderElement.innerHTML = '';
+      }
+      
       setIsScanning(false);
       setIsProcessingScan(false);
       messageApi.destroy();
-      messageApi.info('🛑 Scanner stopped. Click "Start Quick Scanning" to resume.', 2);
-      console.log('Continuous scanner stopped');
+      messageApi.success('🛑 Scanner stopped successfully!', 2);
+      console.log('Scanner cleanup completed');
     } catch (err) {
       console.error('Error stopping scanner:', err);
+      
+      // Force cleanup even if error occurred
+      html5QrCodeRef.current = null;
+      setIsScanning(false);
+      setIsProcessingScan(false);
+      
+      const qrReaderElement = document.getElementById('qr-reader');
+      if (qrReaderElement) {
+        qrReaderElement.innerHTML = '';
+      }
+      
       messageApi.destroy();
-      messageApi.error('❌ Error stopping scanner');
+      messageApi.warning('⚠️ Scanner stopped with cleanup. You can restart if needed.', 3);
     }
   };
 
@@ -514,6 +580,9 @@ const QuickScanner: React.FC = () => {
       <style jsx global>{`
         #qr-reader {
           border: none !important;
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 300px !important;
         }
         #qr-reader__dashboard {
           display: none !important;
@@ -524,13 +593,39 @@ const QuickScanner: React.FC = () => {
         #qr-reader__scan_region {
           border: 2px solid #10b981 !important;
           border-radius: 8px !important;
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 300px !important;
+          display: block !important;
         }
         #qr-reader__scan_region video {
           border-radius: 8px !important;
           object-fit: cover !important;
+          width: 100% !important;
+          height: 100% !important;
+          display: block !important;
+        }
+        #qr-reader__scan_region canvas {
+          border-radius: 8px !important;
+          width: 100% !important;
+          height: 100% !important;
+          display: block !important;
         }
         #qr-reader__scan_region img {
           border-radius: 8px !important;
+          width: 100% !important;
+          height: 100% !important;
+        }
+        #qr-reader video {
+          width: 100% !important;
+          height: 100% !important;
+          object-fit: cover !important;
+          display: block !important;
+        }
+        #qr-reader canvas {
+          width: 100% !important;
+          height: 100% !important;
+          display: block !important;
         }
         .qr-code-success {
           border: 3px solid #10b981 !important;
