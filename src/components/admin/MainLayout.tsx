@@ -103,7 +103,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     menuItems.push({
       key: '/admin/visitors',
       icon: <UserOutlined />,
-      label: 'Visitors',
+      label: 'Visitors Management',
     });
 
     // Event Management - available for admin and manager
