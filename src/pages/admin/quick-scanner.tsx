@@ -160,6 +160,11 @@ const QuickScanner: React.FC = () => {
       const qrReaderElement = document.getElementById('qr-reader');
       if (qrReaderElement) {
         qrReaderElement.innerHTML = '';
+        // Ensure the element is visible and properly sized
+        qrReaderElement.style.display = 'block';
+        qrReaderElement.style.width = '100%';
+        qrReaderElement.style.height = '100%';
+        qrReaderElement.style.minHeight = '300px';
       }
 
       // Import and create scanner
@@ -174,17 +179,24 @@ const QuickScanner: React.FC = () => {
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       
       const config = {
-        fps: isMobile ? 5 : 8,
-        qrbox: { 
-          width: isMobile ? 180 : 220, 
-          height: isMobile ? 180 : 220 
+        fps: isMobile ? 5 : 10,
+        qrbox: function(viewfinderWidth: number, viewfinderHeight: number) {
+          let minEdgePercentage = 0.7; // 70% of the smaller edge
+          let minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+          let qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+          return {
+            width: qrboxSize,
+            height: qrboxSize,
+          };
         },
         aspectRatio: 1.0,
         disableFlip: false,
         videoConstraints: {
           facingMode: "environment", // Use back camera
           deviceId: selectedCamera
-        }
+        },
+        rememberLastUsedCamera: true,
+        supportedScanTypes: [0, 1, 2, 3, 4], // Support all QR code formats
       };
 
       console.log('Scanner config:', config);
@@ -209,6 +221,21 @@ const QuickScanner: React.FC = () => {
           }
         }
       );
+
+      // Additional check to ensure camera is displaying
+      setTimeout(() => {
+        const qrReaderElement = document.getElementById('qr-reader');
+        if (qrReaderElement) {
+          const videoElement = qrReaderElement.querySelector('video');
+          if (videoElement) {
+            console.log('Video element found:', videoElement);
+            console.log('Video dimensions:', videoElement.videoWidth, 'x', videoElement.videoHeight);
+            console.log('Video ready state:', videoElement.readyState);
+          } else {
+            console.warn('No video element found in QR reader');
+          }
+        }
+      }, 2000);
 
       setIsScanning(true);
       setLoading(false);
@@ -484,6 +511,34 @@ const QuickScanner: React.FC = () => {
 
   return (
     <AdminLayout>
+      <style jsx global>{`
+        #qr-reader {
+          border: none !important;
+        }
+        #qr-reader__dashboard {
+          display: none !important;
+        }
+        #qr-reader__camera_selection {
+          display: none !important;
+        }
+        #qr-reader__scan_region {
+          border: 2px solid #10b981 !important;
+          border-radius: 8px !important;
+        }
+        #qr-reader__scan_region video {
+          border-radius: 8px !important;
+          object-fit: cover !important;
+        }
+        #qr-reader__scan_region img {
+          border-radius: 8px !important;
+        }
+        .qr-code-success {
+          border: 3px solid #10b981 !important;
+        }
+        .qr-code-fail {
+          border: 3px solid #ef4444 !important;
+        }
+      `}</style>
       <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
         {contextHolder}
         
@@ -606,13 +661,26 @@ const QuickScanner: React.FC = () => {
 
               {/* Scanner Container - Always present in DOM */}
               <div 
-                className={`w-full aspect-square bg-black rounded-lg overflow-hidden relative max-w-md mx-auto ${
+                className={`w-full bg-black rounded-lg overflow-hidden relative mx-auto ${
                   isScanning ? 'block' : 'hidden'
                 }`}
+                style={{ 
+                  minHeight: '300px',
+                  maxWidth: '500px',
+                  aspectRatio: '1/1'
+                }}
               >
-                <div id="qr-reader" className="w-full h-full"></div>
+                <div 
+                  id="qr-reader" 
+                  className="w-full h-full"
+                  style={{ 
+                    minHeight: '300px',
+                    width: '100%',
+                    height: '100%'
+                  }}
+                ></div>
                 {isProcessingScan && (
-                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-10">
                     <div className="text-white text-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
                       <p>Processing scan...</p>
