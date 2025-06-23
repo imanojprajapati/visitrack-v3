@@ -150,11 +150,11 @@ const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     });
 
     // Scan by Camera - available for all roles
-    menuItems.push({
-      key: '/admin/scan-by-camera',
-      icon: <CameraOutlined />,
-      label: 'Scan by Camera',
-    });
+    // menuItems.push({
+    //   key: '/admin/scan-by-camera',
+    //   icon: <CameraOutlined />,
+    //   label: 'Scan by Camera',
+    // });
 
     // Quick Scanner - available for all roles
     menuItems.push({
