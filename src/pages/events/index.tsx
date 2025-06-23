@@ -3,11 +3,16 @@ import { Event } from '../../types/event';
 import Link from 'next/link';
 import Image from 'next/image';
 import { message, Modal } from 'antd';
+import BadgeDownloadModal from '../../components/BadgeDownloadModal';
+import RegistrationClosedModal from '../../components/RegistrationClosedModal';
 
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [badgeModalVisible, setBadgeModalVisible] = useState(false);
+  const [registrationClosedModalVisible, setRegistrationClosedModalVisible] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
 
   useEffect(() => {
     fetchEvents();
@@ -39,6 +44,16 @@ export default function EventsPage() {
     }
   };
 
+  const handleRegistrationClosedClick = (event: Event) => {
+    setSelectedEvent(event);
+    setRegistrationClosedModalVisible(true);
+  };
+
+  const handleDownloadBadgeClick = () => {
+    setRegistrationClosedModalVisible(false);
+    setBadgeModalVisible(true);
+  };
+
   const handleRegisterClick = (event: Event) => {
     const now = new Date();
     let registrationDeadline = null;
@@ -66,11 +81,8 @@ export default function EventsPage() {
     
     // Check if registration deadline has passed
     if (registrationDeadline && now > registrationDeadline) {
-      Modal.info({
-        title: 'Registration Closed',
-        content: 'On-site registration will be available at the event venue on the event date. Entry will require payment for an entry badge.',
-        okText: 'OK',
-      });
+      setSelectedEvent(event);
+      setRegistrationClosedModalVisible(true);
       return;
     }
     
@@ -252,12 +264,20 @@ export default function EventsPage() {
                                 Event Cancelled
                               </button>
                             ) : isRegistrationClosed(event) ? (
-                              <button
-                                onClick={() => handleRegisterClick(event)}
-                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
-                              >
-                                Registration Closed
-                              </button>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <button
+                                  onClick={() => handleRegistrationClosedClick(event)}
+                                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
+                                >
+                                  Registration Closed
+                                </button>
+                                <button
+                                  onClick={() => handleRegisterClick(event)}
+                                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                  Download Badge
+                                </button>
+                              </div>
                             ) : (
                               <button
                                 onClick={() => handleRegisterClick(event)}
@@ -338,12 +358,20 @@ export default function EventsPage() {
                                 Event Cancelled
                               </button>
                             ) : isRegistrationClosed(event) ? (
-                              <button
-                                onClick={() => handleRegisterClick(event)}
-                                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
-                              >
-                                Registration Closed
-                              </button>
+                              <div className="flex flex-col sm:flex-row gap-2">
+                                <button
+                                  onClick={() => handleRegistrationClosedClick(event)}
+                                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-gray-500 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 cursor-pointer"
+                                >
+                                  Registration Closed
+                                </button>
+                                <button
+                                  onClick={() => handleRegisterClick(event)}
+                                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
+                                >
+                                  Download Badge
+                                </button>
+                              </div>
                             ) : (
                               <button
                                 onClick={() => handleRegisterClick(event)}
@@ -431,6 +459,25 @@ export default function EventsPage() {
               </div>
             )}
           </div>
+        )}
+
+        {/* Registration Closed Modal */}
+        {selectedEvent && (
+          <RegistrationClosedModal
+            visible={registrationClosedModalVisible}
+            onCancel={() => setRegistrationClosedModalVisible(false)}
+            onDownloadBadge={handleDownloadBadgeClick}
+            event={selectedEvent}
+          />
+        )}
+
+        {/* Badge Download Modal */}
+        {selectedEvent && (
+          <BadgeDownloadModal
+            visible={badgeModalVisible}
+            onCancel={() => setBadgeModalVisible(false)}
+            event={selectedEvent}
+          />
         )}
       </div>
     </div>
