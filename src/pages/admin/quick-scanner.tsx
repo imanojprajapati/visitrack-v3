@@ -17,7 +17,32 @@ interface CameraDevice {
   label: string;
 }
 
+interface VisitorData {
+  _id?: string;
+  id?: string;
+  name: string;
+  company?: string;
+  eventName?: string;
+  eventId?: string;
+  registrationId?: string;
+  status?: string;
+  displayTime?: string;
+}
 
+interface ScanCheckResponse {
+  exists: boolean;
+  scan?: {
+    scanTime: string;
+    name: string;
+    company?: string;
+    eventName?: string;
+  };
+}
+
+interface CheckInResult {
+  alreadyCheckedIn: boolean;
+  visitor: VisitorData;
+}
 
 const QuickScanner: React.FC = () => {
   const [isScanning, setIsScanning] = useState(false);
@@ -44,9 +69,8 @@ const QuickScanner: React.FC = () => {
       
       // First request permission to access cameras
       try {
-        await navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-          stream.getTracks().forEach(track => track.stop());
-        });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        stream.getTracks().forEach(track => track.stop());
       } catch (permError) {
         console.warn('Permission request failed:', permError);
         throw new Error('Camera permission required. Please allow camera access and refresh the page.');
@@ -56,16 +80,22 @@ const QuickScanner: React.FC = () => {
       const devices = await Html5Qrcode.getCameras();
       console.log('Available cameras:', devices);
       
-      if (devices && devices.length) {
-        setCameras(devices);
+      if (devices && devices.length > 0) {
+        const cameraDevices: CameraDevice[] = devices.map((device: any) => ({
+          id: device.id,
+          label: device.label || `Camera ${device.id}`
+        }));
+        
+        setCameras(cameraDevices);
+        
         // Select the back camera by default if available
-        const backCamera = devices.find(device => 
+        const backCamera = cameraDevices.find(device => 
           device.label.toLowerCase().includes('back') || 
           device.label.toLowerCase().includes('rear') ||
           device.label.toLowerCase().includes('environment') ||
           device.label.toLowerCase().includes('0')
         );
-        const defaultCamera = backCamera ? backCamera.id : devices[0].id;
+        const defaultCamera = backCamera ? backCamera.id : cameraDevices[0].id;
         setSelectedCamera(defaultCamera);
         console.log('Selected camera:', defaultCamera);
         messageApi.success(`📷 Found ${devices.length} camera(s). Ready to scan!`, 2);
@@ -112,13 +142,12 @@ const QuickScanner: React.FC = () => {
       // Request camera permission first
       try {
         console.log('Requesting camera permission...');
-        await navigator.mediaDevices.getUserMedia({ 
+        const stream = await navigator.mediaDevices.getUserMedia({ 
           video: { deviceId: selectedCamera } 
-        }).then(stream => {
-          // Stop the stream immediately, we just needed permission
-          stream.getTracks().forEach(track => track.stop());
-          console.log('Camera permission granted');
         });
+        // Stop the stream immediately, we just needed permission
+        stream.getTracks().forEach(track => track.stop());
+        console.log('Camera permission granted');
       } catch (permissionError) {
         console.error('Camera permission error:', permissionError);
         throw new Error('Camera permission denied. Please allow camera access and try again.');
@@ -218,7 +247,7 @@ const QuickScanner: React.FC = () => {
       // Cleanup on error
       if (html5QrCodeRef.current) {
         try {
-          html5QrCodeRef.current.stop().catch(console.error);
+          await html5QrCodeRef.current.stop();
           html5QrCodeRef.current.clear();
           html5QrCodeRef.current = null;
         } catch (cleanupError) {
@@ -287,7 +316,7 @@ const QuickScanner: React.FC = () => {
   };
 
   // Helper for safe JSON parsing
-  async function safeJson(response: Response) {
+  async function safeJson(response: Response): Promise<any> {
     try {
       return await response.json();
     } catch {
@@ -295,7 +324,7 @@ const QuickScanner: React.FC = () => {
     }
   }
 
-  const checkInVisitorByQr = async (qrData: string, messageApi: any) => {
+  const checkInVisitorByQr = async (qrData: string, messageApi: any): Promise<CheckInResult> => {
     try {
       const visitorId = qrData.trim();
       if (!visitorId) throw new Error('Invalid QR code data');
@@ -314,8 +343,8 @@ const QuickScanner: React.FC = () => {
         throw new Error('Failed to check visitor scan status');
       }
       
-      const scanCheckData = await safeJson(scanCheckResponse);
-      if (scanCheckData.exists) {
+      const scanCheckData: ScanCheckResponse = await safeJson(scanCheckResponse);
+      if (scanCheckData.exists && scanCheckData.scan) {
         messageApi.destroy();
         const existingScan = scanCheckData.scan;
         const scanTime = new Date(existingScan.scanTime).toLocaleString('en-GB', {
@@ -326,7 +355,9 @@ const QuickScanner: React.FC = () => {
         return { 
           alreadyCheckedIn: true, 
           visitor: { 
-            ...existingScan,
+            name: existingScan.name,
+            company: existingScan.company,
+            eventName: existingScan.eventName,
             displayTime: scanTime
           } 
         };
@@ -351,7 +382,7 @@ const QuickScanner: React.FC = () => {
       }
 
       const responseData = await safeJson(response);
-      const visitorData = responseData.visitor || responseData;
+      const visitorData: VisitorData = responseData.visitor || responseData;
 
       if (visitorData.status === 'Visited') {
         messageApi.destroy();
@@ -487,8 +518,6 @@ const QuickScanner: React.FC = () => {
           />
         )}
 
-
-
         {/* Error Display */}
         {error && (
           <Alert
@@ -549,7 +578,7 @@ const QuickScanner: React.FC = () => {
               </Button>
             )}
 
-                        {/* QR Scanner Display */}
+            {/* QR Scanner Display */}
             <div className="w-full">
               {/* Status Display */}
               {isScanning && (
@@ -677,8 +706,6 @@ const QuickScanner: React.FC = () => {
             </div>
           </div>
         </Card>
-
-
       </div>
     </AdminLayout>
   );
