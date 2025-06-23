@@ -29,7 +29,7 @@ export default async function handler(
     }
 
     // Find visitor by email
-    const visitor = await Visitor.findOne({
+    const visitor: any = await Visitor.findOne({
       email: { $regex: new RegExp(email, 'i') }, // Case-insensitive search
       ...query
     }).lean();
@@ -42,7 +42,7 @@ export default async function handler(
     }
 
     // Get event details
-    const event = await Event.findById(visitor.eventId).lean();
+    const event: any = await Event.findById(visitor.eventId).lean();
     if (!event) {
       return res.status(404).json({ 
         message: 'Event not found',
@@ -51,10 +51,10 @@ export default async function handler(
     }
 
     // Get registration details
-    const registration = await Registration.findById(visitor.registrationId).lean();
+    const registration: any = await Registration.findById(visitor.registrationId).lean();
 
     // Check if badge template exists for this event
-    const badgeTemplate = await BadgeTemplate.findOne({ eventId: visitor.eventId }).lean();
+    const badgeTemplate: any = await BadgeTemplate.findOne({ eventId: visitor.eventId }).lean();
 
     // Prepare response data
     const responseData = {
