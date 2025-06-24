@@ -1431,10 +1431,10 @@ export default function EventRegistration() {
 
       case 2:
         console.log('renderStepContent: Rendering registration form step');
-        console.log('renderStepContent: Event form configuration:', event.form);
+        console.log('renderStepContent: Event form configuration:', event?.form);
         console.log('renderStepContent: Form data to be displayed:', formData);
         
-        if (!event.form) {
+        if (!event?.form) {
           console.log('renderStepContent: Using basic form (no event.form configuration)');
           return (
             <div className="flex flex-col items-center justify-center text-center">
@@ -1911,7 +1911,7 @@ export default function EventRegistration() {
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-4">Registration Complete!</h3>
             <p className="text-gray-600 mb-6">
-              Congratulations! You have successfully registered for {event.title}. Your QR code and badge are ready for download.
+              Congratulations! You have successfully registered for {event?.title}. Your QR code and badge are ready for download.
             </p>
             <div className="mt-8">
               <RegistrationDetails visitor={visitor} />
@@ -2061,7 +2061,7 @@ export default function EventRegistration() {
 
   // Only show "Already Registered" page if user is actually registered AND we're not in the middle of registration
   if (isAlreadyRegistered && visitor && event && currentStep === 3) {
-    const eventTitle = event?.title || 'Event';
+    const eventTitle = event.title || 'Event';
     return (
       <div className="flex flex-col">
         <Head>
@@ -2106,11 +2106,11 @@ export default function EventRegistration() {
         `}</style>
 
         {/* Event Banner */}
-        <div className="relative h-[350px] w-full">
+        <div className="relative h-[160px] w-full">
           <div className="absolute inset-0">
             <div className="relative w-full h-full">
               <Image
-                src={event?.banner || "/images/event-banner.jpg"}
+                src={event.banner || "/images/event-banner.jpg"}
                 alt="Event Banner"
                 fill
                 style={{ objectFit: 'cover' }}
@@ -2124,20 +2124,17 @@ export default function EventRegistration() {
             </div>
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-75"></div>
           </div>
-          <div className="relative max-w-7xl mx-auto py-16 px-4 sm:py-24 sm:px-6 lg:px-8 h-full flex items-center">
+          <div className="relative max-w-7xl mx-auto py-8 px-4 sm:py-8 sm:px-6 lg:px-8 h-full flex items-center">
             <div className="text-center w-full">
-              <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl">
-                {event?.title || 'Event'}
+              <h1 className="text-2xl tracking-tight font-extrabold text-white sm:text-3xl md:text-4xl">
+                {event.title || 'Event'}
               </h1>
-              <p className="mt-6 max-w-lg mx-auto text-xl text-indigo-100 sm:max-w-3xl">
-                {event?.description || `Join us for ${event?.title || 'Event'} featuring cutting-edge innovations and industry leaders.`}
-              </p>
-              <div className="mt-4 text-indigo-100">
-                <p className="text-lg">
-                  {formatDate(event?.startDate)} - {formatDate(event?.endDate)}
+              <div className="mt-2 text-indigo-100">
+                <p className="text-sm sm:text-base">
+                  {formatDate(event.startDate)} - {formatDate(event.endDate)}
                 </p>
-                {event?.location && (
-                  <p className="text-lg mt-2">
+                {event.location && (
+                  <p className="text-sm sm:text-base mt-1">
                     📍 {event.location}
                   </p>
                 )}
@@ -2248,11 +2245,11 @@ export default function EventRegistration() {
         </div>
 
         {/* Footer Banner */}
-        <div className="relative h-[350px] w-full mt-8">
+        <div className="relative h-[160px] w-full mt-8">
           <div className="absolute inset-0">
             <div className="relative w-full h-full">
               <Image
-                src={event?.banner || "/images/event-banner.jpg"}
+                src={event.banner || "/images/event-banner.jpg"}
                 alt="Event Footer Banner"
                 fill
                 style={{ objectFit: 'cover' }}
@@ -2265,6 +2262,16 @@ export default function EventRegistration() {
               />
             </div>
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-60"></div>
+          </div>
+          <div className="relative max-w-7xl mx-auto py-8 px-4 sm:py-8 sm:px-6 lg:px-8 h-full flex items-center">
+            <div className="text-center w-full">
+              <h2 className="text-2xl tracking-tight font-extrabold text-white sm:text-3xl md:text-4xl">
+                Thank You for Registering!
+              </h2>
+              <p className="mt-2 max-w-lg mx-auto text-sm sm:text-base text-indigo-100 sm:max-w-3xl">
+                We look forward to seeing you at {event.title || 'our event'}.
+              </p>
+            </div>
           </div>
         </div>
       </div>
