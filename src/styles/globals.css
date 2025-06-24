@@ -495,6 +495,133 @@ a {
   .text-responsive-xl { font-size: 24px; }
 }
 
+/* Mobile responsive header and footer styles for event registration */
+@media (max-width: 767px) {
+  .event-registration-mobile header {
+    height: 200px !important;
+    min-height: 200px !important;
+  }
+  
+  .event-registration-mobile footer {
+    height: 200px !important;
+    min-height: 200px !important;
+  }
+  
+  .event-registration-mobile header * {
+    font-size: 0.8rem !important;
+  }
+  
+  .event-registration-mobile footer * {
+    font-size: 0.8rem !important;
+  }
+  
+  .event-registration-mobile header h1, 
+  .event-registration-mobile header h2, 
+  .event-registration-mobile header h3 {
+    font-size: 1rem !important;
+  }
+  
+  .event-registration-mobile footer h1, 
+  .event-registration-mobile footer h2, 
+  .event-registration-mobile footer h3 {
+    font-size: 1rem !important;
+  }
+  
+  /* Mobile banner height - target specific banner classes */
+  .mobile-banner-header {
+    height: 160px !important;
+  }
+  
+  .mobile-banner-footer {
+    height: 160px !important;
+  }
+  
+  /* Alternative selector for banner height */
+  .event-registration-mobile .relative.h-\[350px\] {
+    height: 160px !important;
+  }
+  
+  /* Hide banner description on mobile - show event name, date, and location */
+  .event-registration-mobile .mobile-banner-description {
+    display: none !important;
+  }
+  
+  /* Mobile banner text size reductions - for title and date */
+  .mobile-banner-title {
+    font-size: 1.5rem !important;
+    line-height: 1.2 !important;
+  }
+  
+  .mobile-banner-description {
+    font-size: 0.875rem !important;
+    line-height: 1.3 !important;
+  }
+  
+  .mobile-banner-date {
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+  }
+  
+  .mobile-banner-location {
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+  }
+  
+  /* Hide step titles and descriptions on mobile */
+  .event-registration-mobile .text-center.mb-8 h1 {
+    display: none !important;
+  }
+  
+  .event-registration-mobile .text-center.mb-8 p {
+    display: none !important;
+  }
+  
+  /* Mobile responsive steps */
+  .mobile-steps-container {
+    padding: 0 1rem !important;
+  }
+  
+  .mobile-steps-container .ant-steps {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+  }
+  
+  .mobile-steps-container .ant-steps-item {
+    flex: 1 !important;
+    min-width: auto !important;
+    margin-right: 0 !important;
+  }
+  
+  .mobile-steps-container .ant-steps-item-title {
+    font-size: 0.75rem !important;
+    line-height: 1.2 !important;
+  }
+  
+  .mobile-steps-container .ant-steps-item-description {
+    font-size: 0.625rem !important;
+    line-height: 1.1 !important;
+  }
+  
+  .mobile-steps-container .ant-steps-item-icon {
+    width: 24px !important;
+    height: 24px !important;
+    line-height: 24px !important;
+  }
+  
+  /* Enhanced input styling similar to demo page */
+  .event-registration-mobile .visitrack-input {
+    @apply mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm;
+  }
+  
+  .event-registration-mobile .ant-input {
+    @apply mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm;
+  }
+}
+
 /* Spacing responsive utilities */
 .spacing-responsive-xs { padding: 0.5rem; }
 .spacing-responsive-sm { padding: 1rem; }

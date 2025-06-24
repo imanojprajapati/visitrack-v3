@@ -19,6 +19,7 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { jsPDF } from 'jspdf';
 import DynamicForm from '../../../components/DynamicForm';
+
 import { Event } from '../../../types/event';
 import { Visitor } from '../../../types/visitor';
 import ReactDOM from 'react-dom/client';
@@ -1238,14 +1239,13 @@ export default function EventRegistration() {
   };
 
   const renderStepContent = () => {
-    if (!event) {
-      console.log('renderStepContent: No event data available');
-      return null;
+    if (!mounted) {
+      return (
+        <div className="min-h-[400px] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-indigo-600"></div>
+        </div>
+      );
     }
-
-    console.log('renderStepContent: Rendering step', currentStep, 'for event:', event.title);
-    console.log('renderStepContent: Event form configuration:', event.form);
-    console.log('renderStepContent: Current formData:', formData);
 
     switch (currentStep) {
       case 0:
@@ -1265,8 +1265,8 @@ export default function EventRegistration() {
                 }}
               />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">Email Verification</h3>
-            <p className="text-gray-600 mb-6">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4 md:text-2xl sm:text-xl">Email Verification</h3>
+            <p className="text-gray-600 mb-6 md:text-base sm:text-sm">
               Enter your email address to receive a one-time password (OTP) for secure registration.
             </p>
             <div className="w-full max-w-sm">
@@ -1278,16 +1278,41 @@ export default function EventRegistration() {
               >
                 <Form.Item
                   name="email"
-                  label={<div className="text-center">Email</div>}
+                  label={<div className="text-center block text-sm font-medium text-gray-700">Email</div>}
                   rules={[
                     { required: true, message: 'Please enter your email' },
                     { type: 'email', message: 'Please enter a valid email' }
                   ]}
                 >
-                  <Input prefix={<MailOutlined />} placeholder="Enter your email" />
+                  <Input 
+                    prefix={<MailOutlined />} 
+                    placeholder="Enter your email" 
+                    style={{
+                      height: '42px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+                      fontSize: '14px'
+                    }}
+                    disabled={loading}
+                  />
                 </Form.Item>
                 <Form.Item className="text-center">
-                  <Button type="primary" htmlType="submit" loading={loading} block>
+                  <Button 
+                    type="primary" 
+                    htmlType="submit" 
+                    loading={loading} 
+                    block
+                    style={{
+                      height: '48px',
+                      borderRadius: '6px',
+                      backgroundColor: '#4f46e5',
+                      borderColor: '#4f46e5',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
+                    }}
+                  >
                     Send OTP
                   </Button>
                 </Form.Item>
@@ -1313,8 +1338,8 @@ export default function EventRegistration() {
                 }}
               />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">OTP Verification</h3>
-            <p className="text-gray-600 mb-6">
+            <h3 className="text-2xl font-bold text-gray-900 mb-4 md:text-2xl sm:text-xl">OTP Verification</h3>
+            <p className="text-gray-600 mb-6 md:text-base sm:text-sm">
               Check your email for the 6-digit verification code and enter it below to continue.
             </p>
             <div className="w-full max-w-sm">
@@ -1326,7 +1351,7 @@ export default function EventRegistration() {
               >
                 <Form.Item
                   name="otp"
-                  label={<div className="text-center">Enter OTP</div>}
+                  label={<div className="text-center block text-sm font-medium text-gray-700">Enter OTP</div>}
                   rules={[
                     { required: true, message: 'Please enter the OTP' },
                     { 
@@ -1341,6 +1366,13 @@ export default function EventRegistration() {
                     maxLength={6}
                     autoComplete="one-time-code"
                     disabled={isVerifying}
+                    style={{
+                      height: '42px',
+                      borderRadius: '6px',
+                      border: '1px solid #d1d5db',
+                      boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+                      fontSize: '14px'
+                    }}
                     onChange={(e) => {
                       const value = e.target.value.trim();
                       if (value && !/^\d{6}$/.test(value)) {
@@ -1365,6 +1397,15 @@ export default function EventRegistration() {
                     loading={isVerifying}
                     block
                     disabled={isVerifying}
+                    style={{
+                      height: '48px',
+                      borderRadius: '6px',
+                      backgroundColor: '#4f46e5',
+                      borderColor: '#4f46e5',
+                      fontSize: '14px',
+                      fontWeight: '500',
+                      boxShadow: '0 1px 2px 0 rgb(0 0 0 / 0.05)'
+                    }}
                   >
                     {isVerifying ? 'Verifying...' : 'Verify OTP'}
                   </Button>
@@ -1378,6 +1419,7 @@ export default function EventRegistration() {
                       setCurrentStep(0);
                     }}
                     disabled={isVerifying}
+                    className="text-indigo-600 hover:text-indigo-700 text-sm font-medium"
                   >
                     Back to Email
                   </Button>
@@ -2230,51 +2272,16 @@ export default function EventRegistration() {
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col event-registration-mobile">
       <Head>
-        <title>Register - {event?.title || 'Event'}</title>
-        <meta name="description" content={`Register for ${event?.title || 'Event'}`} />
+        <title>{event?.title ? `Register for ${event.title}` : 'Event Registration'} - Visitrack</title>
+        <meta name="description" content={event?.description || 'Register for our exciting event'} />
       </Head>
       
-      {/* Custom styles for mobile-responsive buttons */}
-      <style jsx>{`
-        @media (max-width: 640px) {
-          .mobile-button-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-            max-width: 280px;
-            margin: 0 auto;
-          }
-          
-          .mobile-button-container .ant-btn {
-            width: 100% !important;
-            min-height: 48px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            font-weight: 500;
-            margin-top: 10px;
-          }
-        }
-        
-        @media (min-width: 641px) {
-          .mobile-button-container {
-            display: flex;
-            flex-direction: row;
-            gap: 10px;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
-          }
-        }
-      `}</style>
+      {contextHolder}
 
-      {/* Event Banner */}
-      <div className="relative h-[350px] w-full">
+      {/* Event Banner Header */}
+      <div className="relative h-[350px] w-full md:mt-0 sm:mt-0 mobile-banner-header">
         <div className="absolute inset-0">
           <div className="relative w-full h-full">
             <Image
@@ -2292,20 +2299,20 @@ export default function EventRegistration() {
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-75"></div>
         </div>
-        <div className="relative max-w-7xl mx-auto py-16 px-4 sm:py-24 sm:px-6 lg:px-8 h-full flex items-center">
+        <div className="relative max-w-7xl mx-auto py-8 md:py-16 px-4 sm:py-12 sm:px-6 lg:px-8 h-full flex items-center">
           <div className="text-center w-full">
-            <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl">
+            <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl mobile-banner-title">
               {event?.title || 'Event'}
             </h1>
-            <p className="mt-6 max-w-lg mx-auto text-xl text-indigo-100 sm:max-w-3xl">
+            <p className="mt-6 max-w-lg mx-auto text-xl text-indigo-100 sm:max-w-3xl mobile-banner-description">
               {event?.description || `Join us for ${event?.title || 'Event'} featuring cutting-edge innovations and industry leaders.`}
             </p>
             <div className="mt-4 text-indigo-100">
-              <p className="text-lg">
+              <p className="text-lg mobile-banner-date">
                 {formatDate(event?.startDate)} - {formatDate(event?.endDate)}
               </p>
               {event?.location && (
-                <p className="text-lg mt-2">
+                <p className="text-lg mt-2 mobile-banner-location">
                   📍 {event.location}
                 </p>
               )}
@@ -2317,12 +2324,12 @@ export default function EventRegistration() {
       <div className="flex-grow max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-4xl sm:text-5xl font-extrabold text-gray-900 mb-4">
+            <h1 className="text-4xl sm:text-5xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4">
               {currentStep === 0 ? 'Email Verification' : 
                currentStep === 1 ? 'OTP Verification' : 
                currentStep === 2 ? 'Registration Details' : 'Registration Complete'}
             </h1>
-            <p className="mt-4 text-lg text-gray-600 max-w-2xl mx-auto">
+            <p className="mt-4 text-lg md:text-lg sm:text-base text-gray-600 max-w-2xl mx-auto">
               {currentStep === 0 ? 'Enter your email to receive a one-time password (OTP) for secure registration' : 
                currentStep === 1 ? 'Check your email for the 6-digit verification code and enter it below to continue' : 
                currentStep === 2 ? 'Complete your registration details to finalize your event registration' : 
@@ -2332,12 +2339,22 @@ export default function EventRegistration() {
 
           {/* Progress Steps */}
           <div className="mb-8">
-            <Steps current={currentStep} className="max-w-2xl mx-auto">
-              <Steps.Step title="Email" description="Enter email" />
-              <Steps.Step title="Verify" description="OTP verification" />
-              <Steps.Step title="Details" description="Registration form" />
-              <Steps.Step title="Complete" description="Registration done" />
-            </Steps>
+            <div className="hidden md:block">
+              <Steps current={currentStep} className="max-w-2xl mx-auto">
+                <Steps.Step title="Email" description="Enter email" />
+                <Steps.Step title="Verify" description="OTP verification" />
+                <Steps.Step title="Details" description="Registration form" />
+                <Steps.Step title="Complete" description="Registration done" />
+              </Steps>
+            </div>
+            <div className="md:hidden mobile-steps-container">
+              <Steps current={currentStep} size="small" direction="horizontal">
+                <Steps.Step title="Email" description="Enter email" />
+                <Steps.Step title="Verify" description="OTP verification" />
+                <Steps.Step title="Details" description="Registration form" />
+                <Steps.Step title="Complete" description="Registration done" />
+              </Steps>
+            </div>
           </div>
 
           {/* Error Display */}
@@ -2355,15 +2372,16 @@ export default function EventRegistration() {
           )}
 
           {/* Main Content */}
-          <Card className="shadow-lg">
-            {contextHolder}
-            {renderStepContent()}
-          </Card>
+          <div className="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div className="p-6 sm:p-8">
+              {renderStepContent()}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Footer Banner */}
-      <div className="relative h-[350px] w-full mt-8">
+      {/* Event Banner Footer */}
+      <div className="relative h-[350px] w-full mt-8 mobile-banner-footer">
         <div className="absolute inset-0">
           <div className="relative w-full h-full">
             <Image
@@ -2381,7 +2399,18 @@ export default function EventRegistration() {
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-60"></div>
         </div>
+        <div className="relative max-w-7xl mx-auto py-8 md:py-16 px-4 sm:py-12 sm:px-6 lg:px-8 h-full flex items-center">
+          <div className="text-center w-full">
+            <h2 className="text-3xl tracking-tight font-extrabold text-white sm:text-4xl md:text-5xl mobile-banner-title">
+              Thank You for Registering!
+            </h2>
+            <p className="mt-6 max-w-lg mx-auto text-lg text-indigo-100 sm:max-w-3xl mobile-banner-description">
+              We look forward to seeing you at {event?.title || 'our event'}.
+            </p>
+          </div>
+        </div>
       </div>
+
     </div>
   );
 }
