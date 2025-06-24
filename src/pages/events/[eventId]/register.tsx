@@ -2347,24 +2347,14 @@ export default function EventRegistration() {
             </p>
           </div>
 
-          {/* Progress Steps */}
-          <div className="mb-8">
-            <div className="hidden md:block">
-              <Steps current={currentStep} className="max-w-2xl mx-auto">
-                <Steps.Step title="Email" description="Enter email" />
-                <Steps.Step title="Verify" description="OTP verification" />
-                <Steps.Step title="Details" description="Registration form" />
-                <Steps.Step title="Complete" description="Registration done" />
-              </Steps>
-            </div>
-            <div className="md:hidden mobile-steps-container">
-              <Steps current={currentStep} size="small" direction="horizontal">
-                <Steps.Step title="Email" description="Enter email" />
-                <Steps.Step title="Verify" description="OTP verification" />
-                <Steps.Step title="Details" description="Registration form" />
-                <Steps.Step title="Complete" description="Registration done" />
-              </Steps>
-            </div>
+          {/* Progress Steps - Show before form on desktop (1024px+) */}
+          <div className="mb-8 hidden lg:block">
+            <Steps current={currentStep} className="max-w-2xl mx-auto">
+              <Steps.Step title="Email" description="Enter email" />
+              <Steps.Step title="Verify" description="OTP verification" />
+              <Steps.Step title="Details" description="Registration form" />
+              <Steps.Step title="Complete" description="Registration done" />
+            </Steps>
           </div>
 
           {/* Error Display */}
@@ -2385,6 +2375,26 @@ export default function EventRegistration() {
           <div className="bg-white shadow-lg rounded-lg overflow-hidden">
             <div className="p-6 sm:p-8">
               {renderStepContent()}
+            </div>
+          </div>
+
+          {/* Progress Steps - Show after form on mobile/tablet (less than 1024px) */}
+          <div className="mt-8 lg:hidden">
+            <div className="hidden md:block">
+              <Steps current={currentStep} className="max-w-2xl mx-auto">
+                <Steps.Step title="Email" description="Enter email" />
+                <Steps.Step title="Verify" description="OTP verification" />
+                <Steps.Step title="Details" description="Registration form" />
+                <Steps.Step title="Complete" description="Registration done" />
+              </Steps>
+            </div>
+            <div className="md:hidden mobile-steps-container">
+              <Steps current={currentStep} size="small" direction="horizontal">
+                <Steps.Step title="Email" description="Enter email" />
+                <Steps.Step title="Verify" description="OTP verification" />
+                <Steps.Step title="Details" description="Registration form" />
+                <Steps.Step title="Complete" description="Registration done" />
+              </Steps>
             </div>
           </div>
         </div>
