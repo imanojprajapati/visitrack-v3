@@ -2106,7 +2106,7 @@ export default function EventRegistration() {
         `}</style>
 
         {/* Event Banner */}
-        <div className="relative h-[160px] w-full">
+        <div className="relative h-[130px] sm:h-[240px] lg:h-[320px] w-full">
           <div className="absolute inset-0">
             <div className="relative w-full h-full">
               <Image
@@ -2124,17 +2124,20 @@ export default function EventRegistration() {
             </div>
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-75"></div>
           </div>
-          <div className="relative max-w-7xl mx-auto py-8 px-4 sm:py-8 sm:px-6 lg:px-8 h-full flex items-center">
+          <div className="relative max-w-7xl mx-auto py-8 px-4 sm:py-12 sm:px-6 lg:py-16 lg:px-8 h-full flex items-center">
             <div className="text-center w-full">
-              <h1 className="text-2xl tracking-tight font-extrabold text-white sm:text-3xl md:text-4xl">
+              <h1 className="text-2xl tracking-tight font-extrabold text-white sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl">
                 {event.title || 'Event'}
               </h1>
-              <div className="mt-2 text-indigo-100">
-                <p className="text-sm sm:text-base">
+              <p className="mt-2 sm:mt-4 lg:mt-6 max-w-lg mx-auto text-sm sm:text-base lg:text-xl text-indigo-100 sm:max-w-3xl sm:block hidden">
+                {event.description || `Join us for ${event.title || 'Event'} featuring cutting-edge innovations and industry leaders.`}
+              </p>
+              <div className="mt-2 sm:mt-3 lg:mt-4 text-indigo-100">
+                <p className="text-sm sm:text-base lg:text-lg">
                   {formatDate(event.startDate)} - {formatDate(event.endDate)}
                 </p>
                 {event.location && (
-                  <p className="text-sm sm:text-base mt-1">
+                  <p className="text-sm sm:text-base lg:text-lg mt-1 lg:mt-2">
                     📍 {event.location}
                   </p>
                 )}
@@ -2245,7 +2248,7 @@ export default function EventRegistration() {
         </div>
 
         {/* Footer Banner */}
-        <div className="relative h-[160px] w-full mt-8">
+        <div className="relative h-[130px] sm:h-[240px] lg:h-[320px] w-full mt-8">
           <div className="absolute inset-0">
             <div className="relative w-full h-full">
               <Image
@@ -2263,12 +2266,12 @@ export default function EventRegistration() {
             </div>
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-60"></div>
           </div>
-          <div className="relative max-w-7xl mx-auto py-8 px-4 sm:py-8 sm:px-6 lg:px-8 h-full flex items-center">
+          <div className="relative max-w-7xl mx-auto py-8 px-4 sm:py-12 sm:px-6 lg:py-16 lg:px-8 h-full flex items-center">
             <div className="text-center w-full">
-              <h2 className="text-2xl tracking-tight font-extrabold text-white sm:text-3xl md:text-4xl">
+              <h2 className="text-2xl tracking-tight font-extrabold text-white sm:text-3xl md:text-4xl lg:text-5xl">
                 Thank You for Registering!
               </h2>
-              <p className="mt-2 max-w-lg mx-auto text-sm sm:text-base text-indigo-100 sm:max-w-3xl">
+              <p className="mt-2 sm:mt-4 lg:mt-6 max-w-lg mx-auto text-sm sm:text-base lg:text-xl text-indigo-100 sm:max-w-3xl">
                 We look forward to seeing you at {event.title || 'our event'}.
               </p>
             </div>
@@ -2288,7 +2291,7 @@ export default function EventRegistration() {
       {contextHolder}
 
       {/* Event Banner Header */}
-      <div className="relative h-[350px] w-full md:mt-0 sm:mt-0 mobile-banner-header">
+      <div className="relative h-[130px] sm:h-[240px] lg:h-[320px] w-full md:mt-0 sm:mt-0 mobile-banner-header">
         <div className="absolute inset-0">
           <div className="relative w-full h-full">
             <Image
@@ -2306,20 +2309,20 @@ export default function EventRegistration() {
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-75"></div>
         </div>
-        <div className="relative max-w-7xl mx-auto py-8 md:py-16 px-4 sm:py-12 sm:px-6 lg:px-8 h-full flex items-center">
+        <div className="relative max-w-7xl mx-auto py-8 px-4 sm:py-12 sm:px-6 lg:py-16 lg:px-8 h-full flex items-center">
           <div className="text-center w-full">
-            <h1 className="text-4xl tracking-tight font-extrabold text-white sm:text-5xl md:text-6xl mobile-banner-title">
+            <h1 className="text-2xl tracking-tight font-extrabold text-white sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl mobile-banner-title">
               {event?.title || 'Event'}
             </h1>
-            <p className="mt-6 max-w-lg mx-auto text-xl text-indigo-100 sm:max-w-3xl mobile-banner-description">
+            <p className="mt-2 sm:mt-4 lg:mt-6 max-w-lg mx-auto text-sm sm:text-base lg:text-xl text-indigo-100 sm:max-w-3xl sm:block hidden mobile-banner-description">
               {event?.description || `Join us for ${event?.title || 'Event'} featuring cutting-edge innovations and industry leaders.`}
             </p>
-            <div className="mt-4 text-indigo-100">
-              <p className="text-lg mobile-banner-date">
+            <div className="mt-2 sm:mt-3 lg:mt-4 text-indigo-100">
+              <p className="text-sm sm:text-base lg:text-lg mobile-banner-date">
                 {formatDate(event?.startDate)} - {formatDate(event?.endDate)}
               </p>
               {event?.location && (
-                <p className="text-lg mt-2 mobile-banner-location">
+                <p className="text-sm sm:text-base lg:text-lg mt-1 lg:mt-2 mobile-banner-location">
                   📍 {event.location}
                 </p>
               )}
@@ -2331,12 +2334,12 @@ export default function EventRegistration() {
       <div className="flex-grow max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8">
-            <h1 className="text-4xl sm:text-5xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4">
+            <h1 className="text-4xl sm:text-5xl md:text-4xl lg:text-5xl font-extrabold text-gray-900 mb-4 lg:block hidden">
               {currentStep === 0 ? 'Email Verification' : 
                currentStep === 1 ? 'OTP Verification' : 
                currentStep === 2 ? 'Registration Details' : 'Registration Complete'}
             </h1>
-            <p className="mt-4 text-lg md:text-lg sm:text-base text-gray-600 max-w-2xl mx-auto">
+            <p className="mt-4 text-lg md:text-lg sm:text-base text-gray-600 max-w-2xl mx-auto lg:block hidden">
               {currentStep === 0 ? 'Enter your email to receive a one-time password (OTP) for secure registration' : 
                currentStep === 1 ? 'Check your email for the 6-digit verification code and enter it below to continue' : 
                currentStep === 2 ? 'Complete your registration details to finalize your event registration' : 
@@ -2388,7 +2391,7 @@ export default function EventRegistration() {
       </div>
 
       {/* Event Banner Footer */}
-      <div className="relative h-[350px] w-full mt-8 mobile-banner-footer">
+      <div className="relative h-[130px] sm:h-[240px] lg:h-[320px] w-full mt-8 mobile-banner-footer">
         <div className="absolute inset-0">
           <div className="relative w-full h-full">
             <Image
@@ -2406,12 +2409,12 @@ export default function EventRegistration() {
           </div>
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-900 to-indigo-600 opacity-60"></div>
         </div>
-        <div className="relative max-w-7xl mx-auto py-8 md:py-16 px-4 sm:py-12 sm:px-6 lg:px-8 h-full flex items-center">
+        <div className="relative max-w-7xl mx-auto py-8 px-4 sm:py-12 sm:px-6 lg:py-16 lg:px-8 h-full flex items-center">
           <div className="text-center w-full">
-            <h2 className="text-3xl tracking-tight font-extrabold text-white sm:text-4xl md:text-5xl mobile-banner-title">
+            <h2 className="text-2xl tracking-tight font-extrabold text-white sm:text-3xl md:text-4xl lg:text-5xl mobile-banner-title">
               Thank You for Registering!
             </h2>
-            <p className="mt-6 max-w-lg mx-auto text-lg text-indigo-100 sm:max-w-3xl mobile-banner-description">
+            <p className="mt-2 sm:mt-4 lg:mt-6 max-w-lg mx-auto text-sm sm:text-base lg:text-xl text-indigo-100 sm:max-w-3xl mobile-banner-description">
               We look forward to seeing you at {event?.title || 'our event'}.
             </p>
           </div>

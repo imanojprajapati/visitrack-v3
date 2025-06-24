@@ -529,16 +529,21 @@ a {
   
   /* Mobile banner height - target specific banner classes */
   .mobile-banner-header {
-    height: 160px !important;
+    height: 130px !important;
   }
   
   .mobile-banner-footer {
-    height: 160px !important;
+    height: 130px !important;
   }
   
   /* Alternative selector for banner height */
   .event-registration-mobile .relative.h-\[350px\] {
-    height: 160px !important;
+    height: 130px !important;
+  }
+  
+  /* Override new responsive banner classes for mobile */
+  .event-registration-mobile .relative.h-\[130px\] {
+    height: 130px !important;
   }
   
   /* Hide banner description on mobile - show event name, date, and location */
@@ -619,6 +624,65 @@ a {
   
   .event-registration-mobile .ant-input {
     @apply mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm;
+  }
+}
+
+/* Tablet responsive banner styles (640px and up) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .mobile-banner-header {
+    height: 240px !important;
+  }
+  
+  .mobile-banner-footer {
+    height: 240px !important;
+  }
+  
+  /* Override banner height for tablet */
+  .event-registration-mobile .relative.h-\[350px\] {
+    height: 240px !important;
+  }
+  
+  .event-registration-mobile .relative.h-\[130px\] {
+    height: 240px !important;
+  }
+  
+  /* Show description on tablet */
+  .event-registration-mobile .mobile-banner-description {
+    display: block !important;
+  }
+}
+
+/* Desktop responsive banner styles (1024px and up) */
+@media (min-width: 1024px) {
+  .mobile-banner-header {
+    height: 320px !important;
+  }
+  
+  .mobile-banner-footer {
+    height: 320px !important;
+  }
+  
+  /* Override banner height for desktop */
+  .event-registration-mobile .relative.h-\[350px\] {
+    height: 320px !important;
+  }
+  
+  .event-registration-mobile .relative.h-\[130px\] {
+    height: 320px !important;
+  }
+  
+  /* Show step descriptions on desktop */
+  .event-registration-mobile .text-center.mb-8 h1 {
+    display: block !important;
+  }
+  
+  .event-registration-mobile .text-center.mb-8 p {
+    display: block !important;
+  }
+  
+  /* Show description on desktop */
+  .event-registration-mobile .mobile-banner-description {
+    display: block !important;
   }
 }
 
