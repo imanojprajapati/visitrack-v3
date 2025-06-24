@@ -107,12 +107,12 @@ const Settings: React.FC = () => {
       render: (_, record) => (
         <Space size="small">
           {record.role !== 'admin' && (
-            <Button
-              type="text"
-              icon={<EditOutlined />}
-              onClick={() => handleEditUser(record)}
-              size="small"
-            />
+          <Button
+            type="text"
+            icon={<EditOutlined />}
+            onClick={() => handleEditUser(record)}
+            size="small"
+          />
           )}
           {record.id !== currentUser?.id && record.role !== 'admin' && (
             <Button
